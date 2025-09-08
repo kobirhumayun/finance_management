@@ -11,6 +11,7 @@ const { initializeEnforcer } = require('./services/casbin');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./middleware/errorHandler');
+const morgan = require('morgan');
 
 dotenv.config();
 const port = process.env.PORT || 5000;
@@ -36,6 +37,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(morgan('dev'));
 
 // Routes
 app.get('/', (req, res) => {
