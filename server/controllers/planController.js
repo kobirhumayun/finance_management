@@ -189,7 +189,7 @@ const updatePlan = async (req, res) => {
  */
 const getAllPlans = async (req, res) => {
     try {
-        const plans = await Plan.find()
+        const plans = await Plan.find({ isPublic: true })
             .sort({ price: 1 })
             .select('-__v'); // Exclude the version key
 
@@ -339,7 +339,7 @@ const activatedPlan = async (req, res) => {
         user.subscriptionEndDate = calculateNextBillingDate(subscriptionStartinDate, newPlan.billingCycle);
         // Reset trial end date when changing plans (adjust logic if needed)
         user.trialEndsAt = null;
-        
+
         const invoice = new Invoice({
             user: user._id,
             payment: payment._id,
@@ -350,7 +350,7 @@ const activatedPlan = async (req, res) => {
             subscriptionStartDate: user.subscriptionStartDate,
             subscriptionEndDate: user.subscriptionEndDate,
         });
-        
+
         // Save the updated user document
         await user.save();
         await payment.updateOne({ status: 'succeeded' }); // Mark
