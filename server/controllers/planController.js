@@ -22,7 +22,7 @@ const addPlan = async (req, res) => {
         features, // Optional, defaults in schema
         // currency, // Optional, defaults in schema
         // limits,   // Optional, defaults in schema
-        // isPublic, // Optional, defaults in schema
+        isPublic, // Optional, defaults in schema
         // displayOrder, // Optional, defaults in schema
         // stripePriceId // Optional
     } = req.body;
@@ -51,7 +51,7 @@ const addPlan = async (req, res) => {
             features, // Let schema default handle if undefined
             // currency, // Let schema default handle if undefined
             // limits,   // Let schema default handle if undefined
-            // isPublic, // Let schema default handle if undefined
+            isPublic, // Let schema default handle if undefined
             // displayOrder, // Let schema default handle if undefined
             // stripePriceId
         });
