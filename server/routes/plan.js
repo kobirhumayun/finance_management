@@ -35,6 +35,12 @@ router.put('/plan',
     authorize("admin"),
     planController.updatePlan);
 
+// get all plan route
+router.get('/plan',
+    authenticate,
+    authorize("admin"),
+    planController.getPlans());
+
 // Get subscription details route
 router.get('/my-plan',
     authenticate,
