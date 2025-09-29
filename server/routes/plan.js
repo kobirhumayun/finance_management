@@ -49,8 +49,8 @@ router.post('/approve-plan',
     planController.activatedPlan);
 
 // Get all plans route
-router.get('/all-plans',
-    planController.getPlans());
+router.get('/public-plans',
+    planController.getPlans({ isPublic: true }));
 
 // place order
 router.post('/order',
