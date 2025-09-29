@@ -187,21 +187,27 @@ const updatePlan = async (req, res) => {
  * @access Public or Private (depending on filtering logic, if added)
  * @query  (Optional query params for filtering/sorting could be added later)
  */
-const getAllPlans = async (req, res) => {
-    try {
-        const plans = await Plan.find({ isPublic: true })
-            .sort({ price: 1 })
-            .select('-__v'); // Exclude the version key
+// Controller factory: pass an optional planFilter when wiring up the route
+// Usage:
+//   router.get('/plans', getPlans()); // no filter
+//   router.get('/plans/public', getPlans({ isPublic: true })); // filter by isPublic
 
-        res.status(200).json(plans);
+const getPlans = (planFilter = {}) => async (req, res) => {
+  try {
+    const shouldFilterPublic = planFilter?.isPublic === true;
+    const query = shouldFilterPublic ? { isPublic: true } : {};
 
-    } catch (error) {
-        // Log the detailed error for server-side debugging
-        console.error('Error fetching plans:', error);
-        // Send a generic error message to the client
-        res.status(500).json({ message: 'Server error while fetching plans.' });
-    }
+    const plans = await Plan.find(query)
+      .sort({ price: 1 })
+      .select('-__v'); // Exclude the version key
+
+    res.status(200).json(plans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    res.status(500).json({ message: 'Server error while fetching plans.' });
+  }
 };
+
 
 /**
  * @desc   Delete a subscription plan by its slug (Admin only)
@@ -629,7 +635,7 @@ module.exports = {
     deletePlan,
     activatedPlan,
     getSubscriptionDetails,
-    getAllPlans,
+    getPlans,
     getPaymentsByStatus,
     manualPaymentSubmit,
     placeOrder,

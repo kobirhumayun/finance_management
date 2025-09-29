@@ -50,7 +50,7 @@ router.post('/approve-plan',
 
 // Get all plans route
 router.get('/all-plans',
-    planController.getAllPlans);
+    planController.getPlans());
 
 // place order
 router.post('/order',
