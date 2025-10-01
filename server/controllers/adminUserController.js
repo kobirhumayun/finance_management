@@ -7,6 +7,10 @@ const { generateOtp } = require('../utils/otpUtils');
 const { sendNotification } = require('../services/notificationService');
 
 const ACCOUNT_STATUS_CODES = ['active', 'invited', 'suspended', 'disabled'];
+const SUBSCRIPTION_STATUS_CODES =
+    (User.schema.path('subscriptionStatus') && User.schema.path('subscriptionStatus').enumValues) || [];
+const USER_ROLE_OPTIONS =
+    (User.schema.path('role') && User.schema.path('role').enumValues) || [];
 const STATUS_LABELS = {
     active: 'Active',
     invited: 'Invited',
@@ -66,6 +70,15 @@ const mapUserToResponse = (user, { includeRaw = false } = {}) => {
         email: user.email,
         planId: planDetails ? planDetails.slug : null,
         plan: planDetails ? planDetails.name : null,
+        firstName: user.firstName || null,
+        lastName: user.lastName || null,
+        profilePictureUrl: user.profilePictureUrl || null,
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionStartDate: formatDate(user.subscriptionStartDate),
+        subscriptionEndDate: formatDate(user.subscriptionEndDate),
+        trialEndsAt: formatDate(user.trialEndsAt),
+        role: user.role || null,
+        isActive: typeof user.isActive === 'boolean' ? user.isActive : null,
         statusCode,
         status: humanizeStatus(statusCode),
         registeredAt: formatDate(user.createdAt),
@@ -339,13 +352,32 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { username, email, planId: planIdentifier, status } = req.body;
+        const {
+            username,
+            email,
+            firstName,
+            lastName,
+            profilePictureUrl,
+            planId: planIdentifier,
+            subscriptionStatus,
+            subscriptionStartDate,
+            subscriptionEndDate,
+            trialEndsAt,
+            role,
+            isActive,
+        } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ message: 'Invalid user ID.' });
         }
 
         const updates = {};
+
+        const assignIfDefined = (field, value) => {
+            if (typeof value !== 'undefined') {
+                updates[field] = value;
+            }
+        };
 
         if (username) {
             const existingUsername = await User.findOne({ username, _id: { $ne: userId } });
@@ -363,6 +395,10 @@ const updateUser = async (req, res) => {
             updates.email = email;
         }
 
+        assignIfDefined('firstName', firstName);
+        assignIfDefined('lastName', lastName);
+        assignIfDefined('profilePictureUrl', profilePictureUrl);
+
         if (planIdentifier) {
             const resolvedPlan = await resolvePlanIdentifier(planIdentifier);
             if (!resolvedPlan) {
@@ -371,11 +407,26 @@ const updateUser = async (req, res) => {
             updates.planId = resolvedPlan._id;
         }
 
-        if (status) {
-            if (!ACCOUNT_STATUS_CODES.includes(status)) {
-                return res.status(400).json({ message: `Invalid status '${status}'.` });
+        if (typeof subscriptionStatus !== 'undefined') {
+            if (!SUBSCRIPTION_STATUS_CODES.includes(subscriptionStatus)) {
+                return res.status(400).json({ message: `Invalid subscription status '${subscriptionStatus}'.` });
             }
-            Object.assign(updates, buildStatusUpdate(status));
+            updates.subscriptionStatus = subscriptionStatus;
+        }
+
+        assignIfDefined('subscriptionStartDate', subscriptionStartDate);
+        assignIfDefined('subscriptionEndDate', subscriptionEndDate);
+        assignIfDefined('trialEndsAt', trialEndsAt);
+
+        if (typeof role !== 'undefined') {
+            if (USER_ROLE_OPTIONS.length && !USER_ROLE_OPTIONS.includes(role)) {
+                return res.status(400).json({ message: `Invalid role '${role}'.` });
+            }
+            updates.role = role;
+        }
+
+        if (typeof isActive !== 'undefined') {
+            updates.isActive = isActive;
         }
 
         if (Object.keys(updates).length === 0) {
@@ -491,4 +542,6 @@ module.exports = {
     updateUserStatus,
     triggerPasswordReset,
     ACCOUNT_STATUS_CODES,
+    SUBSCRIPTION_STATUS_CODES,
+    USER_ROLE_OPTIONS,
 };

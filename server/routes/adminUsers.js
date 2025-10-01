@@ -7,9 +7,28 @@ const { authenticate } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/casbinAuthorize');
 const { handleValidationErrors } = require('../validators/validatorsIndex');
 
-const { ACCOUNT_STATUS_CODES } = adminUserController;
+const {
+    ACCOUNT_STATUS_CODES,
+    SUBSCRIPTION_STATUS_CODES,
+    USER_ROLE_OPTIONS,
+} = adminUserController;
 
 const statusValidator = body('status').optional().isIn(ACCOUNT_STATUS_CODES);
+
+const updateUserValidators = [
+    body('username').optional().isString().trim().notEmpty(),
+    body('email').optional().isEmail().normalizeEmail(),
+    body('firstName').optional({ nullable: true }).isString().trim().notEmpty(),
+    body('lastName').optional({ nullable: true }).isString().trim().notEmpty(),
+    body('profilePictureUrl').optional({ nullable: true }).isString().trim().isURL(),
+    body('planId').optional().isString().trim().notEmpty(),
+    body('subscriptionStatus').optional().isIn(SUBSCRIPTION_STATUS_CODES),
+    body('subscriptionStartDate').optional({ nullable: true }).isISO8601().toDate(),
+    body('subscriptionEndDate').optional({ nullable: true }).isISO8601().toDate(),
+    body('trialEndsAt').optional({ nullable: true }).isISO8601().toDate(),
+    body('role').optional().isIn(USER_ROLE_OPTIONS),
+    body('isActive').optional().isBoolean().toBoolean(),
+];
 
 router.get(
     '/',
@@ -48,12 +67,7 @@ router.post(
 
 router.patch(
     '/:userId',
-    [
-        body('username').optional().isString().trim().notEmpty(),
-        body('email').optional().isEmail().normalizeEmail(),
-        body('planId').optional().isString().trim(),
-        statusValidator,
-    ],
+    updateUserValidators,
     handleValidationErrors,
     authenticate,
     authorize('admin'),
