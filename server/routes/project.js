@@ -5,14 +5,30 @@ const { authenticate } = require('../middleware/authMiddleware');
 const {
     projectCreateValidationRules,
     projectUpdateValidationRules,
+    projectIdParamValidationRules,
+    projectListQueryValidationRules,
     transactionCreateValidationRules,
     transactionUpdateValidationRules,
+    transactionIdParamValidationRules,
+    transactionListValidationRules,
     handleValidationErrors,
 } = require('../validators/validatorsIndex');
 
 router.use(authenticate);
 
-router.get('/', projectController.getProjects);
+router.get(
+    '/',
+    projectListQueryValidationRules(),
+    handleValidationErrors,
+    projectController.getProjects,
+);
+
+router.get(
+    '/:projectId',
+    projectIdParamValidationRules(),
+    handleValidationErrors,
+    projectController.getProjectById,
+);
 
 router.post(
     '/',
@@ -30,11 +46,15 @@ router.put(
 
 router.delete(
     '/:projectId',
+    projectIdParamValidationRules(),
+    handleValidationErrors,
     projectController.deleteProject,
 );
 
 router.get(
     '/:projectId/transactions',
+    transactionListValidationRules(),
+    handleValidationErrors,
     projectController.getTransactions,
 );
 
@@ -54,6 +74,8 @@ router.put(
 
 router.delete(
     '/:projectId/transactions/:transactionId',
+    transactionIdParamValidationRules(),
+    handleValidationErrors,
     projectController.deleteTransaction,
 );
 

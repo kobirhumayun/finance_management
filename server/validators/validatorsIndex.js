@@ -54,7 +54,11 @@ module.exports = {
     changePlanValidationRules: planValidators.changePlanValidationRules,
     projectCreateValidationRules: projectValidators.projectCreateValidationRules,
     projectUpdateValidationRules: projectValidators.projectUpdateValidationRules,
+    projectIdParamValidationRules: projectValidators.projectIdParamValidationRules,
+    projectListQueryValidationRules: projectValidators.projectListQueryValidationRules,
     transactionCreateValidationRules: projectValidators.transactionCreateValidationRules,
     transactionUpdateValidationRules: projectValidators.transactionUpdateValidationRules,
+    transactionIdParamValidationRules: projectValidators.transactionIdParamValidationRules,
+    transactionListValidationRules: projectValidators.transactionListValidationRules,
     handleValidationErrors,
 };

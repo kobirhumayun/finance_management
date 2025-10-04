@@ -1,4 +1,4 @@
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
 
 const projectCreateValidationRules = () => [
     body('name')
@@ -46,6 +46,29 @@ const projectUpdateValidationRules = () => [
             }
             return true;
         }),
+];
+
+const projectIdParamValidationRules = () => [
+    param('projectId')
+        .isMongoId().withMessage('Invalid project identifier.'),
+];
+
+const projectListQueryValidationRules = () => [
+    query('search')
+        .optional()
+        .isString().withMessage('Search term must be a string.')
+        .trim()
+        .isLength({ max: 200 }).withMessage('Search term must be 200 characters or fewer.'),
+    query('sort')
+        .optional()
+        .isIn(['newest', 'oldest']).withMessage('Sort must be either "newest" or "oldest".'),
+    query('limit')
+        .optional()
+        .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100 records.')
+        .toInt(),
+    query('cursor')
+        .optional()
+        .isMongoId().withMessage('Cursor must be a valid identifier when provided.'),
 ];
 
 const transactionCreateValidationRules = () => [
@@ -112,9 +135,52 @@ const transactionUpdateValidationRules = () => [
         }),
 ];
 
+const transactionIdParamValidationRules = () => [
+    param('projectId')
+        .isMongoId().withMessage('Invalid project identifier.'),
+    param('transactionId')
+        .isMongoId().withMessage('Invalid transaction identifier.'),
+];
+
+const transactionListValidationRules = () => [
+    param('projectId')
+        .isMongoId().withMessage('Invalid project identifier.'),
+    query('limit')
+        .optional()
+        .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100 records.')
+        .toInt(),
+    query('cursor')
+        .optional()
+        .isMongoId().withMessage('Cursor must be a valid identifier when provided.'),
+    query('sort')
+        .optional()
+        .isIn(['newest', 'oldest']).withMessage('Sort must be either "newest" or "oldest".'),
+    query('type')
+        .optional()
+        .isIn(['income', 'expense']).withMessage('Type filter must be either "income" or "expense".')
+        .toLowerCase(),
+    query('search')
+        .optional()
+        .isString().withMessage('Search term must be a string.')
+        .trim()
+        .isLength({ max: 200 }).withMessage('Search term must be 200 characters or fewer.'),
+    query('startDate')
+        .optional()
+        .isISO8601().withMessage('startDate must be a valid ISO 8601 date.')
+        .trim(),
+    query('endDate')
+        .optional()
+        .isISO8601().withMessage('endDate must be a valid ISO 8601 date.')
+        .trim(),
+];
+
 module.exports = {
     projectCreateValidationRules,
     projectUpdateValidationRules,
+    projectIdParamValidationRules,
+    projectListQueryValidationRules,
     transactionCreateValidationRules,
     transactionUpdateValidationRules,
+    transactionIdParamValidationRules,
+    transactionListValidationRules,
 };
