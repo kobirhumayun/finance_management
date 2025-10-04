@@ -1,4 +1,18 @@
 // File: src/lib/query-keys.js
+const normalizeParams = (params) => {
+  if (!params || typeof params !== "object") {
+    return {};
+  }
+
+  return Object.keys(params)
+    .filter((key) => params[key] !== undefined)
+    .sort()
+    .reduce((acc, key) => {
+      acc[key] = params[key];
+      return acc;
+    }, {});
+};
+
 export const qk = {
   orders: {
     list: (params) => ["orders", "list", params || {}],
@@ -13,8 +27,8 @@ export const qk = {
     recentTransactions: () => ["dashboard", "recent-transactions"],
   },
   projects: {
-    list: () => ["projects", "list"],
-    detail: (id) => ["projects", "detail", String(id)],
+    list: (params) => ["projects", "list", normalizeParams(params)],
+    detail: (id, params) => ["projects", "detail", String(id), normalizeParams(params)],
   },
   reports: {
     filters: () => ["reports", "filters"],
