@@ -1,7 +1,6 @@
 // File: src/components/features/projects/transaction-table.js
 "use client";
 
-import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,33 +13,26 @@ export default function TransactionTable({
   project,
   transactions = [],
   isLoading,
+  isLoadingMore,
+  hasNextPage,
+  onLoadMore,
   onAddTransaction,
   onEditTransaction,
   onDeleteTransaction,
+  searchValue = "",
+  onSearchChange,
+  sortValue = "newest",
+  onSortChange,
 }) {
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("newest");
+  const displayTransactions = Array.isArray(transactions) ? transactions : [];
 
-  const filteredTransactions = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    const getTimestamp = (value) => {
-      if (!value) return 0;
-      const parsed = new Date(value).getTime();
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
+  const handleSearchChange = (event) => {
+    onSearchChange?.(event.target.value);
+  };
 
-    return transactions
-      .filter((transaction) => {
-        const description = typeof transaction?.description === "string" ? transaction.description : "";
-        const subcategory = typeof transaction?.subcategory === "string" ? transaction.subcategory : "";
-        return `${description} ${subcategory}`.toLowerCase().includes(normalizedSearch);
-      })
-      .sort((a, b) => {
-        const aTime = getTimestamp(a?.date);
-        const bTime = getTimestamp(b?.date);
-        return sort === "newest" ? bTime - aTime : aTime - bTime;
-      });
-  }, [transactions, search, sort]);
+  const handleSortChange = (value) => {
+    onSortChange?.(value);
+  };
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -49,7 +41,7 @@ export default function TransactionTable({
           <h2 className="text-lg font-semibold">Transactions</h2>
           <p className="text-xs text-muted-foreground">{project ? `Showing activity for ${project.name}` : "Select a project to begin."}</p>
         </div>
-        <Button onClick={onAddTransaction} size="sm" className="hidden md:inline-flex">
+        <Button onClick={onAddTransaction} size="sm" className="hidden md:inline-flex" disabled={!project}>
           Add Transaction
         </Button>
       </div>
@@ -61,13 +53,13 @@ export default function TransactionTable({
           <Input
             id="transaction-search"
             placeholder="Search by description"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchValue}
+            onChange={handleSearchChange}
           />
         </div>
         <div className="grid gap-2">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">Sort by</Label>
-          <Select value={sort} onValueChange={setSort}>
+          <Select value={sortValue} onValueChange={handleSortChange}>
             <SelectTrigger>
               <SelectValue placeholder="Sort transactions" />
             </SelectTrigger>
@@ -86,7 +78,7 @@ export default function TransactionTable({
               <div key={index} className="h-10 animate-pulse rounded-md bg-muted" />
             ))}
           </div>
-        ) : filteredTransactions.length ? (
+        ) : displayTransactions.length ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -99,7 +91,7 @@ export default function TransactionTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTransactions.map((transaction, index) => {
+              {displayTransactions.map((transaction, index) => {
                 const transactionId = transaction?.id ?? `transaction-${index}`;
                 const amountValue = Number.isFinite(Number(transaction?.amount)) ? Number(transaction.amount) : 0;
                 const formattedAmount = `${transaction?.type === "Expense" ? "-" : "+"}$${amountValue.toLocaleString()}`;
@@ -133,6 +125,7 @@ export default function TransactionTable({
                           variant="outline"
                           size="sm"
                           onClick={() => transaction?.id && onEditTransaction?.(transaction)}
+                          disabled={!transaction?.id}
                         >
                           Edit
                         </Button>
@@ -140,6 +133,7 @@ export default function TransactionTable({
                           variant="destructive"
                           size="sm"
                           onClick={() => transaction?.id && onDeleteTransaction?.(transaction)}
+                          disabled={!transaction?.id}
                         >
                           Delete
                         </Button>
@@ -164,8 +158,8 @@ export default function TransactionTable({
               <div key={index} className="h-24 animate-pulse rounded-lg bg-muted" />
             ))}
           </div>
-        ) : filteredTransactions.length ? (
-          filteredTransactions.map((transaction, index) => {
+        ) : displayTransactions.length ? (
+          displayTransactions.map((transaction, index) => {
             const transactionId = transaction?.id ?? `transaction-${index}`;
             const amountValue = Number.isFinite(Number(transaction?.amount)) ? Number(transaction.amount) : 0;
             const formattedAmount = `${transaction?.type === "Expense" ? "-" : "+"}$${amountValue.toLocaleString()}`;
@@ -203,6 +197,7 @@ export default function TransactionTable({
                     size="sm"
                     className="flex-1"
                     onClick={() => transaction?.id && onEditTransaction?.(transaction)}
+                    disabled={!transaction?.id}
                   >
                     Edit
                   </Button>
@@ -211,6 +206,7 @@ export default function TransactionTable({
                     size="sm"
                     className="flex-1"
                     onClick={() => transaction?.id && onDeleteTransaction?.(transaction)}
+                    disabled={!transaction?.id}
                   >
                     Delete
                   </Button>
@@ -226,10 +222,22 @@ export default function TransactionTable({
       </div>
 
       <div className="sticky bottom-4 md:hidden">
-        <Button className="h-12 w-full" size="lg" onClick={onAddTransaction}>
+        <Button className="h-12 w-full" size="lg" onClick={onAddTransaction} disabled={!project}>
           Add Transaction
         </Button>
       </div>
+      {hasNextPage && (
+        <div className="md:mt-2">
+          <Button
+            variant="outline"
+            className="h-11 w-full md:w-auto"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? "Loading..." : "Load more"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 // File: src/components/features/projects/project-list.js
 "use client";
 
-import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,34 +11,28 @@ import { cn } from "@/lib/utils";
 export default function ProjectList({
   projects = [],
   isLoading,
+  isLoadingMore,
+  hasNextPage,
   selectedProjectId,
   onSelect,
   onAddProject,
   onEditProject,
   onDeleteProject,
+  onLoadMore,
+  searchValue = "",
+  sortValue = "newest",
+  onSearchChange,
+  onSortChange,
 }) {
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("newest");
+  const displayProjects = Array.isArray(projects) ? projects : [];
 
-  const filteredProjects = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    const getTimestamp = (value) => {
-      if (!value) return 0;
-      const parsed = new Date(value).getTime();
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
+  const handleSearchChange = (event) => {
+    onSearchChange?.(event.target.value);
+  };
 
-    return projects
-      .filter((project) => {
-        const name = typeof project?.name === "string" ? project.name : "";
-        return name.toLowerCase().includes(normalizedSearch);
-      })
-      .sort((a, b) => {
-        const aTime = getTimestamp(a?.createdAt);
-        const bTime = getTimestamp(b?.createdAt);
-        return sort === "newest" ? bTime - aTime : aTime - bTime;
-      });
-  }, [projects, search, sort]);
+  const handleSortChange = (value) => {
+    onSortChange?.(value);
+  };
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -60,13 +53,13 @@ export default function ProjectList({
           <Input
             id="project-search"
             placeholder="Search by name"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchValue}
+            onChange={handleSearchChange}
           />
         </div>
         <div className="grid gap-2">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">Sort by</Label>
-          <Select value={sort} onValueChange={setSort}>
+          <Select value={sortValue} onValueChange={handleSortChange}>
             <SelectTrigger>
               <SelectValue placeholder="Sort projects" />
             </SelectTrigger>
@@ -84,8 +77,8 @@ export default function ProjectList({
               <div key={index} className="h-20 animate-pulse rounded-lg bg-muted" />
             ))}
           </div>
-        ) : filteredProjects.length ? (
-          filteredProjects.map((project, index) => {
+        ) : displayProjects.length ? (
+          displayProjects.map((project, index) => {
             const projectId = project?.id;
             const projectName = typeof project?.name === "string" && project.name.trim().length ? project.name : "Untitled project";
             const projectDescription =
@@ -164,6 +157,16 @@ export default function ProjectList({
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
             No projects created yet. Click “Add New Project” to start.
           </div>
+        )}
+        {hasNextPage && (
+          <Button
+            variant="outline"
+            className="mt-2 w-full"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? "Loading..." : "Load more"}
+          </Button>
         )}
       </div>
       <div className="sticky bottom-4 md:hidden">
