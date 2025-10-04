@@ -8,6 +8,7 @@ const userRoutes = require('./routes/user');
 const authRoutes = require('./routes/authRoutes');
 const planRoutes = require('./routes/plan');
 const adminUserRoutes = require('./routes/adminUsers');
+const projectRoutes = require('./routes/project');
 const { initializeEnforcer } = require('./services/casbin');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
 const AppError = require('./utils/AppError');
@@ -48,6 +49,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/projects', projectRoutes);
 
 
 // Handle 404 Not Found for any routes not matched above
