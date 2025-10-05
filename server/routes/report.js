@@ -5,10 +5,20 @@ const reportController = require('../controllers/reportController');
 const { authenticate } = require('../middleware/authMiddleware');
 const {
     summaryListValidationRules,
+    reportChartsValidationRules,
     handleValidationErrors,
 } = require('../validators/validatorsIndex');
 
 router.use(authenticate);
+
+router.get('/filters', reportController.getReportFilters);
+
+router.get(
+    '/charts',
+    reportChartsValidationRules(),
+    handleValidationErrors,
+    reportController.getCharts,
+);
 
 router.get(
     '/summary',

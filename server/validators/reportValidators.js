@@ -38,6 +38,25 @@ const summaryListValidationRules = () => [
         .isLength({ max: 200 }).withMessage('Subcategory must be 200 characters or fewer.'),
 ];
 
+const reportChartsValidationRules = () => [
+    query('projectId')
+        .optional()
+        .isMongoId().withMessage('projectId must be a valid identifier when provided.'),
+    query('type')
+        .optional()
+        .isIn(['income', 'expense']).withMessage('Type filter must be either "income" or "expense".')
+        .toLowerCase(),
+    query('startDate')
+        .optional()
+        .isISO8601().withMessage('startDate must be a valid ISO 8601 date.')
+        .trim(),
+    query('endDate')
+        .optional()
+        .isISO8601().withMessage('endDate must be a valid ISO 8601 date.')
+        .trim(),
+];
+
 module.exports = {
     summaryListValidationRules,
+    reportChartsValidationRules,
 };
