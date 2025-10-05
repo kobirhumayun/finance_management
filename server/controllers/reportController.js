@@ -1,0 +1,289 @@
+const Project = require('../models/Project');
+const Transaction = require('../models/Transaction');
+
+const {
+    clampLimit,
+    escapeRegex,
+    toObjectIdOrNull,
+    mapTransaction,
+    buildTransactionCursorFilter,
+    toStorageType,
+    parseTransactionDate,
+} = require('../utils/transactionQueryHelpers');
+
+const getSummary = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        const {
+            limit: limitParam,
+            cursor,
+            sort,
+            type,
+            projectId,
+            search,
+            startDate,
+            endDate,
+        } = req.query;
+
+        const userIdentifier = toObjectIdOrNull(userId) ?? userId;
+        const filters = [{ user_id: userIdentifier }];
+
+        if (projectId) {
+            const projectFilter = toObjectIdOrNull(projectId);
+            if (!projectFilter) {
+                return res.status(400).json({ message: 'Invalid project identifier provided.' });
+            }
+            filters.push({ project_id: projectFilter });
+        }
+
+        if (type) {
+            const storageType = toStorageType(type);
+            if (!storageType) {
+                return res.status(400).json({ message: 'Invalid transaction type filter provided.' });
+            }
+            filters.push({ type: storageType });
+        }
+
+        if (search) {
+            const expression = new RegExp(escapeRegex(search.trim()), 'i');
+            filters.push({
+                $or: [
+                    { description: { $regex: expression } },
+                    { subcategory: { $regex: expression } },
+                ],
+            });
+        }
+
+        if (startDate || endDate) {
+            const dateFilter = {};
+            if (startDate) {
+                const parsedStart = parseTransactionDate(startDate);
+                if (!parsedStart) {
+                    return res.status(400).json({ message: 'Invalid startDate provided.' });
+                }
+                dateFilter.$gte = parsedStart;
+            }
+            if (endDate) {
+                const parsedEnd = parseTransactionDate(endDate);
+                if (!parsedEnd) {
+                    return res.status(400).json({ message: 'Invalid endDate provided.' });
+                }
+                dateFilter.$lte = parsedEnd;
+            }
+
+            if (dateFilter.$gte && dateFilter.$lte && dateFilter.$gte > dateFilter.$lte) {
+                return res.status(400).json({ message: 'startDate cannot be later than endDate.' });
+            }
+
+            filters.push({ transaction_date: dateFilter });
+        }
+
+        const limit = clampLimit(limitParam, { defaultValue: 20 });
+        const sortDirection = sort === 'oldest' ? 1 : -1;
+
+        const queryFilters = [...filters];
+
+        if (cursor) {
+            const cursorTransaction = await Transaction.findOne({
+                _id: cursor,
+                user_id: userIdentifier,
+            })
+                .select({ transaction_date: 1 })
+                .lean();
+
+            if (!cursorTransaction) {
+                return res.status(400).json({ message: 'Cursor transaction could not be found.' });
+            }
+
+            queryFilters.push(buildTransactionCursorFilter(sortDirection, cursorTransaction));
+        }
+
+        const query = queryFilters.length > 1 ? { $and: queryFilters } : queryFilters[0];
+
+        const transactions = await Transaction.find(query)
+            .sort({ transaction_date: sortDirection, _id: sortDirection })
+            .limit(limit + 1)
+            .populate({ path: 'project_id', select: 'name' })
+            .lean();
+
+        const hasNextPage = transactions.length > limit;
+        const trimmedTransactions = hasNextPage ? transactions.slice(0, -1) : transactions;
+        const nextCursor = hasNextPage
+            ? trimmedTransactions[trimmedTransactions.length - 1]?._id?.toString() ?? null
+            : null;
+
+        const summaryFilters = filters.length > 1 ? { $and: filters } : filters[0];
+
+        const totals = await Transaction.aggregate([
+            { $match: summaryFilters },
+            {
+                $group: {
+                    _id: '$type',
+                    total: { $sum: '$amount' },
+                    count: { $sum: 1 },
+                },
+            },
+        ]);
+
+        const summary = totals.reduce(
+            (accumulator, item) => {
+                if (item._id === 'cash_in') {
+                    accumulator.income += item.total;
+                    accumulator.counts.income += item.count;
+                }
+                if (item._id === 'cash_out') {
+                    accumulator.expense += item.total;
+                    accumulator.counts.expense += item.count;
+                }
+                return accumulator;
+            },
+            { income: 0, expense: 0, counts: { income: 0, expense: 0 } },
+        );
+
+        const balance = summary.income - summary.expense;
+
+        const projectBreakdownAggregation = await Transaction.aggregate([
+            { $match: summaryFilters },
+            {
+                $group: {
+                    _id: '$project_id',
+                    income: {
+                        $sum: {
+                            $cond: [{ $eq: ['$type', 'cash_in'] }, '$amount', 0],
+                        },
+                    },
+                    expense: {
+                        $sum: {
+                            $cond: [{ $eq: ['$type', 'cash_out'] }, '$amount', 0],
+                        },
+                    },
+                    transactionCount: { $sum: 1 },
+                },
+            },
+        ]);
+
+        const projectIds = projectBreakdownAggregation
+            .map((item) => item._id)
+            .filter(Boolean)
+            .map((id) => id.toString());
+
+        let projectNameById = {};
+        if (projectIds.length > 0) {
+            const uniqueProjectIds = Array.from(new Set(projectIds));
+            const relatedProjects = await Project.find({ _id: { $in: uniqueProjectIds } })
+                .select({ name: 1 })
+                .lean();
+
+            projectNameById = relatedProjects.reduce((accumulator, project) => {
+                accumulator[project._id.toString()] = project.name;
+                return accumulator;
+            }, {});
+        }
+
+        const projectBreakdown = projectBreakdownAggregation.map((item) => {
+            const projectKey = item._id ? item._id.toString() : '';
+            const incomeTotal = item.income || 0;
+            const expenseTotal = item.expense || 0;
+
+            return {
+                projectId: projectKey,
+                projectName: projectNameById[projectKey] ?? null,
+                income: incomeTotal,
+                expense: expenseTotal,
+                balance: incomeTotal - expenseTotal,
+                transactionCount: item.transactionCount || 0,
+            };
+        });
+
+        projectBreakdown.sort((a, b) => {
+            const nameA = a.projectName || '';
+            const nameB = b.projectName || '';
+
+            if (!nameA && !nameB) {
+                return a.projectId.localeCompare(b.projectId);
+            }
+            if (!nameA) {
+                return 1;
+            }
+            if (!nameB) {
+                return -1;
+            }
+            return nameA.localeCompare(nameB);
+        });
+
+        const counts = {
+            income: summary.counts.income,
+            expense: summary.counts.expense,
+            total: summary.counts.income + summary.counts.expense,
+        };
+
+        const formattedTransactions = trimmedTransactions.map((transaction) => {
+            const mapped = mapTransaction(transaction);
+            return {
+                id: mapped.id,
+                projectId: mapped.projectId,
+                projectName: mapped.projectName,
+                date: mapped.date,
+                type: mapped.type,
+                category: mapped.subcategory,
+                amount: mapped.amount,
+                description: mapped.description,
+            };
+        });
+
+        const totalCount = counts.total;
+
+        res.status(200).json({
+            transactions: formattedTransactions,
+            summary: {
+                income: summary.income,
+                expense: summary.expense,
+                balance,
+                counts,
+            },
+            pageInfo: {
+                hasNextPage,
+                nextCursor,
+                limit,
+            },
+            totalCount,
+            aggregates: {
+                byProject: projectBreakdown,
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getSummaryFilters = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        const userIdentifier = toObjectIdOrNull(userId) ?? userId;
+
+        const projects = await Project.find({ user_id: userIdentifier })
+            .select({ name: 1 })
+            .sort({ name: 1 })
+            .lean();
+
+        res.status(200).json({
+            projects: projects.map((project) => ({
+                id: project._id.toString(),
+                name: project.name,
+                label: project.name,
+                value: project._id.toString(),
+            })),
+            transactionTypes: [
+                { label: 'Income', value: 'income' },
+                { label: 'Expense', value: 'expense' },
+            ],
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = {
+    getSummary,
+    getSummaryFilters,
+};
