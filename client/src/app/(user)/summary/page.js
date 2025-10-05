@@ -254,7 +254,7 @@ export default function SummaryPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           <div className="grid gap-2">
-            <Label>Project</Label>
+            <Label>Projects</Label>
             <Select
               value={projectFilter}
               onValueChange={setProjectFilter}
@@ -327,13 +327,13 @@ export default function SummaryPage() {
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Type</Label>
+            <Label>Transaction Type</Label>
             <Select value={typeFilter} onValueChange={setTypeFilter} disabled={filtersLoading}>
               <SelectTrigger>
-                <SelectValue placeholder="All types" />
+                <SelectValue placeholder="Both types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">Both</SelectItem>
                 {typeOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -343,7 +343,7 @@ export default function SummaryPage() {
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Subcategory</Label>
+            <Label>Subcategories</Label>
             <Select
               value={subcategoryFilter}
               onValueChange={setSubcategoryFilter}
@@ -387,7 +387,7 @@ export default function SummaryPage() {
                     }}
                   />
                 </div>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">All subcategories</SelectItem>
                 {filteredSubcategoryOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -449,7 +449,7 @@ export default function SummaryPage() {
       <Card>
         <CardHeader className="space-y-1 sm:flex sm:items-center sm:justify-between sm:space-y-0">
           <div>
-            <CardTitle>Transactions</CardTitle>
+            <CardTitle>Transaction Records</CardTitle>
             <p className="text-sm text-muted-foreground">
               {isInitialLoading
                 ? "Loading transactions..."
