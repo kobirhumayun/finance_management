@@ -3,6 +3,7 @@ const authValidators = require('./authValidators');
 const paymentValidators = require('./paymentValidators');
 const planValidators = require('./planValidators');
 const projectValidators = require('./projectValidators');
+const reportValidators = require('./reportValidators');
 
 /**
  * Middleware to handle validation results.
@@ -60,5 +61,6 @@ module.exports = {
     transactionUpdateValidationRules: projectValidators.transactionUpdateValidationRules,
     transactionIdParamValidationRules: projectValidators.transactionIdParamValidationRules,
     transactionListValidationRules: projectValidators.transactionListValidationRules,
+    summaryListValidationRules: reportValidators.summaryListValidationRules,
     handleValidationErrors,
 };

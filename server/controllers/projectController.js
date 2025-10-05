@@ -1,33 +1,17 @@
-const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Transaction = require('../models/Transaction');
 
-const { Types } = mongoose;
-
-const isValidObjectId = (value) => Types.ObjectId.isValid(value);
-
-const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const clampLimit = (value, { min = 1, max = 100, defaultValue = 20 } = {}) => {
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isFinite(parsed)) {
-        return defaultValue;
-    }
-    return Math.min(Math.max(parsed, min), max);
-};
-
-const toObjectIdOrNull = (value) => {
-    if (!value) {
-        return null;
-    }
-    if (value instanceof Types.ObjectId) {
-        return value;
-    }
-    if (typeof value === 'string' && Types.ObjectId.isValid(value)) {
-        return new Types.ObjectId(value);
-    }
-    return null;
-};
+const {
+    clampLimit,
+    escapeRegex,
+    toObjectIdOrNull,
+    isValidObjectId,
+    toResponseDate,
+    mapTransaction,
+    buildTransactionCursorFilter,
+    toStorageType,
+    parseTransactionDate,
+} = require('../utils/transactionQueryHelpers');
 
 const mapProject = (project) => ({
     id: project._id.toString(),
@@ -36,29 +20,6 @@ const mapProject = (project) => ({
     currency: project.currency,
     createdAt: toResponseDate(project.createdAt),
     updatedAt: project.updatedAt ? project.updatedAt.toISOString() : null,
-});
-
-const toResponseDate = (date) => {
-    if (!date) {
-        return null;
-    }
-    try {
-        return date.toISOString().slice(0, 10);
-    } catch (error) {
-        return null;
-    }
-};
-
-const mapTransaction = (transaction) => ({
-    id: transaction._id.toString(),
-    projectId: transaction.project_id.toString(),
-    date: toResponseDate(transaction.transaction_date),
-    type: transaction.type === 'cash_out' ? 'Expense' : 'Income',
-    amount: transaction.amount,
-    subcategory: transaction.subcategory,
-    description: transaction.description || '',
-    createdAt: transaction.createdAt ? transaction.createdAt.toISOString() : null,
-    updatedAt: transaction.updatedAt ? transaction.updatedAt.toISOString() : null,
 });
 
 const ensureProjectOwnership = async (projectId, userId) => {
@@ -84,25 +45,6 @@ const buildCursorFilter = (direction, fieldName, fieldValue, idValue) => {
             {
                 [fieldName]: fieldValue,
                 _id: { [equalityOperator]: idValue },
-            },
-        ],
-    };
-};
-
-const buildTransactionCursorFilter = (direction, cursorDoc) => {
-    if (!cursorDoc?.transaction_date) {
-        return {};
-    }
-
-    const comparisonOperator = direction === 1 ? '$gt' : '$lt';
-    const equalityOperator = direction === 1 ? '$gt' : '$lt';
-
-    return {
-        $or: [
-            { transaction_date: { [comparisonOperator]: cursorDoc.transaction_date } },
-            {
-                transaction_date: cursorDoc.transaction_date,
-                _id: { [equalityOperator]: cursorDoc._id },
             },
         ],
     };
@@ -422,24 +364,6 @@ const getTransactions = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-};
-
-const toStorageType = (type) => {
-    if (type === 'income') {
-        return 'cash_in';
-    }
-    if (type === 'expense') {
-        return 'cash_out';
-    }
-    return null;
-};
-
-const parseTransactionDate = (value) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-    return date;
 };
 
 const createTransaction = async (req, res, next) => {
