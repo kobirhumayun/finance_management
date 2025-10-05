@@ -28,7 +28,7 @@ const normalizeTransaction = (transaction) => {
     projectName: transaction.projectName ?? null,
     date: transaction.date ?? null,
     type: transaction.type ?? "Expense",
-    category: transaction.category ?? "",
+    subcategory: transaction.subcategory ?? "",
     amount: Number(transaction.amount) || 0,
     description: transaction.description ?? "",
   };
@@ -113,12 +113,41 @@ const normalizeTransactionTypes = (types) => {
     .filter(Boolean);
 };
 
+const normalizeSubcategories = (subcategories) => {
+  if (!Array.isArray(subcategories)) {
+    return [];
+  }
+
+  return subcategories
+    .map((item) => {
+      if (!item) {
+        return null;
+      }
+
+      if (typeof item === "string") {
+        return { label: item, value: item };
+      }
+
+      if (typeof item === "object") {
+        const value = item.value ?? item.label;
+        if (!value) {
+          return null;
+        }
+        return { label: item.label ?? value, value };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+};
+
 export async function fetchSummaryFilters({ signal } = {}) {
   const response = await apiJSON(SUMMARY_FILTERS_ENDPOINT, { method: "GET", signal });
 
   return {
     projects: normalizeProjects(response?.projects),
     transactionTypes: normalizeTransactionTypes(response?.transactionTypes),
+    subcategories: normalizeSubcategories(response?.subcategories),
   };
 }
 
@@ -127,12 +156,13 @@ export async function fetchSummaryReport({
   type,
   startDate,
   endDate,
+  subcategory,
   limit,
   cursor,
   sort,
   signal,
 } = {}) {
-  const queryString = buildQueryString({ projectId, type, startDate, endDate, limit, cursor, sort });
+  const queryString = buildQueryString({ projectId, type, startDate, endDate, subcategory, limit, cursor, sort });
   const response = await apiJSON(`${SUMMARY_ENDPOINT}${queryString}`, { method: "GET", signal });
 
   const transactions = Array.isArray(response?.transactions)

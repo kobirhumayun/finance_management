@@ -23,11 +23,13 @@ export default function SummaryPage() {
   });
   const [projectFilter, setProjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
   const deferredProjectSearch = useDeferredValue(projectSearch);
   const projectOptions = useMemo(() => filtersData?.projects ?? [], [filtersData?.projects]);
+  const subcategoryOptions = useMemo(() => filtersData?.subcategories ?? [], [filtersData?.subcategories]);
 
   useEffect(() => {
     if (!filtersData?.projects?.length || projectFilter === "all") {
@@ -40,12 +42,24 @@ export default function SummaryPage() {
     }
   }, [filtersData?.projects, projectFilter]);
 
+  useEffect(() => {
+    if (!filtersData?.subcategories?.length || subcategoryFilter === "all") {
+      return;
+    }
+
+    const exists = filtersData.subcategories.some((item) => item.value === subcategoryFilter);
+    if (!exists) {
+      setSubcategoryFilter("all");
+    }
+  }, [filtersData?.subcategories, subcategoryFilter]);
+
   const filtersKey = useMemo(() => ({
     projectId: projectFilter !== "all" ? projectFilter : undefined,
     type: typeFilter !== "all" ? typeFilter : undefined,
     startDate: from || undefined,
     endDate: to || undefined,
-  }), [projectFilter, typeFilter, from, to]);
+    subcategory: subcategoryFilter !== "all" ? subcategoryFilter : undefined,
+  }), [projectFilter, typeFilter, from, to, subcategoryFilter]);
 
   const isDateRangeInvalid = useMemo(() => {
     if (!from || !to) {
@@ -125,7 +139,7 @@ export default function SummaryPage() {
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           <div className="grid gap-2">
             <Label>Project</Label>
             <Select
@@ -192,6 +206,22 @@ export default function SummaryPage() {
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 {typeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Subcategory</Label>
+            <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter} disabled={filtersLoading}>
+              <SelectTrigger>
+                <SelectValue placeholder="All subcategories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {subcategoryOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -267,7 +297,7 @@ export default function SummaryPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Project</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Category</TableHead>
+                      <TableHead>Subcategory</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -277,7 +307,7 @@ export default function SummaryPage() {
                         <TableCell>{item.date}</TableCell>
                         <TableCell>{item.projectName || item.projectId || "--"}</TableCell>
                         <TableCell>{item.type}</TableCell>
-                        <TableCell>{item.category || "--"}</TableCell>
+                        <TableCell>{item.subcategory || "--"}</TableCell>
                         <TableCell className="text-right font-medium">${item.amount.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}

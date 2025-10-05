@@ -183,7 +183,7 @@ export async function fetchSummaryTable() {
     projectId: transaction.projectId,
     date: transaction.date,
     type: transaction.type,
-    category: transaction.category,
+    subcategory: transaction.subcategory,
     amount: transaction.amount,
   }));
 }
