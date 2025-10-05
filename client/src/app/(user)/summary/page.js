@@ -148,6 +148,10 @@ export default function SummaryPage() {
                     onChange={(event) => setProjectSearch(event.target.value)}
                     placeholder="Search projects..."
                     className="h-8"
+                    onKeyDown={(event) => {
+                      // Prevent the parent select from capturing the keystroke and stealing focus.
+                      event.stopPropagation();
+                    }}
                   />
                 </div>
                 <SelectItem value="all">All projects</SelectItem>
