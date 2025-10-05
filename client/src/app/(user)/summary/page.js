@@ -480,9 +480,9 @@ export default function SummaryPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Project</TableHead>
+                      <TableHead>Projects</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Subcategory</TableHead>
+                      <TableHead>Subcategories</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
