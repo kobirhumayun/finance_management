@@ -1,7 +1,7 @@
 // File: src/app/(user)/summary/page.js
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,8 +28,12 @@ export default function SummaryPage() {
   const [to, setTo] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
   const [subcategorySearch, setSubcategorySearch] = useState("");
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [subcategoryMenuOpen, setSubcategoryMenuOpen] = useState(false);
   const deferredProjectSearch = useDeferredValue(projectSearch);
   const deferredSubcategorySearch = useDeferredValue(subcategorySearch);
+  const projectSearchInputRef = useRef(null);
+  const subcategorySearchInputRef = useRef(null);
   const projectOptions = useMemo(() => filtersData?.projects ?? [], [filtersData?.projects]);
   const subcategoryOptions = useMemo(() => filtersData?.subcategories ?? [], [filtersData?.subcategories]);
 
@@ -54,6 +58,7 @@ export default function SummaryPage() {
       setSubcategoryFilter("all");
     }
   }, [filtersData?.subcategories, subcategoryFilter]);
+
 
   const filtersKey = useMemo(() => ({
     projectId: projectFilter !== "all" ? projectFilter : undefined,
@@ -148,6 +153,49 @@ export default function SummaryPage() {
       );
     });
   }, [deferredSubcategorySearch, subcategoryOptions]);
+  const isSelectedProjectFilteredOut = useMemo(() => {
+    if (projectFilter === "all") {
+      return false;
+    }
+
+    return !filteredProjectOptions.some((option) => option.value === projectFilter);
+  }, [projectFilter, filteredProjectOptions]);
+  const isSelectedSubcategoryFilteredOut = useMemo(() => {
+    if (subcategoryFilter === "all") {
+      return false;
+    }
+
+    return !filteredSubcategoryOptions.some((option) => option.value === subcategoryFilter);
+  }, [subcategoryFilter, filteredSubcategoryOptions]);
+  useEffect(() => {
+    if (!projectMenuOpen) {
+      return;
+    }
+
+    const input = projectSearchInputRef.current;
+    if (!input || document.activeElement === input) {
+      return;
+    }
+
+    if (projectSearch && isSelectedProjectFilteredOut) {
+      input.focus({ preventScroll: true });
+    }
+  }, [projectMenuOpen, projectSearch, isSelectedProjectFilteredOut]);
+
+  useEffect(() => {
+    if (!subcategoryMenuOpen) {
+      return;
+    }
+
+    const input = subcategorySearchInputRef.current;
+    if (!input || document.activeElement === input) {
+      return;
+    }
+
+    if (subcategorySearch && isSelectedSubcategoryFilteredOut) {
+      input.focus({ preventScroll: true });
+    }
+  }, [subcategoryMenuOpen, subcategorySearch, isSelectedSubcategoryFilteredOut]);
   const typeOptions = filtersData?.transactionTypes ?? [];
 
   return (
@@ -168,6 +216,7 @@ export default function SummaryPage() {
               onValueChange={setProjectFilter}
               disabled={filtersLoading}
               onOpenChange={(open) => {
+                setProjectMenuOpen(open);
                 if (!open) {
                   setProjectSearch("");
                 }
@@ -176,9 +225,22 @@ export default function SummaryPage() {
               <SelectTrigger>
                 <SelectValue placeholder="All projects" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                onOpenAutoFocus={(event) => {
+                  event.preventDefault();
+                  const focusSearch = () => {
+                    projectSearchInputRef.current?.focus({ preventScroll: true });
+                  };
+                  if (typeof window !== "undefined") {
+                    window.requestAnimationFrame(focusSearch);
+                  } else {
+                    focusSearch();
+                  }
+                }}
+              >
                 <div className="sticky top-0 z-10 bg-popover p-2">
                   <Input
+                    ref={projectSearchInputRef}
                     value={projectSearch}
                     onChange={(event) => setProjectSearch(event.target.value)}
                     placeholder="Search projects..."
@@ -241,6 +303,7 @@ export default function SummaryPage() {
               onValueChange={setSubcategoryFilter}
               disabled={filtersLoading}
               onOpenChange={(open) => {
+                setSubcategoryMenuOpen(open);
                 if (!open) {
                   setSubcategorySearch("");
                 }
@@ -249,9 +312,22 @@ export default function SummaryPage() {
               <SelectTrigger>
                 <SelectValue placeholder="All subcategories" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                onOpenAutoFocus={(event) => {
+                  event.preventDefault();
+                  const focusSearch = () => {
+                    subcategorySearchInputRef.current?.focus({ preventScroll: true });
+                  };
+                  if (typeof window !== "undefined") {
+                    window.requestAnimationFrame(focusSearch);
+                  } else {
+                    focusSearch();
+                  }
+                }}
+              >
                 <div className="sticky top-0 z-10 bg-popover p-2">
                   <Input
+                    ref={subcategorySearchInputRef}
                     value={subcategorySearch}
                     onChange={(event) => setSubcategorySearch(event.target.value)}
                     placeholder="Search subcategories..."
