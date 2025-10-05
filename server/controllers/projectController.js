@@ -366,24 +366,6 @@ const getTransactions = async (req, res, next) => {
     }
 };
 
-const toStorageType = (type) => {
-    if (type === 'income') {
-        return 'cash_in';
-    }
-    if (type === 'expense') {
-        return 'cash_out';
-    }
-    return null;
-};
-
-const parseTransactionDate = (value) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-    return date;
-};
-
 const createTransaction = async (req, res, next) => {
     try {
         const userId = req.user?._id;
