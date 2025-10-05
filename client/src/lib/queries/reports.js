@@ -2,6 +2,8 @@
 import { apiJSON } from "@/lib/api";
 
 const REPORTS_BASE = "/api/reports";
+const REPORT_FILTERS_ENDPOINT = `${REPORTS_BASE}/filters`;
+const CHARTS_ENDPOINT = `${REPORTS_BASE}/charts`;
 const SUMMARY_ENDPOINT = `${REPORTS_BASE}/summary`;
 const SUMMARY_FILTERS_ENDPOINT = `${SUMMARY_ENDPOINT}/filters`;
 
@@ -140,6 +142,133 @@ const normalizeSubcategories = (subcategories) => {
     })
     .filter(Boolean);
 };
+
+const normalizeAvailableDateRange = (range) => {
+  const earliest = typeof range?.earliest === "string" ? range.earliest : null;
+  const latest = typeof range?.latest === "string" ? range.latest : null;
+
+  return { earliest, latest };
+};
+
+const normalizeAppliedDateRange = (range) => {
+  const start = typeof range?.start === "string" ? range.start : null;
+  const end = typeof range?.end === "string" ? range.end : null;
+
+  return { start, end };
+};
+
+const toSafeNumber = (value) => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const toLabel = (value) => {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value);
+};
+
+const normalizeIncomeExpenseSeries = (series) => {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((item) => {
+      const month = toLabel(item?.month);
+      if (!month) {
+        return null;
+      }
+
+      return {
+        month,
+        income: toSafeNumber(item?.income),
+        expense: toSafeNumber(item?.expense),
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeCashFlowSeries = (series) => {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((item) => {
+      const month = toLabel(item?.month);
+      if (!month) {
+        return null;
+      }
+
+      return {
+        month,
+        cashIn: toSafeNumber(item?.cashIn),
+        cashOut: toSafeNumber(item?.cashOut),
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeExpenseByCategory = (series) => {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((item) => {
+      const name = toLabel(item?.name);
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        value: toSafeNumber(item?.value),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b.value === a.value) {
+        return a.name.localeCompare(b.name);
+      }
+      return b.value - a.value;
+    });
+};
+
+const normalizeChartsFilters = (filters) => ({
+  projectId: filters?.projectId ?? null,
+  type: filters?.type ?? null,
+  storageType: filters?.storageType ?? null,
+});
+
+export async function fetchReportFilters({ signal } = {}) {
+  const response = await apiJSON(REPORT_FILTERS_ENDPOINT, { method: "GET", signal });
+
+  return {
+    projects: normalizeProjects(response?.projects),
+    transactionTypes: normalizeTransactionTypes(response?.transactionTypes),
+    dateRange: normalizeAvailableDateRange(response?.dateRange),
+  };
+}
+
+export async function fetchReportCharts({ projectId, type, startDate, endDate, signal } = {}) {
+  const queryString = buildQueryString({ projectId, type, startDate, endDate });
+  const response = await apiJSON(`${CHARTS_ENDPOINT}${queryString}`, { method: "GET", signal });
+
+  return {
+    incomeVsExpense: normalizeIncomeExpenseSeries(response?.incomeVsExpense),
+    cashFlow: normalizeCashFlowSeries(response?.cashFlow),
+    expenseByCategory: normalizeExpenseByCategory(response?.expenseByCategory),
+    summary: normalizeSummary(response?.summary),
+    dateRange: normalizeAppliedDateRange(response?.dateRange),
+    filters: normalizeChartsFilters(response?.filters ?? {}),
+  };
+}
 
 export async function fetchSummaryFilters({ signal } = {}) {
   const response = await apiJSON(SUMMARY_FILTERS_ENDPOINT, { method: "GET", signal });
