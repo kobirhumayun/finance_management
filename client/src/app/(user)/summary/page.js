@@ -1,7 +1,7 @@
 // File: src/app/(user)/summary/page.js
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,9 @@ export default function SummaryPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [projectSearch, setProjectSearch] = useState("");
+  const deferredProjectSearch = useDeferredValue(projectSearch);
+  const projectOptions = useMemo(() => filtersData?.projects ?? [], [filtersData?.projects]);
 
   useEffect(() => {
     if (!filtersData?.projects?.length || projectFilter === "all") {
@@ -91,7 +94,25 @@ export default function SummaryPage() {
   const hasNextPage = Boolean(summaryQuery.hasNextPage);
   const errorMessage = summaryQuery.error?.body?.message || summaryQuery.error?.message;
 
-  const projectOptions = filtersData?.projects ?? [];
+  const filteredProjectOptions = useMemo(() => {
+    if (!deferredProjectSearch) {
+      return projectOptions;
+    }
+
+    const searchValue = deferredProjectSearch.trim().toLowerCase();
+    if (!searchValue) {
+      return projectOptions;
+    }
+
+    return projectOptions.filter((project) => {
+      const name = project.label || project.name || "";
+      return (
+        name.toLowerCase().includes(searchValue) ||
+        String(project.value ?? "").toLowerCase().includes(searchValue) ||
+        String(project.id ?? "").toLowerCase().includes(searchValue)
+      );
+    });
+  }, [deferredProjectSearch, projectOptions]);
   const typeOptions = filtersData?.transactionTypes ?? [];
 
   return (
@@ -107,17 +128,39 @@ export default function SummaryPage() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="grid gap-2">
             <Label>Project</Label>
-            <Select value={projectFilter} onValueChange={setProjectFilter} disabled={filtersLoading}>
+            <Select
+              value={projectFilter}
+              onValueChange={setProjectFilter}
+              disabled={filtersLoading}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setProjectSearch("");
+                }
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All projects" />
               </SelectTrigger>
               <SelectContent>
+                <div className="sticky top-0 z-10 bg-popover p-2">
+                  <Input
+                    value={projectSearch}
+                    onChange={(event) => setProjectSearch(event.target.value)}
+                    placeholder="Search projects..."
+                    className="h-8"
+                  />
+                </div>
                 <SelectItem value="all">All projects</SelectItem>
-                {projectOptions.map((project) => (
+                {filteredProjectOptions.map((project) => (
                   <SelectItem key={project.value} value={project.value}>
                     {project.label || project.name || project.value}
                   </SelectItem>
                 ))}
+                {filteredProjectOptions.length === 0 && (
+                  <SelectItem key="__no_results" value="__no_results" disabled className="text-muted-foreground">
+                    No projects found
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
