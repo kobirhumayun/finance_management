@@ -23,6 +23,7 @@ const getSummary = async (req, res, next) => {
             search,
             startDate,
             endDate,
+            subcategory,
         } = req.query;
 
         const userIdentifier = toObjectIdOrNull(userId) ?? userId;
@@ -52,6 +53,14 @@ const getSummary = async (req, res, next) => {
                     { subcategory: { $regex: expression } },
                 ],
             });
+        }
+
+        if (subcategory) {
+            const trimmed = subcategory.trim();
+            if (trimmed.length === 0) {
+                return res.status(400).json({ message: 'Subcategory filter cannot be empty.' });
+            }
+            filters.push({ subcategory: trimmed });
         }
 
         if (startDate || endDate) {
@@ -225,7 +234,7 @@ const getSummary = async (req, res, next) => {
                 projectName: mapped.projectName,
                 date: mapped.date,
                 type: mapped.type,
-                category: mapped.subcategory,
+                subcategory: mapped.subcategory,
                 amount: mapped.amount,
                 description: mapped.description,
             };
@@ -266,6 +275,16 @@ const getSummaryFilters = async (req, res, next) => {
             .sort({ name: 1 })
             .lean();
 
+        const rawSubcategories = await Transaction.distinct('subcategory', { user_id: userIdentifier });
+        const normalizedSubcategories = Array.from(
+            new Set(
+                rawSubcategories
+                    .filter((value) => typeof value === 'string')
+                    .map((value) => value.trim())
+                    .filter((value) => value.length > 0),
+            ),
+        ).sort((a, b) => a.localeCompare(b));
+
         res.status(200).json({
             projects: projects.map((project) => ({
                 id: project._id.toString(),
@@ -277,6 +296,7 @@ const getSummaryFilters = async (req, res, next) => {
                 { label: 'Income', value: 'income' },
                 { label: 'Expense', value: 'expense' },
             ],
+            subcategories: normalizedSubcategories.map((name) => ({ label: name, value: name })),
         });
     } catch (error) {
         next(error);

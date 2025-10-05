@@ -31,6 +31,11 @@ const summaryListValidationRules = () => [
         .optional()
         .isISO8601().withMessage('endDate must be a valid ISO 8601 date.')
         .trim(),
+    query('subcategory')
+        .optional()
+        .isString().withMessage('Subcategory filter must be a string.')
+        .trim()
+        .isLength({ max: 200 }).withMessage('Subcategory must be 200 characters or fewer.'),
 ];
 
 module.exports = {

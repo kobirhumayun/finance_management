@@ -33,7 +33,7 @@ export const qk = {
   reports: {
     filters: () => ["reports", "filters"],
     charts: () => ["reports", "charts"],
-    summaryTable: () => ["reports", "summary-table"],
+    summaryTable: (params) => ["reports", "summary-table", normalizeParams(params)],
   },
   plans: {
     all: () => ["plans", "all"],
