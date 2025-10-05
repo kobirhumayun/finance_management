@@ -27,7 +27,9 @@ export default function SummaryPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+  const [subcategorySearch, setSubcategorySearch] = useState("");
   const deferredProjectSearch = useDeferredValue(projectSearch);
+  const deferredSubcategorySearch = useDeferredValue(subcategorySearch);
   const projectOptions = useMemo(() => filtersData?.projects ?? [], [filtersData?.projects]);
   const subcategoryOptions = useMemo(() => filtersData?.subcategories ?? [], [filtersData?.subcategories]);
 
@@ -127,6 +129,25 @@ export default function SummaryPage() {
       );
     });
   }, [deferredProjectSearch, projectOptions]);
+  const filteredSubcategoryOptions = useMemo(() => {
+    if (!deferredSubcategorySearch) {
+      return subcategoryOptions;
+    }
+
+    const searchValue = deferredSubcategorySearch.trim().toLowerCase();
+    if (!searchValue) {
+      return subcategoryOptions;
+    }
+
+    return subcategoryOptions.filter((subcategory) => {
+      const label = subcategory.label || subcategory.name || "";
+      return (
+        label.toLowerCase().includes(searchValue) ||
+        String(subcategory.value ?? "").toLowerCase().includes(searchValue) ||
+        String(subcategory.id ?? "").toLowerCase().includes(searchValue)
+      );
+    });
+  }, [deferredSubcategorySearch, subcategoryOptions]);
   const typeOptions = filtersData?.transactionTypes ?? [];
 
   return (
@@ -215,17 +236,57 @@ export default function SummaryPage() {
           </div>
           <div className="grid gap-2">
             <Label>Subcategory</Label>
-            <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter} disabled={filtersLoading}>
+            <Select
+              value={subcategoryFilter}
+              onValueChange={setSubcategoryFilter}
+              disabled={filtersLoading}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setSubcategorySearch("");
+                }
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All subcategories" />
               </SelectTrigger>
               <SelectContent>
+                <div className="sticky top-0 z-10 bg-popover p-2">
+                  <Input
+                    value={subcategorySearch}
+                    onChange={(event) => setSubcategorySearch(event.target.value)}
+                    placeholder="Search subcategories..."
+                    className="h-8"
+                    onKeyDownCapture={(event) => {
+                      event.stopPropagation();
+                      if (event.nativeEvent.stopImmediatePropagation) {
+                        event.nativeEvent.stopImmediatePropagation();
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onKeyUpCapture={(event) => {
+                      event.stopPropagation();
+                      if (event.nativeEvent.stopImmediatePropagation) {
+                        event.nativeEvent.stopImmediatePropagation();
+                      }
+                    }}
+                    onKeyUp={(event) => {
+                      event.stopPropagation();
+                    }}
+                  />
+                </div>
                 <SelectItem value="all">All</SelectItem>
-                {subcategoryOptions.map((option) => (
+                {filteredSubcategoryOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
                 ))}
+                {filteredSubcategoryOptions.length === 0 && (
+                  <SelectItem key="__no_subcategories" value="__no_subcategories" disabled className="text-muted-foreground">
+                    No subcategories found
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
