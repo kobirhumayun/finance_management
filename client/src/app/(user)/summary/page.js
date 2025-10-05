@@ -164,6 +164,16 @@ export default function SummaryPage() {
       );
     });
   }, [deferredProjectSearch, projectOptions]);
+  const selectedProjectOption = useMemo(
+    () => projectOptions.find((project) => project.value === projectFilter),
+    [projectOptions, projectFilter],
+  );
+  const isProjectSelectionFilteredOut = useMemo(() => {
+    if (projectFilter === "all") {
+      return false;
+    }
+    return !filteredProjectOptions.some((project) => project.value === projectFilter);
+  }, [filteredProjectOptions, projectFilter]);
   const filteredSubcategoryOptions = useMemo(() => {
     if (!deferredSubcategorySearch) {
       return subcategoryOptions;
@@ -183,6 +193,17 @@ export default function SummaryPage() {
       );
     });
   }, [deferredSubcategorySearch, subcategoryOptions]);
+  const selectedSubcategoryOption = useMemo(
+    () =>
+      subcategoryOptions.find((subcategory) => subcategory.value === subcategoryFilter),
+    [subcategoryOptions, subcategoryFilter],
+  );
+  const isSubcategorySelectionFilteredOut = useMemo(() => {
+    if (subcategoryFilter === "all") {
+      return false;
+    }
+    return !filteredSubcategoryOptions.some((subcategory) => subcategory.value === subcategoryFilter);
+  }, [filteredSubcategoryOptions, subcategoryFilter]);
 
   const handleProjectSearchChange = (event) => {
     const { value, selectionStart, selectionEnd } = event.target;
@@ -284,6 +305,19 @@ export default function SummaryPage() {
                     {project.label || project.name || project.value}
                   </SelectItem>
                 ))}
+                {isProjectSelectionFilteredOut && selectedProjectOption ? (
+                  <SelectItem
+                    key={`__selected_project_${selectedProjectOption.value}`}
+                    value={selectedProjectOption.value}
+                    className="hidden"
+                    aria-hidden="true"
+                    style={{ display: "none" }}
+                  >
+                    {selectedProjectOption.label ||
+                      selectedProjectOption.name ||
+                      selectedProjectOption.value}
+                  </SelectItem>
+                ) : null}
                 {filteredProjectOptions.length === 0 && (
                   <SelectItem key="__no_results" value="__no_results" disabled className="text-muted-foreground">
                     No projects found
@@ -359,6 +393,19 @@ export default function SummaryPage() {
                     {option.label}
                   </SelectItem>
                 ))}
+                {isSubcategorySelectionFilteredOut && selectedSubcategoryOption ? (
+                  <SelectItem
+                    key={`__selected_subcategory_${selectedSubcategoryOption.value}`}
+                    value={selectedSubcategoryOption.value}
+                    className="hidden"
+                    aria-hidden="true"
+                    style={{ display: "none" }}
+                  >
+                    {selectedSubcategoryOption.label ||
+                      selectedSubcategoryOption.name ||
+                      selectedSubcategoryOption.value}
+                  </SelectItem>
+                ) : null}
                 {filteredSubcategoryOptions.length === 0 && (
                   <SelectItem key="__no_subcategories" value="__no_subcategories" disabled className="text-muted-foreground">
                     No subcategories found
