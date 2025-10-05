@@ -15,6 +15,34 @@ import { fetchSummaryFilters, fetchSummaryReport } from "@/lib/queries/reports";
 
 const PAGE_SIZE = 20;
 
+function focusDropdownSearch(input, selection) {
+  if (!input) {
+    return () => {};
+  }
+
+  const focus = () => {
+    if (document.activeElement !== input) {
+      input.focus({ preventScroll: true });
+    }
+
+    if (typeof input.setSelectionRange === "function") {
+      const start = typeof selection?.start === "number" ? selection.start : input.value.length;
+      const end = typeof selection?.end === "number" ? selection.end : start;
+      input.setSelectionRange(start, end);
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    const frame = window.requestAnimationFrame(focus);
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }
+
+  focus();
+  return () => {};
+}
+
 // Summary view combining filters with a tabular report.
 export default function SummaryPage() {
   const { data: filtersData, isLoading: filtersLoading } = useQuery({
@@ -34,6 +62,8 @@ export default function SummaryPage() {
   const deferredSubcategorySearch = useDeferredValue(subcategorySearch);
   const projectSearchInputRef = useRef(null);
   const subcategorySearchInputRef = useRef(null);
+  const projectSearchSelectionRef = useRef(null);
+  const subcategorySearchSelectionRef = useRef(null);
   const projectOptions = useMemo(() => filtersData?.projects ?? [], [filtersData?.projects]);
   const subcategoryOptions = useMemo(() => filtersData?.subcategories ?? [], [filtersData?.subcategories]);
 
@@ -153,97 +183,42 @@ export default function SummaryPage() {
       );
     });
   }, [deferredSubcategorySearch, subcategoryOptions]);
-  const isSelectedProjectFilteredOut = useMemo(() => {
-    if (projectFilter === "all") {
-      return false;
-    }
 
-    return !filteredProjectOptions.some((option) => option.value === projectFilter);
-  }, [projectFilter, filteredProjectOptions]);
-  const isSelectedSubcategoryFilteredOut = useMemo(() => {
-    if (subcategoryFilter === "all") {
-      return false;
-    }
-
-    return !filteredSubcategoryOptions.some((option) => option.value === subcategoryFilter);
-  }, [subcategoryFilter, filteredSubcategoryOptions]);
-  useEffect(() => {
-    if (!projectMenuOpen) {
-      return;
-    }
-
-    const input = projectSearchInputRef.current;
-    if (!input || document.activeElement === input) {
-      return;
-    }
-
-    const focus = () => {
-      input.focus({ preventScroll: true });
+  const handleProjectSearchChange = (event) => {
+    const { value, selectionStart, selectionEnd } = event.target;
+    setProjectSearch(value);
+    projectSearchSelectionRef.current = {
+      start: typeof selectionStart === "number" ? selectionStart : value.length,
+      end: typeof selectionEnd === "number" ? selectionEnd : value.length,
     };
+  };
 
-    if (typeof window !== "undefined") {
-      const frame = window.requestAnimationFrame(focus);
-      return () => {
-        window.cancelAnimationFrame(frame);
-      };
-    }
-
-    focus();
-  }, [projectMenuOpen]);
-
+  const handleSubcategorySearchChange = (event) => {
+    const { value, selectionStart, selectionEnd } = event.target;
+    setSubcategorySearch(value);
+    subcategorySearchSelectionRef.current = {
+      start: typeof selectionStart === "number" ? selectionStart : value.length,
+      end: typeof selectionEnd === "number" ? selectionEnd : value.length,
+    };
+  };
   useEffect(() => {
     if (!projectMenuOpen) {
-      return;
+      return undefined;
     }
 
-    const input = projectSearchInputRef.current;
-    if (!input || document.activeElement === input) {
-      return;
-    }
-
-    if (projectSearch && isSelectedProjectFilteredOut) {
-      input.focus({ preventScroll: true });
-    }
-  }, [projectMenuOpen, projectSearch, isSelectedProjectFilteredOut]);
+    return focusDropdownSearch(projectSearchInputRef.current, projectSearchSelectionRef.current);
+  }, [projectMenuOpen, projectSearch]);
 
   useEffect(() => {
     if (!subcategoryMenuOpen) {
-      return;
+      return undefined;
     }
 
-    const input = subcategorySearchInputRef.current;
-    if (!input || document.activeElement === input) {
-      return;
-    }
-
-    const focus = () => {
-      input.focus({ preventScroll: true });
-    };
-
-    if (typeof window !== "undefined") {
-      const frame = window.requestAnimationFrame(focus);
-      return () => {
-        window.cancelAnimationFrame(frame);
-      };
-    }
-
-    focus();
-  }, [subcategoryMenuOpen]);
-
-  useEffect(() => {
-    if (!subcategoryMenuOpen) {
-      return;
-    }
-
-    const input = subcategorySearchInputRef.current;
-    if (!input || document.activeElement === input) {
-      return;
-    }
-
-    if (subcategorySearch && isSelectedSubcategoryFilteredOut) {
-      input.focus({ preventScroll: true });
-    }
-  }, [subcategoryMenuOpen, subcategorySearch, isSelectedSubcategoryFilteredOut]);
+    return focusDropdownSearch(
+      subcategorySearchInputRef.current,
+      subcategorySearchSelectionRef.current,
+    );
+  }, [subcategoryMenuOpen, subcategorySearch]);
   const typeOptions = filtersData?.transactionTypes ?? [];
 
   return (
@@ -267,6 +242,7 @@ export default function SummaryPage() {
                 setProjectMenuOpen(open);
                 if (!open) {
                   setProjectSearch("");
+                  projectSearchSelectionRef.current = null;
                 }
               }}
             >
@@ -278,7 +254,7 @@ export default function SummaryPage() {
                   <Input
                     ref={projectSearchInputRef}
                     value={projectSearch}
-                    onChange={(event) => setProjectSearch(event.target.value)}
+                    onChange={handleProjectSearchChange}
                     placeholder="Search projects..."
                     className="h-8"
                     onKeyDownCapture={(event) => {
@@ -342,6 +318,7 @@ export default function SummaryPage() {
                 setSubcategoryMenuOpen(open);
                 if (!open) {
                   setSubcategorySearch("");
+                  subcategorySearchSelectionRef.current = null;
                 }
               }}
             >
@@ -353,7 +330,7 @@ export default function SummaryPage() {
                   <Input
                     ref={subcategorySearchInputRef}
                     value={subcategorySearch}
-                    onChange={(event) => setSubcategorySearch(event.target.value)}
+                    onChange={handleSubcategorySearchChange}
                     placeholder="Search subcategories..."
                     className="h-8"
                     onKeyDownCapture={(event) => {
