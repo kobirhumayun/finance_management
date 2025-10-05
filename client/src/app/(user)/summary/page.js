@@ -148,8 +148,23 @@ export default function SummaryPage() {
                     onChange={(event) => setProjectSearch(event.target.value)}
                     placeholder="Search projects..."
                     className="h-8"
-                    onKeyDown={(event) => {
+                    onKeyDownCapture={(event) => {
                       // Prevent the parent select from capturing the keystroke and stealing focus.
+                      event.stopPropagation();
+                      if (event.nativeEvent.stopImmediatePropagation) {
+                        event.nativeEvent.stopImmediatePropagation();
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onKeyUpCapture={(event) => {
+                      event.stopPropagation();
+                      if (event.nativeEvent.stopImmediatePropagation) {
+                        event.nativeEvent.stopImmediatePropagation();
+                      }
+                    }}
+                    onKeyUp={(event) => {
                       event.stopPropagation();
                     }}
                   />
