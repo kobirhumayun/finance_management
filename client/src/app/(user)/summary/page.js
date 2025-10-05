@@ -177,10 +177,58 @@ export default function SummaryPage() {
       return;
     }
 
+    const focus = () => {
+      input.focus({ preventScroll: true });
+    };
+
+    if (typeof window !== "undefined") {
+      const frame = window.requestAnimationFrame(focus);
+      return () => {
+        window.cancelAnimationFrame(frame);
+      };
+    }
+
+    focus();
+  }, [projectMenuOpen]);
+
+  useEffect(() => {
+    if (!projectMenuOpen) {
+      return;
+    }
+
+    const input = projectSearchInputRef.current;
+    if (!input || document.activeElement === input) {
+      return;
+    }
+
     if (projectSearch && isSelectedProjectFilteredOut) {
       input.focus({ preventScroll: true });
     }
   }, [projectMenuOpen, projectSearch, isSelectedProjectFilteredOut]);
+
+  useEffect(() => {
+    if (!subcategoryMenuOpen) {
+      return;
+    }
+
+    const input = subcategorySearchInputRef.current;
+    if (!input || document.activeElement === input) {
+      return;
+    }
+
+    const focus = () => {
+      input.focus({ preventScroll: true });
+    };
+
+    if (typeof window !== "undefined") {
+      const frame = window.requestAnimationFrame(focus);
+      return () => {
+        window.cancelAnimationFrame(frame);
+      };
+    }
+
+    focus();
+  }, [subcategoryMenuOpen]);
 
   useEffect(() => {
     if (!subcategoryMenuOpen) {
@@ -225,19 +273,7 @@ export default function SummaryPage() {
               <SelectTrigger>
                 <SelectValue placeholder="All projects" />
               </SelectTrigger>
-              <SelectContent
-                onOpenAutoFocus={(event) => {
-                  event.preventDefault();
-                  const focusSearch = () => {
-                    projectSearchInputRef.current?.focus({ preventScroll: true });
-                  };
-                  if (typeof window !== "undefined") {
-                    window.requestAnimationFrame(focusSearch);
-                  } else {
-                    focusSearch();
-                  }
-                }}
-              >
+              <SelectContent>
                 <div className="sticky top-0 z-10 bg-popover p-2">
                   <Input
                     ref={projectSearchInputRef}
@@ -312,19 +348,7 @@ export default function SummaryPage() {
               <SelectTrigger>
                 <SelectValue placeholder="All subcategories" />
               </SelectTrigger>
-              <SelectContent
-                onOpenAutoFocus={(event) => {
-                  event.preventDefault();
-                  const focusSearch = () => {
-                    subcategorySearchInputRef.current?.focus({ preventScroll: true });
-                  };
-                  if (typeof window !== "undefined") {
-                    window.requestAnimationFrame(focusSearch);
-                  } else {
-                    focusSearch();
-                  }
-                }}
-              >
+              <SelectContent>
                 <div className="sticky top-0 z-10 bg-popover p-2">
                   <Input
                     ref={subcategorySearchInputRef}
