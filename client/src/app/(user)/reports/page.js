@@ -286,11 +286,12 @@ export default function ReportsPage() {
         <p className="text-sm text-muted-foreground">Loading charts…</p>
       )}
 
+      <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
+
       <div className="grid gap-6 lg:grid-cols-2">
-        <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
+        <CashFlowChart data={chartsData?.cashFlow || []} />
         <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
       </div>
-      <CashFlowChart data={chartsData?.cashFlow || []} />
     </div>
   );
 }
