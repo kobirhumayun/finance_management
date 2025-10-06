@@ -182,7 +182,8 @@ function toSafeNumber(value) {
     }
 
     if (typeof value.toString === "function" && value.toString !== Object.prototype.toString) {
-      const parsedFromToString = Number(value.toString());
+      const decimalString = value.toString();
+      const parsedFromToString = Number(decimalString);
       return Number.isFinite(parsedFromToString) ? parsedFromToString : 0;
     }
   }
