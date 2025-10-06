@@ -13,11 +13,9 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toNumeric } from "@/lib/utils/numbers";
 
-const toNumber = (value) => {
-  const numeric = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-};
+const toNumber = (value) => toNumeric(value);
 
 const toMonthLabel = (value) => {
   if (typeof value === "string") {

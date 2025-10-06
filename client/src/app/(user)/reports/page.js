@@ -13,14 +13,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { qk } from "@/lib/query-keys";
 import { fetchReportCharts, fetchReportFilters } from "@/lib/queries/reports";
+import { toNumeric } from "@/lib/utils/numbers";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const integerFormatter = new Intl.NumberFormat("en-US");
 
-const toNumber = (value) => {
-  const numeric = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-};
+const toNumber = (value) => toNumeric(value);
 
 const formatCurrency = (value) => currencyFormatter.format(toNumber(value));
 const formatInteger = (value) => integerFormatter.format(Math.round(toNumber(value)));
