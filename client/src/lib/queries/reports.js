@@ -31,25 +31,32 @@ const normalizeTransaction = (transaction) => {
     date: transaction.date ?? null,
     type: transaction.type ?? "Expense",
     subcategory: transaction.subcategory ?? "",
-    amount: Number(transaction.amount) || 0,
+    amount: toSafeNumber(transaction.amount),
     description: transaction.description ?? "",
   };
 };
 
 const normalizeSummary = (summary) => {
-  const income = Number(summary?.income) || 0;
-  const expense = Number(summary?.expense) || 0;
-  const balance = Number(summary?.balance) || income - expense;
+  const income = toSafeNumber(summary?.income);
+  const expense = toSafeNumber(summary?.expense);
+  const balanceValue = toSafeNumber(summary?.balance);
+  const hasBalance = summary?.balance !== undefined && summary?.balance !== null;
+  const balance = hasBalance && Number.isFinite(balanceValue) ? balanceValue : income - expense;
   const counts = summary?.counts ?? {};
+
+  const incomeCount = toSafeNumber(counts.income);
+  const expenseCount = toSafeNumber(counts.expense);
+  const hasTotalCount = counts.total !== undefined && counts.total !== null;
+  const totalCount = hasTotalCount ? toSafeNumber(counts.total) : incomeCount + expenseCount;
 
   return {
     income,
     expense,
     balance,
     counts: {
-      income: Number(counts.income) || 0,
-      expense: Number(counts.expense) || 0,
-      total: Number(counts.total) || (Number(counts.income) || 0) + (Number(counts.expense) || 0),
+      income: incomeCount,
+      expense: expenseCount,
+      total: totalCount,
     },
   };
 };
@@ -62,10 +69,10 @@ const normalizeAggregateByProject = (aggregate) => {
   return {
     projectId: aggregate.projectId ?? "",
     projectName: aggregate.projectName ?? null,
-    income: Number(aggregate.income) || 0,
-    expense: Number(aggregate.expense) || 0,
-    balance: Number(aggregate.balance) || 0,
-    transactionCount: Number(aggregate.transactionCount) || 0,
+    income: toSafeNumber(aggregate.income),
+    expense: toSafeNumber(aggregate.expense),
+    balance: toSafeNumber(aggregate.balance),
+    transactionCount: toSafeNumber(aggregate.transactionCount),
   };
 };
 
@@ -157,10 +164,32 @@ const normalizeAppliedDateRange = (range) => {
   return { start, end };
 };
 
-const toSafeNumber = (value) => {
-  const numeric = typeof value === "number" ? value : Number(value);
+function toSafeNumber(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+
+  if (value && typeof value === "object") {
+    const decimal = value.$numberDecimal ?? value.$numberDouble ?? value.$numberInt ?? value.$numberLong;
+    if (typeof decimal === "string") {
+      const parsedDecimal = Number(decimal);
+      return Number.isFinite(parsedDecimal) ? parsedDecimal : 0;
+    }
+
+    if (typeof value.toString === "function" && value.toString !== Object.prototype.toString) {
+      const parsedFromToString = Number(value.toString());
+      return Number.isFinite(parsedFromToString) ? parsedFromToString : 0;
+    }
+  }
+
+  const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
-};
+}
 
 const toLabel = (value) => {
   if (typeof value === "string") {
