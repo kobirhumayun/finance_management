@@ -1,5 +1,6 @@
 // File: src/lib/queries/reports.js
 import { apiJSON } from "@/lib/api";
+import { toNumeric } from "@/lib/utils/numbers";
 
 const REPORTS_BASE = "/api/reports";
 const REPORT_FILTERS_ENDPOINT = `${REPORTS_BASE}/filters`;
@@ -31,23 +32,23 @@ const normalizeTransaction = (transaction) => {
     date: transaction.date ?? null,
     type: transaction.type ?? "Expense",
     subcategory: transaction.subcategory ?? "",
-    amount: toSafeNumber(transaction.amount),
+    amount: toNumeric(transaction.amount),
     description: transaction.description ?? "",
   };
 };
 
 const normalizeSummary = (summary) => {
-  const income = toSafeNumber(summary?.income);
-  const expense = toSafeNumber(summary?.expense);
-  const balanceValue = toSafeNumber(summary?.balance);
+  const income = toNumeric(summary?.income);
+  const expense = toNumeric(summary?.expense);
+  const balanceValue = toNumeric(summary?.balance);
   const hasBalance = summary?.balance !== undefined && summary?.balance !== null;
   const balance = hasBalance && Number.isFinite(balanceValue) ? balanceValue : income - expense;
   const counts = summary?.counts ?? {};
 
-  const incomeCount = toSafeNumber(counts.income);
-  const expenseCount = toSafeNumber(counts.expense);
+  const incomeCount = toNumeric(counts.income);
+  const expenseCount = toNumeric(counts.expense);
   const hasTotalCount = counts.total !== undefined && counts.total !== null;
-  const totalCount = hasTotalCount ? toSafeNumber(counts.total) : incomeCount + expenseCount;
+  const totalCount = hasTotalCount ? toNumeric(counts.total) : incomeCount + expenseCount;
 
   return {
     income,
@@ -69,10 +70,10 @@ const normalizeAggregateByProject = (aggregate) => {
   return {
     projectId: aggregate.projectId ?? "",
     projectName: aggregate.projectName ?? null,
-    income: toSafeNumber(aggregate.income),
-    expense: toSafeNumber(aggregate.expense),
-    balance: toSafeNumber(aggregate.balance),
-    transactionCount: toSafeNumber(aggregate.transactionCount),
+    income: toNumeric(aggregate.income),
+    expense: toNumeric(aggregate.expense),
+    balance: toNumeric(aggregate.balance),
+    transactionCount: toNumeric(aggregate.transactionCount),
   };
 };
 
@@ -164,34 +165,6 @@ const normalizeAppliedDateRange = (range) => {
   return { start, end };
 };
 
-function toSafeNumber(value) {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  if (typeof value === "string") {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : 0;
-  }
-
-  if (value && typeof value === "object") {
-    const decimal = value.$numberDecimal ?? value.$numberDouble ?? value.$numberInt ?? value.$numberLong;
-    if (typeof decimal === "string") {
-      const parsedDecimal = Number(decimal);
-      return Number.isFinite(parsedDecimal) ? parsedDecimal : 0;
-    }
-
-    if (typeof value.toString === "function" && value.toString !== Object.prototype.toString) {
-      const decimalString = value.toString();
-      const parsedFromToString = Number(decimalString);
-      return Number.isFinite(parsedFromToString) ? parsedFromToString : 0;
-    }
-  }
-
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-}
-
 const toLabel = (value) => {
   if (typeof value === "string") {
     return value.trim();
@@ -216,8 +189,8 @@ const normalizeIncomeExpenseSeries = (series) => {
 
       return {
         month,
-        income: toSafeNumber(item?.income),
-        expense: toSafeNumber(item?.expense),
+        income: toNumeric(item?.income),
+        expense: toNumeric(item?.expense),
       };
     })
     .filter(Boolean);
@@ -237,8 +210,8 @@ const normalizeCashFlowSeries = (series) => {
 
       return {
         month,
-        cashIn: toSafeNumber(item?.cashIn),
-        cashOut: toSafeNumber(item?.cashOut),
+        cashIn: toNumeric(item?.cashIn),
+        cashOut: toNumeric(item?.cashOut),
       };
     })
     .filter(Boolean);
@@ -258,7 +231,7 @@ const normalizeExpenseByCategory = (series) => {
 
       return {
         name,
-        value: toSafeNumber(item?.value),
+        value: toNumeric(item?.value),
       };
     })
     .filter(Boolean)
@@ -333,10 +306,10 @@ export async function fetchSummaryReport({
   const pageInfo = {
     hasNextPage: Boolean(response?.pageInfo?.hasNextPage),
     nextCursor: response?.pageInfo?.nextCursor ?? null,
-    limit: response?.pageInfo?.limit ?? limit ?? 20,
+    limit: toNumeric(response?.pageInfo?.limit ?? limit ?? 20),
   };
 
-  const totalCount = typeof response?.totalCount === "number" ? response.totalCount : transactions.length;
+  const totalCount = toNumeric(response?.totalCount ?? transactions.length);
 
   const aggregates = {
     byProject: Array.isArray(response?.aggregates?.byProject)
