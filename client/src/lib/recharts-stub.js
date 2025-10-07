@@ -98,6 +98,11 @@ export function Bar() {
 }
 Bar.chartType = "Bar";
 
+export function Rectangle() {
+  return null;
+}
+Rectangle.chartType = "Rectangle";
+
 export function PieChart({ children }) {
   const pies = collect(children, "Pie");
   const cells = collect(children, "Cell");
