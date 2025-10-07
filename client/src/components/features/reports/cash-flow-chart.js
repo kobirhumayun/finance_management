@@ -17,10 +17,10 @@ export default function CashFlowChart({ data = [] }) {
             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
             <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value / 1000}k`} />
-            <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} cursor={{ stroke: "hsl(var(--primary))" }} />
+            <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} cursor={{ stroke: "var(--primary)" }} />
             <Legend />
-            <Line type="monotone" dataKey="cashIn" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="cashOut" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="cashIn" stroke="var(--primary)" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="cashOut" stroke="var(--chart-3)" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </CardContent>

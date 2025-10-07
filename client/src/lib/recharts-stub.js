@@ -2,11 +2,11 @@
 import React from "react";
 
 const DEFAULT_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
+  "var(--primary)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 function flattenChildren(children) {
@@ -161,7 +161,7 @@ export function LineChart({ data = [], children }) {
             strokeWidth={2}
           />
         ))}
-        <line x1="0" y1="100" x2="100" y2="100" stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} />
+        <line x1="0" y1="100" x2="100" y2="100" stroke="var(--muted-foreground)" strokeWidth={0.5} />
       </svg>
       <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground">
         {data.map((row, index) => (

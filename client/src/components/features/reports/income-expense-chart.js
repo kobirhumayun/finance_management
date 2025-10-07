@@ -95,10 +95,10 @@ export default function IncomeExpenseChart({ data = [] }) {
                 axisLine={false}
                 tickFormatter={formatCurrencyTick}
               />
-              <Tooltip formatter={formatTooltipValue} cursor={{ fill: "hsl(var(--muted))" }} />
+              <Tooltip formatter={formatTooltipValue} cursor={{ fill: "var(--muted)" }} />
               <Legend />
-              <Bar dataKey="income" name="Income" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="Expense" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="income" name="Income" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name="Expense" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
