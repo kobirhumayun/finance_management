@@ -7,6 +7,7 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -85,9 +86,18 @@ export default function IncomeExpenseChart({ data = [] }) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-              <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="month"
+                stroke="currentColor"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
               <YAxis
                 stroke="currentColor"
                 fontSize={12}
@@ -97,8 +107,20 @@ export default function IncomeExpenseChart({ data = [] }) {
               />
               <Tooltip formatter={formatTooltipValue} cursor={{ fill: "var(--muted)" }} />
               <Legend />
-              <Bar dataKey="income" name="Income" fill="var(--primary)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="Expense" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="income"
+                name="Income"
+                fill="#8884d8"
+                radius={[4, 4, 0, 0]}
+                activeBar={<Rectangle fill="pink" stroke="blue" />}
+              />
+              <Bar
+                dataKey="expense"
+                name="Expense"
+                fill="#82ca9d"
+                radius={[4, 4, 0, 0]}
+                activeBar={<Rectangle fill="gold" stroke="purple" />}
+              />
             </BarChart>
           </ResponsiveContainer>
         )}
