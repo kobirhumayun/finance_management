@@ -1,5 +1,5 @@
 // File: src/lib/recharts-stub.js
-import React from "react";
+import React, { useMemo, useState } from "react";
 
 const DEFAULT_COLORS = [
   "var(--primary)",
@@ -20,6 +20,87 @@ function collect(children, chartType) {
   return flattenChildren(children)
     .filter((child) => child.type?.chartType === chartType)
     .map((child) => child.props);
+}
+
+function parseBars(children) {
+  return React.Children.toArray(children)
+    .filter((child) => React.isValidElement(child) && child.type?.chartType === "Bar")
+    .map((bar) => ({
+      dataKey: bar.props?.dataKey,
+      name: bar.props?.name,
+      fill: bar.props?.fill,
+      fillOpacity: bar.props?.fillOpacity,
+      stroke: bar.props?.stroke,
+      strokeWidth: bar.props?.strokeWidth,
+      radius: bar.props?.radius,
+      cells: React.Children.toArray(bar.props?.children)
+        .filter((cell) => React.isValidElement(cell) && cell.type?.chartType === "Cell")
+        .map((cell) => cell.props || {}),
+    }));
+}
+
+function resolveRadiusStyle(radius) {
+  if (!radius && radius !== 0) {
+    return {};
+  }
+
+  if (Array.isArray(radius)) {
+    const [topLeft = 0, topRight = 0, bottomRight = 0, bottomLeft = 0] = radius;
+    return {
+      borderTopLeftRadius: `${topLeft}px`,
+      borderTopRightRadius: `${topRight}px`,
+      borderBottomRightRadius: `${bottomRight}px`,
+      borderBottomLeftRadius: `${bottomLeft}px`,
+    };
+  }
+
+  if (typeof radius === "number") {
+    return { borderRadius: `${radius}px` };
+  }
+
+  return {};
+}
+
+function resolveGap(value, fallback, barSize) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const numeric = Number.parseFloat(value);
+    if (Number.isFinite(numeric)) {
+      if (value.trim().endsWith("%")) {
+        return (numeric / 100) * (barSize ? barSize * 2 : 24);
+      }
+      return numeric;
+    }
+  }
+
+  return fallback;
+}
+
+function buildTooltipElement(tooltipNode, hoverState) {
+  if (!tooltipNode) return null;
+
+  const content = tooltipNode.props?.content;
+  if (!content) return null;
+
+  const tooltipProps = {
+    active: Boolean(hoverState),
+    payload: hoverState?.payload ?? [],
+    label: hoverState?.label ?? null,
+  };
+
+  if (React.isValidElement(content)) {
+    return React.cloneElement(content, tooltipProps);
+  }
+
+  if (typeof content === "function") {
+    const Content = content;
+    return <Content {...tooltipProps} />;
+  }
+
+  return null;
 }
 
 export function ResponsiveContainer({ width = "100%", height = 300, children }) {
@@ -60,34 +141,129 @@ export function YAxis() {
 }
 YAxis.chartType = "YAxis";
 
-export function BarChart({ data = [], children }) {
-  const bars = collect(children, "Bar");
+export function BarChart({
+  data = [],
+  children,
+  onMouseMove,
+  onMouseLeave,
+  barSize,
+  barGap = 12,
+  barCategoryGap = "20%",
+}) {
+  const [hoverState, setHoverState] = useState(null);
+
+  const bars = useMemo(() => parseBars(children), [children]);
+  const tooltipNode = useMemo(
+    () => flattenChildren(children).find((child) => child.type?.chartType === "Tooltip"),
+    [children]
+  );
+
   const keys = bars.map((bar) => bar.dataKey);
   const colors = bars.map((bar, index) => bar.fill || DEFAULT_COLORS[index % DEFAULT_COLORS.length]);
-  const numericValues = data.flatMap((row) => keys.map((key) => Number(row[key]) || 0));
+  const resolvedBarSize = Number.isFinite(barSize) ? barSize : 24;
+  const resolvedBarGap = resolveGap(barGap, 12, resolvedBarSize);
+  const resolvedCategoryGap = resolveGap(barCategoryGap, 24, resolvedBarSize);
+
+  const numericValues = data.flatMap((row) => keys.map((key) => Number(row?.[key]) || 0));
   const maxValue = Math.max(...numericValues, 1);
 
+  const tooltipElement = buildTooltipElement(tooltipNode, hoverState);
+  const cursorStyles = tooltipNode?.props?.cursor || {};
+
+  const payloadForIndex = (groupIndex) =>
+    keys.map((key, keyIndex) => ({
+      dataKey: key,
+      name: bars[keyIndex]?.name ?? key,
+      value: Number(data[groupIndex]?.[key]) || 0,
+      color: colors[keyIndex],
+      payload: data[groupIndex],
+    }));
+
+  const labelForIndex = (groupIndex) =>
+    data[groupIndex]?.month || data[groupIndex]?.name || `#${groupIndex + 1}`;
+
+  const handleBarHover = (groupIndex, dataKey, keyIndex) => (event) => {
+    const payload = payloadForIndex(groupIndex);
+    const label = labelForIndex(groupIndex);
+
+    setHoverState({ index: groupIndex, dataKey, payload, label });
+
+    onMouseMove?.(
+      {
+        isTooltipActive: true,
+        activeTooltipIndex: groupIndex,
+        activeLabel: label,
+        activePayload: payload,
+        chartX: keyIndex,
+        tooltipCoordinate: { x: keyIndex + 0.5 },
+      },
+      event
+    );
+  };
+
+  const handleMouseLeave = (event) => {
+    setHoverState(null);
+    onMouseLeave?.(event);
+  };
+
   return (
-    <div className="flex w-full items-end gap-6 overflow-hidden px-4" role="img" aria-label="Bar chart">
-      {data.map((row, index) => (
-        <div key={row.month || row.name || index} className="flex flex-col items-center gap-2 text-xs">
-          <div className="flex h-40 items-end gap-2">
-            {keys.map((key, keyIndex) => {
-              const value = Number(row[key]) || 0;
-              const height = Math.max(6, (value / maxValue) * 100);
-              return (
-                <div
-                  key={key}
-                  className="w-4 rounded-t-md"
-                  style={{ height: `${height}%`, backgroundColor: colors[keyIndex] }}
-                  title={`${key}: ${value.toLocaleString()}`}
-                />
-              );
-            })}
-          </div>
-          <span className="text-muted-foreground">{row.month || row.name || `#${index + 1}`}</span>
-        </div>
-      ))}
+    <div className="relative flex h-full w-full flex-col" role="img" aria-label="Bar chart" onMouseLeave={handleMouseLeave}>
+      <div
+        className="flex flex-1 items-end justify-center overflow-hidden px-4"
+        style={{ gap: `${resolvedCategoryGap}px` }}
+      >
+        {data.map((row, index) => {
+          const groupLabel = row?.month || row?.name || `#${index + 1}`;
+          const isGroupActive = hoverState?.index === index;
+
+          return (
+            <div key={groupLabel} className="flex flex-col items-center gap-2 text-xs">
+              <div
+                className="flex h-40 items-end rounded-md px-2 py-1 transition-all"
+                style={{
+                  backgroundColor: isGroupActive ? cursorStyles.fill || "var(--muted)" : "transparent",
+                  opacity: isGroupActive ? cursorStyles.fillOpacity ?? 0.25 : 1,
+                  gap: `${resolvedBarGap}px`,
+                }}
+              >
+                {keys.map((key, keyIndex) => {
+                  const value = Number(row?.[key]) || 0;
+                  const height = Math.max(6, (value / maxValue) * 100);
+                  const barDefinition = bars[keyIndex] || {};
+                  const cell = barDefinition.cells?.[index] || {};
+                  const fill = cell.fill || barDefinition.fill || colors[keyIndex];
+                  const opacity = cell.fillOpacity ?? barDefinition.fillOpacity ?? 1;
+                  const stroke = cell.stroke || barDefinition.stroke;
+                  const strokeWidth = cell.strokeWidth ?? barDefinition.strokeWidth ?? 0;
+                  const radiusStyle = resolveRadiusStyle(cell.radius ?? barDefinition.radius);
+
+                  const shadow = stroke && strokeWidth ? `0 0 0 ${strokeWidth}px ${stroke}` : undefined;
+
+                  return (
+                    <div
+                      key={`${key}-${index}`}
+                      onMouseEnter={handleBarHover(index, key, keyIndex)}
+                      onMouseMove={handleBarHover(index, key, keyIndex)}
+                      style={{
+                        height: `${height}%`,
+                        width: `${resolvedBarSize}px`,
+                        backgroundColor: fill,
+                        opacity,
+                        boxShadow: shadow,
+                        transition: "opacity 150ms ease, box-shadow 150ms ease",
+                        ...radiusStyle,
+                      }}
+                      title={`${barDefinition.name || key}: ${value.toLocaleString()}`}
+                    />
+                  );
+                })}
+              </div>
+              <span className="text-muted-foreground">{groupLabel}</span>
+            </div>
+          );
+        })}
+      </div>
+      {tooltipElement ? <div className="pointer-events-none absolute right-4 top-4 z-10">{tooltipElement}</div> : null}
     </div>
   );
 }
