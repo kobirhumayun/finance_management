@@ -323,16 +323,18 @@ export default function IncomeExpenseChart({ data = [] }) {
           </div>
         )}
         {scaleMarkers.length > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <div className="mt-4 flex flex-col gap-2 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Scale</span>
-            {scaleMarkers.map((marker) => (
-              <span key={marker.ratio} className="flex items-center gap-2">
-                <span className="h-px w-6 rounded-full bg-border" aria-hidden />
-                <span>
-                  {marker.label}: {marker.value}
+            <div className="flex flex-col gap-2">
+              {scaleMarkers.map((marker) => (
+                <span key={marker.ratio} className="flex items-center gap-2">
+                  <span className="h-6 w-px rounded-full bg-border" aria-hidden />
+                  <span>
+                    {marker.label}: {marker.value}
+                  </span>
                 </span>
-              </span>
-            ))}
+              ))}
+            </div>
           </div>
         ) : null}
       </CardContent>
