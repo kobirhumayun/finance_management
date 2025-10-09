@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 
 const toNumber = (value) => toNumeric(value);
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const toMonthLabel = (value) => {
   if (typeof value === "string") {
@@ -186,34 +187,43 @@ export default function IncomeExpenseChart({ data = [] }) {
   const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
 
   const groupCount = chartData.length;
+  const seriesPerGroup = 2;
 
-  const targetBarSize = useMemo(() => {
+  const sizing = useMemo(() => {
     if (!containerWidth || groupCount === 0) {
-      return undefined;
+      return {
+        barSize: undefined,
+        barGap: 12,
+        barCategoryGap: "20%",
+      };
     }
 
-    const MAX_BAR_WIDTH = 48;
     const MIN_BAR_WIDTH = 12;
-    const calculated = containerWidth / (groupCount * 3);
-    const safeValue = Math.max(MIN_BAR_WIDTH, Math.min(MAX_BAR_WIDTH, calculated));
-    return Number.isFinite(safeValue) ? Math.round(safeValue) : undefined;
-  }, [containerWidth, groupCount]);
+    const MAX_BAR_WIDTH = 48;
+    const MIN_GROUP_GAP = 8;
+    const MAX_GROUP_GAP = 32;
+    const MIN_SERIES_GAP = 4;
+    const MAX_SERIES_GAP = 24;
 
-  const barGap = useMemo(() => {
-    if (!targetBarSize) return 12;
-    return Math.max(6, Math.round(targetBarSize * 0.4));
-  }, [targetBarSize]);
+    const groupGapPx = clamp(containerWidth * 0.03, MIN_GROUP_GAP, MAX_GROUP_GAP);
+    const availableWidth = Math.max(containerWidth - groupGapPx * (groupCount - 1), MIN_BAR_WIDTH);
+    const groupWidth = availableWidth / groupCount;
 
-  const barCategoryGap = useMemo(() => {
-    if (!targetBarSize || !containerWidth || groupCount === 0) {
-      return "20%";
-    }
+    const innerGapPx = seriesPerGroup > 1 ? clamp(groupWidth * 0.08, MIN_SERIES_GAP, MAX_SERIES_GAP) : 0;
+    const totalInnerGap = innerGapPx * Math.max(seriesPerGroup - 1, 0);
 
-    const groupWidth = containerWidth / groupCount;
-    const availableForGap = Math.max(groupWidth - targetBarSize * 2, targetBarSize * 0.5);
-    const ratio = Math.max(0.1, Math.min(0.6, availableForGap / groupWidth));
-    return `${Math.round(ratio * 100)}%`;
-  }, [targetBarSize, containerWidth, groupCount]);
+    const computedBarSize = (groupWidth - totalInnerGap) / Math.max(seriesPerGroup, 1);
+    const safeBarSize = clamp(computedBarSize, MIN_BAR_WIDTH, MAX_BAR_WIDTH);
+
+    const normalizedGroupWidth = safeBarSize * seriesPerGroup + totalInnerGap;
+    const categoryGapPercent = `${Math.max(0, (groupGapPx / Math.max(normalizedGroupWidth, 1)) * 100).toFixed(2)}%`;
+
+    return {
+      barSize: Math.round(safeBarSize),
+      barGap: Math.round(innerGapPx),
+      barCategoryGap: categoryGapPercent,
+    };
+  }, [containerWidth, groupCount, seriesPerGroup]);
 
   const resetActiveBar = useCallback(() => {
     setActiveBar({ index: null, dataKey: null });
@@ -277,9 +287,9 @@ export default function IncomeExpenseChart({ data = [] }) {
                 <BarChart
                   data={chartData}
                   margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
-                  barSize={targetBarSize}
-                  barGap={barGap}
-                  barCategoryGap={barCategoryGap}
+                  barSize={sizing.barSize}
+                  barGap={sizing.barGap}
+                  barCategoryGap={sizing.barCategoryGap}
                   onMouseMove={handleChartMouseMove}
                   onMouseLeave={resetActiveBar}
                 >
