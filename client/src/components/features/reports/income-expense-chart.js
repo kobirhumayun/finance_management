@@ -197,7 +197,7 @@ export default function IncomeExpenseChart({ data = [] }) {
     return `${Math.round(ratio * 100)}%`;
   }, [targetBarSize, containerWidth, groupCount]);
 
-  const handleBarEnter = useCallback((_, index, dataKey) => {
+  const handleBarEnter = useCallback((dataKey, index) => {
     setActiveBar({ index, dataKey });
   }, []);
 
@@ -247,13 +247,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                   content={<IncomeExpenseTooltip />}
                 />
                 <Legend />
-                <Bar
-                  dataKey="income"
-                  name="Income"
-                  fill={incomeColor}
-                  onMouseEnter={(payload, index) => handleBarEnter(payload, index, "income")}
-                  onMouseLeave={handleBarLeave}
-                >
+                <Bar dataKey="income" name="Income" fill={incomeColor}>
                   {chartData.map((_, index) => {
                     const isActive = activeBar?.dataKey === "income" && activeBar?.index === index;
                     const isOtherActive =
@@ -264,20 +258,16 @@ export default function IncomeExpenseChart({ data = [] }) {
                         key={`income-${index}`}
                         radius={[4, 4, 0, 0]}
                         fill={incomeColor}
-                        fillOpacity={isActive ? 1 : isOtherActive ? 0.4 : 0.85}
+                        fillOpacity={isActive ? 1 : isOtherActive ? 0.35 : 0.85}
                         stroke={isActive ? highlightColor : undefined}
                         strokeWidth={isActive ? 2 : 0}
+                        onMouseEnter={() => handleBarEnter("income", index)}
+                        onMouseLeave={handleBarLeave}
                       />
                     );
                   })}
                 </Bar>
-                <Bar
-                  dataKey="expense"
-                  name="Expense"
-                  fill={expenseColor}
-                  onMouseEnter={(payload, index) => handleBarEnter(payload, index, "expense")}
-                  onMouseLeave={handleBarLeave}
-                >
+                <Bar dataKey="expense" name="Expense" fill={expenseColor}>
                   {chartData.map((_, index) => {
                     const isActive = activeBar?.dataKey === "expense" && activeBar?.index === index;
                     const isOtherActive =
@@ -288,9 +278,11 @@ export default function IncomeExpenseChart({ data = [] }) {
                         key={`expense-${index}`}
                         radius={[4, 4, 0, 0]}
                         fill={expenseColor}
-                        fillOpacity={isActive ? 1 : isOtherActive ? 0.4 : 0.85}
+                        fillOpacity={isActive ? 1 : isOtherActive ? 0.35 : 0.85}
                         stroke={isActive ? highlightColor : undefined}
                         strokeWidth={isActive ? 2 : 0}
+                        onMouseEnter={() => handleBarEnter("expense", index)}
+                        onMouseLeave={handleBarLeave}
                       />
                     );
                   })}
