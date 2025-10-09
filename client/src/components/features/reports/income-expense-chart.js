@@ -157,6 +157,24 @@ export default function IncomeExpenseChart({ data = [] }) {
   }, [data]);
 
   const hasSeries = chartData.some((item) => item.income !== 0 || item.expense !== 0);
+  const maxValue = useMemo(() => {
+    return chartData.reduce((max, item) => {
+      return Math.max(max, Math.abs(item.income || 0), Math.abs(item.expense || 0));
+    }, 0);
+  }, [chartData]);
+
+  const scaleMarkers = useMemo(() => {
+    if (!Number.isFinite(maxValue) || maxValue <= 0) {
+      return [];
+    }
+
+    const anchors = [0.25, 0.5, 0.75, 1];
+    return anchors.map((ratio) => ({
+      ratio,
+      label: `${Math.round(ratio * 100)}%`,
+      value: formatCurrencyTick(maxValue * ratio),
+    }));
+  }, [maxValue]);
 
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
@@ -254,6 +272,14 @@ export default function IncomeExpenseChart({ data = [] }) {
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={formatCurrencyTick}
+                  label={{
+                    value: "Amount (USD)",
+                    angle: -90,
+                    position: "insideLeft",
+                    offset: -4,
+                    fill: "currentColor",
+                    fontSize: 12,
+                  }}
                 />
                 <Tooltip
                   cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
@@ -296,6 +322,19 @@ export default function IncomeExpenseChart({ data = [] }) {
             </ResponsiveContainer>
           </div>
         )}
+        {scaleMarkers.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Scale</span>
+            {scaleMarkers.map((marker) => (
+              <span key={marker.ratio} className="flex items-center gap-2">
+                <span className="h-px w-6 rounded-full bg-border" aria-hidden />
+                <span>
+                  {marker.label}: {marker.value}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
