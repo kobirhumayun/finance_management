@@ -74,15 +74,23 @@ const useElementSize = () => {
       return undefined;
     }
 
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        const { width, height } = entry.contentRect;
+    const updateSizeFromEntry = (entry) => {
+      if (!entry) return;
+      const rect = entry.contentRect ?? entry;
+      const { width, height } = rect || {};
+      if (typeof width === "number" && typeof height === "number") {
         setSize({ width, height });
       }
+    };
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      updateSizeFromEntry(entry);
     });
 
     observer.observe(ref.current);
+
+    updateSizeFromEntry(ref.current.getBoundingClientRect?.());
 
     return () => {
       observer.disconnect();
@@ -199,29 +207,26 @@ export default function IncomeExpenseChart({ data = [] }) {
     }
 
     const MIN_BAR_WIDTH = 12;
-    const MAX_BAR_WIDTH = 48;
     const MIN_GROUP_GAP = 8;
     const MAX_GROUP_GAP = 32;
     const MIN_SERIES_GAP = 4;
     const MAX_SERIES_GAP = 24;
 
     const groupGapPx = clamp(containerWidth * 0.03, MIN_GROUP_GAP, MAX_GROUP_GAP);
-    const availableWidth = Math.max(containerWidth - groupGapPx * (groupCount - 1), MIN_BAR_WIDTH);
-    const groupWidth = availableWidth / groupCount;
+    const totalGroupGap = groupGapPx * Math.max(groupCount - 1, 0);
+    const availableWidth = Math.max(containerWidth - totalGroupGap, groupCount * MIN_BAR_WIDTH);
+    const groupWidth = availableWidth / Math.max(groupCount, 1);
 
     const innerGapPx = seriesPerGroup > 1 ? clamp(groupWidth * 0.08, MIN_SERIES_GAP, MAX_SERIES_GAP) : 0;
     const totalInnerGap = innerGapPx * Math.max(seriesPerGroup - 1, 0);
 
     const computedBarSize = (groupWidth - totalInnerGap) / Math.max(seriesPerGroup, 1);
-    const safeBarSize = clamp(computedBarSize, MIN_BAR_WIDTH, MAX_BAR_WIDTH);
-
-    const normalizedGroupWidth = safeBarSize * seriesPerGroup + totalInnerGap;
-    const categoryGapPercent = `${Math.max(0, (groupGapPx / Math.max(normalizedGroupWidth, 1)) * 100).toFixed(2)}%`;
+    const safeBarSize = Math.max(MIN_BAR_WIDTH, computedBarSize);
 
     return {
-      barSize: Math.round(safeBarSize),
-      barGap: Math.round(innerGapPx),
-      barCategoryGap: categoryGapPercent,
+      barSize: safeBarSize,
+      barGap: innerGapPx,
+      barCategoryGap: groupGapPx,
     };
   }, [containerWidth, groupCount, seriesPerGroup]);
 
