@@ -158,8 +158,8 @@ export default function IncomeExpenseChart({ data = [] }) {
 
   const hasSeries = chartData.some((item) => item.income !== 0 || item.expense !== 0);
 
-  const incomeColor = useCSSVariable("--chart-1");
-  const expenseColor = useCSSVariable("--chart-2");
+  const incomeColor = useCSSVariable("--chart-income");
+  const expenseColor = useCSSVariable("--chart-expense");
   const ringColor = useCSSVariable("--ring");
   const cursorFill = useCSSVariable("--muted");
   const highlightColor = ringColor || incomeColor || expenseColor;
@@ -264,14 +264,12 @@ export default function IncomeExpenseChart({ data = [] }) {
                   {chartData.map((_, index) => {
                     const isActive =
                       activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "income");
-                    const isDimmed = activeBar.index !== null && activeBar.index !== index;
 
                     return (
                       <Cell
                         key={`income-${index}`}
                         radius={[4, 4, 0, 0]}
                         fill={incomeColor}
-                        fillOpacity={isActive ? 1 : isDimmed ? 0.25 : 0.85}
                         stroke={isActive ? highlightColor : undefined}
                         strokeWidth={isActive ? 2 : 0}
                       />
@@ -282,14 +280,12 @@ export default function IncomeExpenseChart({ data = [] }) {
                   {chartData.map((_, index) => {
                     const isActive =
                       activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "expense");
-                    const isDimmed = activeBar.index !== null && activeBar.index !== index;
 
                     return (
                       <Cell
                         key={`expense-${index}`}
                         radius={[4, 4, 0, 0]}
                         fill={expenseColor}
-                        fillOpacity={isActive ? 1 : isDimmed ? 0.25 : 0.85}
                         stroke={isActive ? highlightColor : undefined}
                         strokeWidth={isActive ? 2 : 0}
                       />
