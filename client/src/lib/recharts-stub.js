@@ -217,7 +217,11 @@ export function BarChart({
           const isGroupActive = hoverState?.index === index;
 
           return (
-            <div key={groupLabel} className="flex flex-col items-center gap-2 text-xs">
+            <div
+              key={groupLabel}
+              className="flex h-full flex-col items-center gap-2 text-xs"
+              style={{ alignSelf: "stretch" }}
+            >
               <div
                 className="flex h-full w-full items-end rounded-md px-2 py-1 transition-all"
                 style={{
