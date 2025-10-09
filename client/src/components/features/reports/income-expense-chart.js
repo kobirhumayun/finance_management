@@ -2,17 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Rectangle,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 
@@ -207,31 +197,6 @@ export default function IncomeExpenseChart({ data = [] }) {
     return `${Math.round(ratio * 100)}%`;
   }, [targetBarSize, containerWidth, groupCount]);
 
-  const CustomBarShape = useCallback(
-    (dataKey) => {
-      const InteractiveBar = (props) => {
-        const { fill, ...rest } = props;
-        const isActive = activeBar?.dataKey === dataKey && activeBar?.index === props.index;
-
-        return (
-          <Rectangle
-            {...rest}
-            fill={fill}
-            radius={[4, 4, 0, 0]}
-            fillOpacity={isActive ? 1 : 0.85}
-            stroke={highlightColor}
-            strokeOpacity={isActive ? 1 : 0}
-            strokeWidth={isActive ? 2 : 0}
-          />
-        );
-      };
-
-      InteractiveBar.displayName = `IncomeExpense${dataKey}BarShape`;
-      return InteractiveBar;
-    },
-    [activeBar, highlightColor]
-  );
-
   const handleBarEnter = useCallback((_, index, dataKey) => {
     setActiveBar({ index, dataKey });
   }, []);
@@ -286,18 +251,50 @@ export default function IncomeExpenseChart({ data = [] }) {
                   dataKey="income"
                   name="Income"
                   fill={incomeColor}
-                  shape={CustomBarShape("income")}
                   onMouseEnter={(payload, index) => handleBarEnter(payload, index, "income")}
                   onMouseLeave={handleBarLeave}
-                />
+                >
+                  {chartData.map((_, index) => {
+                    const isActive = activeBar?.dataKey === "income" && activeBar?.index === index;
+                    const isOtherActive =
+                      activeBar && (activeBar.dataKey !== "income" || activeBar.index !== index);
+
+                    return (
+                      <Cell
+                        key={`income-${index}`}
+                        radius={[4, 4, 0, 0]}
+                        fill={incomeColor}
+                        fillOpacity={isActive ? 1 : isOtherActive ? 0.4 : 0.85}
+                        stroke={isActive ? highlightColor : undefined}
+                        strokeWidth={isActive ? 2 : 0}
+                      />
+                    );
+                  })}
+                </Bar>
                 <Bar
                   dataKey="expense"
                   name="Expense"
                   fill={expenseColor}
-                  shape={CustomBarShape("expense")}
                   onMouseEnter={(payload, index) => handleBarEnter(payload, index, "expense")}
                   onMouseLeave={handleBarLeave}
-                />
+                >
+                  {chartData.map((_, index) => {
+                    const isActive = activeBar?.dataKey === "expense" && activeBar?.index === index;
+                    const isOtherActive =
+                      activeBar && (activeBar.dataKey !== "expense" || activeBar.index !== index);
+
+                    return (
+                      <Cell
+                        key={`expense-${index}`}
+                        radius={[4, 4, 0, 0]}
+                        fill={expenseColor}
+                        fillOpacity={isActive ? 1 : isOtherActive ? 0.4 : 0.85}
+                        stroke={isActive ? highlightColor : undefined}
+                        strokeWidth={isActive ? 2 : 0}
+                      />
+                    );
+                  })}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
