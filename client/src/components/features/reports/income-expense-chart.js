@@ -247,96 +247,99 @@ export default function IncomeExpenseChart({ data = [] }) {
               : "No recorded income or expenses for the selected period."}
           </div>
         ) : (
-          <div ref={containerRef} className="h-full w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
-                barSize={targetBarSize}
-                barGap={barGap}
-                barCategoryGap={barCategoryGap}
-                onMouseMove={handleChartMouseMove}
-                onMouseLeave={resetActiveBar}
-              >
-                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                <XAxis
-                  dataKey="month"
-                  stroke="currentColor"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="currentColor"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={formatCurrencyTick}
-                  label={{
-                    value: "Amount (USD)",
-                    angle: -90,
-                    position: "insideLeft",
-                    offset: -4,
-                    fill: "currentColor",
-                    fontSize: 12,
-                  }}
-                />
-                <Tooltip
-                  cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
-                  content={<IncomeExpenseTooltip />}
-                />
-                <Legend />
-                <Bar dataKey="income" name="Income" fill={incomeColor}>
-                  {chartData.map((_, index) => {
-                    const isActive =
-                      activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "income");
+          <div className="flex h-full items-stretch gap-4">
+            {scaleMarkers.length > 0 ? (
+              <div className="flex w-28 shrink-0 flex-col text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Scale</span>
+                <div className="mt-3 flex flex-1 flex-col justify-between gap-2">
+                  {scaleMarkers.map((marker) => (
+                    <div key={marker.ratio} className="flex items-center gap-2">
+                      <span className="h-full w-px rounded-full bg-border" aria-hidden />
+                      <div className="leading-tight">
+                        <div className="font-medium text-foreground">{marker.value}</div>
+                        <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div ref={containerRef} className="h-full flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+                  barSize={targetBarSize}
+                  barGap={barGap}
+                  barCategoryGap={barCategoryGap}
+                  onMouseMove={handleChartMouseMove}
+                  onMouseLeave={resetActiveBar}
+                >
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                  <XAxis
+                    dataKey="month"
+                    stroke="currentColor"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="currentColor"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={formatCurrencyTick}
+                    label={{
+                      value: "Amount (USD)",
+                      angle: -90,
+                      position: "insideLeft",
+                      offset: -4,
+                      fill: "currentColor",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Tooltip
+                    cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
+                    content={<IncomeExpenseTooltip />}
+                  />
+                  <Legend />
+                  <Bar dataKey="income" name="Income" fill={incomeColor}>
+                    {chartData.map((_, index) => {
+                      const isActive =
+                        activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "income");
 
-                    return (
-                      <Cell
-                        key={`income-${index}`}
-                        radius={[4, 4, 0, 0]}
-                        fill={incomeColor}
-                        stroke={isActive ? highlightColor : undefined}
-                        strokeWidth={isActive ? 2 : 0}
-                      />
-                    );
-                  })}
-                </Bar>
-                <Bar dataKey="expense" name="Expense" fill={expenseColor}>
-                  {chartData.map((_, index) => {
-                    const isActive =
-                      activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "expense");
+                      return (
+                        <Cell
+                          key={`income-${index}`}
+                          radius={[4, 4, 0, 0]}
+                          fill={incomeColor}
+                          stroke={isActive ? highlightColor : undefined}
+                          strokeWidth={isActive ? 2 : 0}
+                        />
+                      );
+                    })}
+                  </Bar>
+                  <Bar dataKey="expense" name="Expense" fill={expenseColor}>
+                    {chartData.map((_, index) => {
+                      const isActive =
+                        activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "expense");
 
-                    return (
-                      <Cell
-                        key={`expense-${index}`}
-                        radius={[4, 4, 0, 0]}
-                        fill={expenseColor}
-                        stroke={isActive ? highlightColor : undefined}
-                        strokeWidth={isActive ? 2 : 0}
-                      />
-                    );
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        {scaleMarkers.length > 0 ? (
-          <div className="mt-4 flex flex-col gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Scale</span>
-            <div className="flex flex-col gap-2">
-              {scaleMarkers.map((marker) => (
-                <span key={marker.ratio} className="flex items-center gap-2">
-                  <span className="h-6 w-px rounded-full bg-border" aria-hidden />
-                  <span>
-                    {marker.label}: {marker.value}
-                  </span>
-                </span>
-              ))}
+                      return (
+                        <Cell
+                          key={`expense-${index}`}
+                          radius={[4, 4, 0, 0]}
+                          fill={expenseColor}
+                          stroke={isActive ? highlightColor : undefined}
+                          strokeWidth={isActive ? 2 : 0}
+                        />
+                      );
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
-        ) : null}
+        )}
       </CardContent>
     </Card>
   );
