@@ -219,7 +219,7 @@ export function BarChart({
           return (
             <div key={groupLabel} className="flex flex-col items-center gap-2 text-xs">
               <div
-                className="flex h-40 w-full items-end rounded-md px-2 py-1 transition-all"
+                className="flex h-full w-full items-end rounded-md px-2 py-1 transition-all"
                 style={{
                   backgroundColor: isGroupActive ? cursorStyles.fill || "var(--muted)" : "transparent",
                   opacity: isGroupActive ? cursorStyles.fillOpacity ?? 0.25 : 1,
