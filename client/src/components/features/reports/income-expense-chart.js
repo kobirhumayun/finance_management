@@ -1,7 +1,7 @@
 // File: src/components/features/reports/income-expense-chart.js
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -46,7 +46,103 @@ const formatCurrencyTick = (value) => {
   return `$${value.toLocaleString()}`;
 };
 
-const formatTooltipValue = (value) => `$${toNumber(value).toLocaleString()}`;
+const useCSSVariable = (variableName) => {
+  const getValue = useCallback(() => {
+    if (typeof window === "undefined") return "";
+    return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+  }, [variableName]);
+
+  const [value, setValue] = useState(() => getValue());
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateValue = () => {
+      setValue(getValue());
+    };
+
+    updateValue();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", updateValue);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateValue);
+    };
+  }, [getValue]);
+
+  return value;
+};
+
+const useElementSize = () => {
+  const ref = useRef(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!ref.current || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        setSize({ width, height });
+      }
+    });
+
+    observer.observe(ref.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  return [ref, size];
+};
+
+const formatCurrency = (value) => `$${toNumber(value).toLocaleString()}`;
+
+function IncomeExpenseTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const net = payload.reduce((total, entry) => {
+    if (entry.dataKey === "income") {
+      return total + toNumber(entry.value);
+    }
+    if (entry.dataKey === "expense") {
+      return total - toNumber(entry.value);
+    }
+    return total;
+  }, 0);
+
+  return (
+    <div className="min-w-[200px] rounded-md border bg-popover p-3 text-sm shadow-md">
+      <div className="mb-2 font-medium">{label}</div>
+      <div className="space-y-2">
+        {payload.map((entry) => (
+          <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: entry.color }}
+                aria-hidden
+              />
+              {entry.name}
+            </span>
+            <span className="font-medium">{formatCurrency(entry.value)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between border-t pt-2 text-xs text-muted-foreground">
+        <span>Net</span>
+        <span className="font-medium text-foreground">{formatCurrency(net)}</span>
+      </div>
+    </div>
+  );
+}
 
 // Bar chart comparing income versus expense across time.
 export default function IncomeExpenseChart({ data = [] }) {
@@ -72,6 +168,78 @@ export default function IncomeExpenseChart({ data = [] }) {
 
   const hasSeries = chartData.some((item) => item.income !== 0 || item.expense !== 0);
 
+  const incomeColor = useCSSVariable("--chart-1");
+  const expenseColor = useCSSVariable("--chart-2");
+  const ringColor = useCSSVariable("--ring");
+  const cursorFill = useCSSVariable("--muted");
+  const highlightColor = ringColor || incomeColor || expenseColor;
+
+  const [containerRef, { width: containerWidth }] = useElementSize();
+  const [activeBar, setActiveBar] = useState(null);
+
+  const groupCount = chartData.length;
+
+  const targetBarSize = useMemo(() => {
+    if (!containerWidth || groupCount === 0) {
+      return undefined;
+    }
+
+    const MAX_BAR_WIDTH = 48;
+    const MIN_BAR_WIDTH = 12;
+    const calculated = containerWidth / (groupCount * 3);
+    const safeValue = Math.max(MIN_BAR_WIDTH, Math.min(MAX_BAR_WIDTH, calculated));
+    return Number.isFinite(safeValue) ? Math.round(safeValue) : undefined;
+  }, [containerWidth, groupCount]);
+
+  const barGap = useMemo(() => {
+    if (!targetBarSize) return 12;
+    return Math.max(6, Math.round(targetBarSize * 0.4));
+  }, [targetBarSize]);
+
+  const barCategoryGap = useMemo(() => {
+    if (!targetBarSize || !containerWidth || groupCount === 0) {
+      return "20%";
+    }
+
+    const groupWidth = containerWidth / groupCount;
+    const availableForGap = Math.max(groupWidth - targetBarSize * 2, targetBarSize * 0.5);
+    const ratio = Math.max(0.1, Math.min(0.6, availableForGap / groupWidth));
+    return `${Math.round(ratio * 100)}%`;
+  }, [targetBarSize, containerWidth, groupCount]);
+
+  const CustomBarShape = useCallback(
+    (dataKey) => {
+      const InteractiveBar = (props) => {
+        const { fill, ...rest } = props;
+        const isActive = activeBar?.dataKey === dataKey && activeBar?.index === props.index;
+
+        return (
+          <Rectangle
+            {...rest}
+            fill={fill}
+            radius={[4, 4, 0, 0]}
+            fillOpacity={isActive ? 1 : 0.85}
+            stroke={highlightColor}
+            strokeOpacity={isActive ? 1 : 0}
+            strokeWidth={isActive ? 2 : 0}
+          />
+        );
+      };
+
+      InteractiveBar.displayName = `IncomeExpense${dataKey}BarShape`;
+      return InteractiveBar;
+    },
+    [activeBar, highlightColor]
+  );
+
+  const handleBarEnter = useCallback((_, index, dataKey) => {
+    setActiveBar({ index, dataKey });
+  }, []);
+
+  const handleBarLeave = useCallback(() => {
+    setActiveBar(null);
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -85,44 +253,54 @@ export default function IncomeExpenseChart({ data = [] }) {
               : "No recorded income or expenses for the selected period."}
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-              <XAxis
-                dataKey="month"
-                stroke="currentColor"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="currentColor"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={formatCurrencyTick}
-              />
-              <Tooltip formatter={formatTooltipValue} cursor={{ fill: "var(--muted)" }} />
-              <Legend />
-              <Bar
-                dataKey="income"
-                name="Income"
-                fill="#8884d8"
-                radius={[4, 4, 0, 0]}
-                activeBar={<Rectangle fill="pink" stroke="blue" />}
-              />
-              <Bar
-                dataKey="expense"
-                name="Expense"
-                fill="#82ca9d"
-                radius={[4, 4, 0, 0]}
-                activeBar={<Rectangle fill="gold" stroke="purple" />}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <div ref={containerRef} className="h-full w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartData}
+                margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+                barSize={targetBarSize}
+                barGap={barGap}
+                barCategoryGap={barCategoryGap}
+              >
+                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                <XAxis
+                  dataKey="month"
+                  stroke="currentColor"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="currentColor"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={formatCurrencyTick}
+                />
+                <Tooltip
+                  cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
+                  content={<IncomeExpenseTooltip />}
+                />
+                <Legend />
+                <Bar
+                  dataKey="income"
+                  name="Income"
+                  fill={incomeColor}
+                  shape={CustomBarShape("income")}
+                  onMouseEnter={(payload, index) => handleBarEnter(payload, index, "income")}
+                  onMouseLeave={handleBarLeave}
+                />
+                <Bar
+                  dataKey="expense"
+                  name="Expense"
+                  fill={expenseColor}
+                  shape={CustomBarShape("expense")}
+                  onMouseEnter={(payload, index) => handleBarEnter(payload, index, "expense")}
+                  onMouseLeave={handleBarLeave}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </CardContent>
     </Card>
