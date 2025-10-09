@@ -219,7 +219,7 @@ export function BarChart({
           return (
             <div
               key={groupLabel}
-              className="flex h-full flex-col items-center gap-2 text-xs"
+              className="flex h-full flex-col items-stretch gap-2 text-xs"
               style={{ alignSelf: "stretch", flex: "1 1 0%", minWidth: 0 }}
             >
               <div
@@ -265,7 +265,7 @@ export function BarChart({
                   );
                 })}
               </div>
-              <span className="text-muted-foreground">{groupLabel}</span>
+              <span className="w-full text-center text-muted-foreground">{groupLabel}</span>
             </div>
           );
         })}
