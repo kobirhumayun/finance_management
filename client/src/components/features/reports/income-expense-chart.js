@@ -247,7 +247,14 @@ export default function IncomeExpenseChart({ data = [] }) {
                   content={<IncomeExpenseTooltip />}
                 />
                 <Legend />
-                <Bar dataKey="income" name="Income" fill={incomeColor}>
+                <Bar
+                  dataKey="income"
+                  name="Income"
+                  fill={incomeColor}
+                  onMouseEnter={(_, index) => handleBarEnter("income", index)}
+                  onMouseLeave={handleBarLeave}
+                  onMouseMove={(_, index) => handleBarEnter("income", index)}
+                >
                   {chartData.map((_, index) => {
                     const isActive = activeBar?.dataKey === "income" && activeBar?.index === index;
                     const isOtherActive =
@@ -261,13 +268,18 @@ export default function IncomeExpenseChart({ data = [] }) {
                         fillOpacity={isActive ? 1 : isOtherActive ? 0.35 : 0.85}
                         stroke={isActive ? highlightColor : undefined}
                         strokeWidth={isActive ? 2 : 0}
-                        onMouseEnter={() => handleBarEnter("income", index)}
-                        onMouseLeave={handleBarLeave}
                       />
                     );
                   })}
                 </Bar>
-                <Bar dataKey="expense" name="Expense" fill={expenseColor}>
+                <Bar
+                  dataKey="expense"
+                  name="Expense"
+                  fill={expenseColor}
+                  onMouseEnter={(_, index) => handleBarEnter("expense", index)}
+                  onMouseLeave={handleBarLeave}
+                  onMouseMove={(_, index) => handleBarEnter("expense", index)}
+                >
                   {chartData.map((_, index) => {
                     const isActive = activeBar?.dataKey === "expense" && activeBar?.index === index;
                     const isOtherActive =
@@ -281,8 +293,6 @@ export default function IncomeExpenseChart({ data = [] }) {
                         fillOpacity={isActive ? 1 : isOtherActive ? 0.35 : 0.85}
                         stroke={isActive ? highlightColor : undefined}
                         strokeWidth={isActive ? 2 : 0}
-                        onMouseEnter={() => handleBarEnter("expense", index)}
-                        onMouseLeave={handleBarLeave}
                       />
                     );
                   })}
