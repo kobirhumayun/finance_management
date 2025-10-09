@@ -223,7 +223,7 @@ export function BarChart({
               style={{ alignSelf: "stretch", flex: "1 1 0%", minWidth: 0 }}
             >
               <div
-                className="flex h-full w-full items-end rounded-md px-2 py-1 transition-all"
+                className="flex h-full w-full items-end justify-center rounded-md px-2 py-1 transition-all"
                 style={{
                   backgroundColor: isGroupActive ? cursorStyles.fill || "var(--muted)" : "transparent",
                   opacity: isGroupActive ? cursorStyles.fillOpacity ?? 0.25 : 1,
