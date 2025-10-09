@@ -265,7 +265,7 @@ export function BarChart({
                   );
                 })}
               </div>
-              <span className="w-full text-center text-muted-foreground">{groupLabel}</span>
+              <span className="block w-full text-center text-muted-foreground">{groupLabel}</span>
             </div>
           );
         })}
