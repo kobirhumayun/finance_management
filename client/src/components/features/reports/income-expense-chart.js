@@ -168,7 +168,7 @@ export default function IncomeExpenseChart({ data = [] }) {
       return [];
     }
 
-    const anchors = [0.25, 0.5, 0.75, 1];
+    const anchors = [1, 0.75, 0.5, 0.25];
     return anchors.map((ratio) => ({
       ratio,
       label: `${Math.round(ratio * 100)}%`,
