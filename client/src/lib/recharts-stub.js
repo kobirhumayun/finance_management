@@ -220,7 +220,7 @@ export function BarChart({
             <div
               key={groupLabel}
               className="flex h-full flex-col items-center gap-2 text-xs"
-              style={{ alignSelf: "stretch" }}
+              style={{ alignSelf: "stretch", flex: "1 1 0%", minWidth: 0 }}
             >
               <div
                 className="flex h-full w-full items-end rounded-md px-2 py-1 transition-all"
@@ -251,7 +251,9 @@ export function BarChart({
                       key={`${key}-${index}`}
                       style={{
                         height: `${height}%`,
-                        width: `${resolvedBarSize}px`,
+                        flex: "1 1 0%",
+                        minWidth: 0,
+                        maxWidth: `${resolvedBarSize}px`,
                         backgroundColor: fill,
                         opacity,
                         boxShadow: shadow,
