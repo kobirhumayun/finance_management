@@ -219,6 +219,14 @@ export default function IncomeExpenseChart({ data = [] }) {
     setActiveBar({ index: null, dataKey: null });
   }, []);
 
+  const yAxisDomain = useMemo(() => {
+    if (!Number.isFinite(maxValue) || maxValue <= 0) {
+      return [0, "auto"];
+    }
+
+    return [0, maxValue];
+  }, [maxValue]);
+
   const handleChartMouseMove = useCallback(
     (state) => {
       if (!state?.isTooltipActive || typeof state.activeTooltipIndex !== "number") {
@@ -289,6 +297,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={formatCurrencyTick}
+                    domain={yAxisDomain}
                     label={{
                       value: "Amount (USD)",
                       angle: -90,
