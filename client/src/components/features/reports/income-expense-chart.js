@@ -208,30 +208,9 @@ export default function IncomeExpenseChart({ data = [] }) {
         return;
       }
 
-      const payload = Array.isArray(state.activePayload) ? state.activePayload : [];
-
-      const hoveredEntry = (() => {
-        if (payload.length === 0) {
-          return null;
-        }
-
-        if (payload.length === 1) {
-          return payload[0];
-        }
-
-        const chartX = typeof state.chartX === "number" ? state.chartX : null;
-        const tooltipX = typeof state.tooltipCoordinate?.x === "number" ? state.tooltipCoordinate.x : null;
-
-        if (chartX !== null && tooltipX !== null) {
-          return chartX <= tooltipX ? payload[0] : payload[payload.length - 1];
-        }
-
-        return payload[0];
-      })();
-
       setActiveBar({
         index: state.activeTooltipIndex,
-        dataKey: hoveredEntry?.dataKey ?? null,
+        dataKey: null,
       });
     },
     [resetActiveBar]

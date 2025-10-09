@@ -182,7 +182,7 @@ export function BarChart({
   const labelForIndex = (groupIndex) =>
     data[groupIndex]?.month || data[groupIndex]?.name || `#${groupIndex + 1}`;
 
-  const handleBarHover = (groupIndex, dataKey, keyIndex) => (event) => {
+  const handleBarHover = (groupIndex, dataKey = null, keyIndex = 0) => (event) => {
     const payload = payloadForIndex(groupIndex);
     const label = labelForIndex(groupIndex);
 
@@ -219,12 +219,14 @@ export function BarChart({
           return (
             <div key={groupLabel} className="flex flex-col items-center gap-2 text-xs">
               <div
-                className="flex h-40 items-end rounded-md px-2 py-1 transition-all"
+                className="flex h-40 w-full items-end rounded-md px-2 py-1 transition-all"
                 style={{
                   backgroundColor: isGroupActive ? cursorStyles.fill || "var(--muted)" : "transparent",
                   opacity: isGroupActive ? cursorStyles.fillOpacity ?? 0.25 : 1,
                   gap: `${resolvedBarGap}px`,
                 }}
+                onMouseEnter={handleBarHover(index)}
+                onMouseMove={handleBarHover(index)}
               >
                 {keys.map((key, keyIndex) => {
                   const value = Number(row?.[key]) || 0;
@@ -233,17 +235,16 @@ export function BarChart({
                   const cell = barDefinition.cells?.[index] || {};
                   const fill = cell.fill || barDefinition.fill || colors[keyIndex];
                   const opacity = cell.fillOpacity ?? barDefinition.fillOpacity ?? 1;
-                  const stroke = cell.stroke || barDefinition.stroke;
-                  const strokeWidth = cell.strokeWidth ?? barDefinition.strokeWidth ?? 0;
                   const radiusStyle = resolveRadiusStyle(cell.radius ?? barDefinition.radius);
 
-                  const shadow = stroke && strokeWidth ? `0 0 0 ${strokeWidth}px ${stroke}` : undefined;
+                  const isSeriesActive = hoverState?.index === index && (!hoverState?.dataKey || hoverState.dataKey === key);
+                  const strokeColor = isSeriesActive ? cell.stroke || barDefinition.stroke : undefined;
+                  const strokeWidth = isSeriesActive ? cell.strokeWidth ?? barDefinition.strokeWidth ?? 0 : 0;
+                  const shadow = strokeColor && strokeWidth ? `0 0 0 ${strokeWidth}px ${strokeColor}` : undefined;
 
                   return (
                     <div
                       key={`${key}-${index}`}
-                      onMouseEnter={handleBarHover(index, key, keyIndex)}
-                      onMouseMove={handleBarHover(index, key, keyIndex)}
                       style={{
                         height: `${height}%`,
                         width: `${resolvedBarSize}px`,
