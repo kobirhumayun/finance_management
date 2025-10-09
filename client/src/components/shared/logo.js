@@ -19,9 +19,9 @@ export default function Logo({ className, withText = true }) {
         <svg className="h-7 w-7" viewBox="0 0 32 32" role="presentation">
           <defs>
             <linearGradient id={gradientId} x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--chart-4))" />
-              <stop offset="50%" stopColor="hsl(var(--primary))" />
-              <stop offset="100%" stopColor="hsl(var(--chart-2))" />
+              <stop offset="0%" stopColor="var(--chart-4)" />
+              <stop offset="50%" stopColor="var(--primary)" />
+              <stop offset="100%" stopColor="var(--chart-2)" />
             </linearGradient>
           </defs>
           <circle cx="16" cy="16" r="14" fill={`url(#${gradientId})`} opacity="0.9" />

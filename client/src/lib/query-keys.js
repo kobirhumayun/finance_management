@@ -31,8 +31,9 @@ export const qk = {
     detail: (id, params) => ["projects", "detail", String(id), normalizeParams(params)],
   },
   reports: {
-    filters: () => ["reports", "filters"],
-    charts: () => ["reports", "charts"],
+    filters: () => ["reports", "overview", "filters"],
+    charts: (params) => ["reports", "overview", "charts", normalizeParams(params)],
+    summaryFilters: () => ["reports", "summary", "filters"],
     summaryTable: (params) => ["reports", "summary-table", normalizeParams(params)],
   },
   plans: {

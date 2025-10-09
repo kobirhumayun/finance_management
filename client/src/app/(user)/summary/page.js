@@ -46,7 +46,7 @@ function focusDropdownSearch(input, selection) {
 // Summary view combining filters with a tabular report.
 export default function SummaryPage() {
   const { data: filtersData, isLoading: filtersLoading } = useQuery({
-    queryKey: qk.reports.filters(),
+    queryKey: qk.reports.summaryFilters(),
     queryFn: fetchSummaryFilters,
   });
   const [projectFilter, setProjectFilter] = useState("all");
