@@ -206,7 +206,6 @@ export default function IncomeExpenseChart({ data = [] }) {
       };
     }
 
-    const MIN_BAR_WIDTH = 12;
     const MIN_GROUP_GAP = 8;
     const MAX_GROUP_GAP = 32;
     const MIN_SERIES_GAP = 4;
@@ -214,14 +213,14 @@ export default function IncomeExpenseChart({ data = [] }) {
 
     const groupGapPx = clamp(containerWidth * 0.03, MIN_GROUP_GAP, MAX_GROUP_GAP);
     const totalGroupGap = groupGapPx * Math.max(groupCount - 1, 0);
-    const availableWidth = Math.max(containerWidth - totalGroupGap, groupCount * MIN_BAR_WIDTH);
+    const availableWidth = Math.max(containerWidth - totalGroupGap, 0);
     const groupWidth = availableWidth / Math.max(groupCount, 1);
 
     const innerGapPx = seriesPerGroup > 1 ? clamp(groupWidth * 0.08, MIN_SERIES_GAP, MAX_SERIES_GAP) : 0;
     const totalInnerGap = innerGapPx * Math.max(seriesPerGroup - 1, 0);
 
     const computedBarSize = (groupWidth - totalInnerGap) / Math.max(seriesPerGroup, 1);
-    const safeBarSize = Math.max(MIN_BAR_WIDTH, computedBarSize);
+    const safeBarSize = Math.max(computedBarSize, 1);
 
     return {
       barSize: safeBarSize,
