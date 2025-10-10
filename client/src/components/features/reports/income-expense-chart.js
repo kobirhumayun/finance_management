@@ -363,15 +363,15 @@ export default function IncomeExpenseChart({ data = [] }) {
         state.activeLabel ?? chartData[state.activeTooltipIndex]?.month ?? "";
 
       const coordinate = state?.activeCoordinate ?? {};
-      const baseX = Number.isFinite(coordinate.x)
-        ? coordinate.x
-        : Number.isFinite(state.chartX)
-          ? state.chartX
+      const pointerX = Number.isFinite(state.chartX)
+        ? state.chartX
+        : Number.isFinite(coordinate.x)
+          ? coordinate.x
           : 0;
-      const baseY = Number.isFinite(coordinate.y)
-        ? coordinate.y
-        : Number.isFinite(state.chartY)
-          ? state.chartY
+      const pointerY = Number.isFinite(state.chartY)
+        ? state.chartY
+        : Number.isFinite(coordinate.y)
+          ? coordinate.y
           : 0;
 
       setActiveBar({
@@ -385,8 +385,8 @@ export default function IncomeExpenseChart({ data = [] }) {
           label: nextLabel,
           payload: nextPayload,
           position: {
-            x: baseX,
-            y: baseY,
+            x: pointerX,
+            y: pointerY,
           },
         })
       );
