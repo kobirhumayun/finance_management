@@ -2,7 +2,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 
@@ -189,6 +200,8 @@ export default function IncomeExpenseChart({ data = [] }) {
   const expenseColor = useCSSVariable("--chart-expense");
   const ringColor = useCSSVariable("--ring");
   const cursorFill = useCSSVariable("--muted");
+  const borderColor = useCSSVariable("--border");
+  const referenceLineColor = borderColor || cursorFill;
   const highlightColor = ringColor || incomeColor || expenseColor;
 
   const [containerRef, { width: containerWidth }] = useElementSize();
@@ -325,6 +338,17 @@ export default function IncomeExpenseChart({ data = [] }) {
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
                     content={<IncomeExpenseTooltip />}
                   />
+                  {scaleMarkers.map((marker) => (
+                    <ReferenceLine
+                      key={`marker-${marker.ratio}`}
+                      y={maxValue * marker.ratio}
+                      stroke={referenceLineColor || undefined}
+                      strokeWidth={1}
+                      strokeOpacity={0.35}
+                      ifOverflow="extendDomain"
+                      isFront={false}
+                    />
+                  ))}
                   <Legend />
                   <Bar dataKey="income" name="Income" fill={incomeColor}>
                     {chartData.map((_, index) => {
