@@ -286,10 +286,9 @@ export default function ReportsPage() {
 
       <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <CashFlowChart data={chartsData?.cashFlow || []} />
-        <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
-      </div>
+      <CashFlowChart data={chartsData?.cashFlow || []} />
+
+      <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
     </div>
   );
 }
