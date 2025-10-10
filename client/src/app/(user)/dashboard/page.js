@@ -10,6 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { qk } from "@/lib/query-keys";
 import { fetchDashboardOverview } from "@/lib/queries/dashboard";
 
+const percentFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1,
+});
+
 // Authenticated user dashboard summarizing key insights.
 export default function DashboardPage() {
   const {
@@ -25,6 +30,7 @@ export default function DashboardPage() {
   const summary = data?.summary;
   const recentTransactions = data?.recentTransactions ?? [];
   const projects = data?.projectCount ?? 0;
+  const comparisons = data?.comparisons ?? {};
 
   const income = summary?.income ?? 0;
   const expenses = summary?.expense ?? 0;
@@ -33,6 +39,21 @@ export default function DashboardPage() {
   const isSummaryLoading = isLoading || isFetching;
   const showSummaryPlaceholder = isSummaryLoading || isError;
   const isTransactionsLoading = isSummaryLoading;
+
+  const formatTrend = (comparison, { fallbackDirection = "up" } = {}) => {
+    if (!comparison || showSummaryPlaceholder) {
+      return { label: "-- vs last month", direction: fallbackDirection };
+    }
+
+    const percent = Number.isFinite(comparison.percentChange) ? comparison.percentChange : 0;
+    const sign = percent > 0 ? "+" : percent < 0 ? "-" : "";
+    const magnitude = percentFormatter.format(Math.abs(percent));
+
+    return {
+      label: `${sign}${magnitude}% vs last month`,
+      direction: comparison.direction ?? fallbackDirection,
+    };
+  };
 
   return (
     <div className="space-y-8">
@@ -46,21 +67,21 @@ export default function DashboardPage() {
           value={showSummaryPlaceholder ? "--" : `$${income.toLocaleString()}`}
           description="Month to date"
           icon={Wallet}
-          trend={{ label: "+12% vs last month", direction: "up" }}
+          trend={formatTrend(comparisons.income, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Total Expenses"
           value={showSummaryPlaceholder ? "--" : `$${expenses.toLocaleString()}`}
           description="Month to date"
           icon={ArrowDownCircle}
-          trend={{ label: "+4% vs last month", direction: "down" }}
+          trend={formatTrend(comparisons.expense, { fallbackDirection: "down" })}
         />
         <SummaryCard
           title="Net Balance"
           value={showSummaryPlaceholder ? "--" : `$${net.toLocaleString()}`}
           description="After expenses"
           icon={PiggyBank}
-          trend={{ label: "+8% vs last month", direction: "up" }}
+          trend={formatTrend(comparisons.balance, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Active Projects"
