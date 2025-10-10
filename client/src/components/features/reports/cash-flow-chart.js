@@ -55,35 +55,53 @@ const formatCurrencyTick = (value) => {
   return `$${value.toLocaleString()}`;
 };
 
-function CashFlowTooltip({ active, payload, label }) {
+const monthFormatter = new Intl.DateTimeFormat("en", {
+  month: "short",
+  year: "numeric",
+});
+
+const parseMonthValue = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const directParse = new Date(value);
+  if (Number.isFinite(directParse.getTime())) {
+    return new Date(
+      Date.UTC(directParse.getUTCFullYear(), directParse.getUTCMonth(), 1),
+    );
+  }
+
+  const normalized = value.replace(/[-/.]/g, " ");
+  const parts = normalized.split(" ").filter(Boolean);
+  if (parts.length >= 2) {
+    const [first, second] = parts;
+    const monthIndex = Number.parseInt(first, 10) - 1;
+    const year = Number.parseInt(second, 10);
+    if (Number.isFinite(monthIndex) && Number.isFinite(year) && monthIndex >= 0 && monthIndex < 12) {
+      return new Date(Date.UTC(year, monthIndex, 1));
+    }
+  }
+
+  return null;
+};
+
+function CashFlowTooltip({ active, payload }) {
   if (!active || !Array.isArray(payload) || payload.length === 0) {
     return null;
   }
 
-  const totals = payload.reduce(
-    (accumulator, entry) => {
-      if (!entry || typeof entry !== "object") {
-        return accumulator;
-      }
-
-      if (entry.dataKey === "cashIn") {
-        accumulator.cashIn = toNumber(entry.value);
-      }
-
-      if (entry.dataKey === "cashOut") {
-        accumulator.cashOut = toNumber(entry.value);
-      }
-
-      return accumulator;
-    },
-    { cashIn: 0, cashOut: 0 },
-  );
-
+  const { label, date, cashIn, cashOut } = payload[0]?.payload ?? {};
+  const displayLabel = label ?? (Number.isFinite(date) ? monthFormatter.format(new Date(date)) : "");
+  const totals = {
+    cashIn: toNumber(cashIn),
+    cashOut: toNumber(cashOut),
+  };
   const net = totals.cashIn - totals.cashOut;
 
   return (
     <div className="min-w-[220px] rounded-md border bg-popover p-3 text-sm shadow-md">
-      <div className="mb-2 font-medium">{label}</div>
+      <div className="mb-2 font-medium">{displayLabel}</div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2">
@@ -117,8 +135,10 @@ export default function CashFlowChart({ data = [] }) {
 
     return data
       .map((item) => {
-        const month = toLabel(item?.month);
-        if (!month) {
+        const rawLabel = toLabel(item?.month);
+        const monthDate = parseMonthValue(rawLabel);
+
+        if (!monthDate) {
           return null;
         }
 
@@ -126,13 +146,15 @@ export default function CashFlowChart({ data = [] }) {
         const cashOut = toNumber(item?.cashOut);
 
         return {
-          month,
+          date: monthDate.getTime(),
+          label: monthFormatter.format(monthDate),
           cashIn,
           cashOut,
           net: cashIn - cashOut,
         };
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort((a, b) => a.date - b.date);
   }, [data]);
 
   const yExtents = useMemo(() => {
@@ -179,6 +201,14 @@ export default function CashFlowChart({ data = [] }) {
 
   const [tooltipPosition, setTooltipPosition] = useState(null);
 
+  const xTicks = useMemo(() => chartData.map((item) => item.date), [chartData]);
+  const labelByDate = useMemo(() => {
+    return chartData.reduce((accumulator, item) => {
+      accumulator[item.date] = item.label;
+      return accumulator;
+    }, {});
+  }, [chartData]);
+
   const handleMouseMove = useCallback((state) => {
     if (!state || !state.isTooltipActive) {
       setTooltipPosition(null);
@@ -214,7 +244,19 @@ export default function CashFlowChart({ data = [] }) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
               <CartesianGrid strokeDasharray="4 8" strokeOpacity={0.25} />
-              <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="date"
+                type="number"
+                scale="time"
+                domain={["dataMin", "dataMax"]}
+                ticks={xTicks}
+                stroke="currentColor"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => labelByDate[value] ?? monthFormatter.format(new Date(value))}
+                tickMargin={12}
+              />
               <YAxis
                 stroke="currentColor"
                 fontSize={12}
