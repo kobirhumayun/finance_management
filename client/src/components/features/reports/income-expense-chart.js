@@ -113,6 +113,9 @@ const useElementSize = () => {
 
 const formatCurrency = (value) => `$${toNumber(value).toLocaleString()}`;
 
+const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 8 };
+const X_AXIS_HEIGHT = 32;
+
 function IncomeExpenseTooltip({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) {
     return null;
@@ -285,8 +288,14 @@ export default function IncomeExpenseChart({ data = [] }) {
           <div className="flex h-full items-stretch gap-4">
             {scaleMarkers.length > 0 ? (
               <div className="flex w-28 shrink-0 flex-col text-xs text-muted-foreground">
-                <div className="relative mt-3 flex-1 pl-4">
-                  <span className="absolute left-0 top-0 h-full w-px rounded-full bg-border" aria-hidden />
+                <div
+                  className="relative mt-3 flex-1 pl-4"
+                  style={{
+                    paddingTop: CHART_MARGIN.top,
+                    paddingBottom: CHART_MARGIN.bottom + X_AXIS_HEIGHT,
+                  }}
+                >
+                  <span className="absolute inset-y-0 left-0 w-px rounded-full bg-border" aria-hidden />
                   {scaleMarkers.map((marker) => (
                     <div
                       key={marker.ratio}
@@ -308,7 +317,7 @@ export default function IncomeExpenseChart({ data = [] }) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
-                  margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+                  margin={CHART_MARGIN}
                   barSize={sizing.barSize}
                   barGap={sizing.barGap}
                   barCategoryGap={sizing.barCategoryGap}
@@ -322,6 +331,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
+                    height={X_AXIS_HEIGHT}
                   />
                   <YAxis
                     stroke="currentColor"
