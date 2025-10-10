@@ -141,6 +141,11 @@ export function YAxis() {
 }
 YAxis.chartType = "YAxis";
 
+export function ReferenceLine() {
+  return null;
+}
+ReferenceLine.chartType = "ReferenceLine";
+
 export function BarChart({
   data = [],
   children,
@@ -153,6 +158,7 @@ export function BarChart({
   const [hoverState, setHoverState] = useState(null);
 
   const bars = useMemo(() => parseBars(children), [children]);
+  const referenceLines = useMemo(() => collect(children, "ReferenceLine"), [children]);
   const tooltipNode = useMemo(
     () => flattenChildren(children).find((child) => child.type?.chartType === "Tooltip"),
     [children]
@@ -209,9 +215,41 @@ export function BarChart({
   return (
     <div className="relative flex h-full w-full flex-col" role="img" aria-label="Bar chart" onMouseLeave={handleMouseLeave}>
       <div
-        className="flex flex-1 items-end justify-center overflow-hidden px-4"
+        className="relative flex flex-1 items-end justify-center overflow-hidden px-4"
         style={{ gap: `${resolvedCategoryGap}px` }}
       >
+        <div className="pointer-events-none absolute inset-0 z-0 flex flex-col" aria-hidden>
+          {referenceLines
+            .map((line, index) => {
+              const value = Number(line?.y);
+              if (!Number.isFinite(value)) {
+                return null;
+              }
+
+              const clamped = Math.max(0, Math.min(value, maxValue));
+              const ratio = maxValue === 0 ? 0 : clamped / maxValue;
+              const top = 100 - ratio * 100;
+              const strokeColor = line?.stroke || "var(--border)";
+              const strokeWidth = Number(line?.strokeWidth) || 1;
+              const strokeOpacity =
+                typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.35;
+
+              return (
+                <div
+                  key={line?.key ?? `reference-${index}`}
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top: `${top}%`,
+                    borderTop: `${strokeWidth}px solid ${strokeColor}`,
+                    opacity: strokeOpacity,
+                  }}
+                />
+              );
+            })
+            .filter(Boolean)}
+        </div>
         {data.map((row, index) => {
           const groupLabel = row?.month || row?.name || `#${index + 1}`;
           const isGroupActive = hoverState?.index === index;
@@ -223,7 +261,7 @@ export function BarChart({
               style={{ alignSelf: "stretch", flex: "1 1 0%", minWidth: 0 }}
             >
               <div
-                className="flex h-full w-full items-end justify-center rounded-md px-2 py-1 transition-all"
+                className="relative z-[1] flex h-full w-full items-end justify-center rounded-md px-2 py-1 transition-all"
                 style={{
                   backgroundColor: isGroupActive ? cursorStyles.fill || "var(--muted)" : "transparent",
                   opacity: isGroupActive ? cursorStyles.fillOpacity ?? 0.25 : 1,
