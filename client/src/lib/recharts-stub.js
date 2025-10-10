@@ -230,9 +230,9 @@ export function BarChart({
               const ratio = maxValue === 0 ? 0 : clamped / maxValue;
               const top = 100 - ratio * 100;
               const strokeColor = line?.stroke || "var(--border)";
-              const strokeWidth = Number(line?.strokeWidth) || 1;
+              const strokeWidth = Number(line?.strokeWidth) || 1.5;
               const strokeOpacity =
-                typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.35;
+                typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.5;
 
               return (
                 <div

@@ -342,8 +342,8 @@ export default function IncomeExpenseChart({ data = [] }) {
                       key={`marker-${marker.ratio}`}
                       y={maxValue * marker.ratio}
                       stroke={referenceLineColor || undefined}
-                      strokeWidth={1}
-                      strokeOpacity={0.35}
+                      strokeWidth={1.5}
+                      strokeOpacity={0.5}
                       ifOverflow="extendDomain"
                       isFront={false}
                     />
