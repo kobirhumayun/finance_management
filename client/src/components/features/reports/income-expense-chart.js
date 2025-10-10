@@ -116,6 +116,14 @@ const formatCurrency = (value) => `$${toNumber(value).toLocaleString()}`;
 const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 8 };
 const X_AXIS_HEIGHT = 32;
 
+const createTooltipState = (overrides = {}) => ({
+  visible: false,
+  label: "",
+  payload: [],
+  position: { x: 0, y: 0 },
+  ...overrides,
+});
+
 function ChartLegend({ payload, onHeightChange }) {
   const [legendRef, { height }] = useElementSize();
 
@@ -148,8 +156,8 @@ function ChartLegend({ payload, onHeightChange }) {
   );
 }
 
-function IncomeExpenseTooltip({ active, payload, label }) {
-  if (!active || !payload || payload.length === 0) {
+function IncomeExpenseTooltipContent({ payload, label }) {
+  if (!payload || payload.length === 0) {
     return null;
   }
 
@@ -184,6 +192,45 @@ function IncomeExpenseTooltip({ active, payload, label }) {
       <div className="mt-3 flex items-center justify-between border-t pt-2 text-xs text-muted-foreground">
         <span>Net</span>
         <span className="font-medium text-foreground">{formatCurrency(net)}</span>
+      </div>
+    </div>
+  );
+}
+
+function FloatingIncomeExpenseTooltip({ tooltip, containerSize, legendHeight = 0 }) {
+  const { visible, label, payload, position } = tooltip || {};
+  const [tooltipRef, { width: tooltipWidth, height: tooltipHeight }] = useElementSize();
+
+  if (!visible || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const OFFSET = 16;
+  const containerWidth = Number.isFinite(containerSize?.width) ? containerSize.width : 0;
+  const containerHeight = Number.isFinite(containerSize?.height) ? containerSize.height : 0;
+
+  const baseLeft = (position?.x ?? 0) + CHART_MARGIN.left;
+  const baseTop = (position?.y ?? 0) + CHART_MARGIN.top + legendHeight;
+
+  let left = baseLeft + OFFSET;
+  let top = baseTop + OFFSET;
+
+  if (containerWidth > 0 && tooltipWidth > 0) {
+    left = clamp(left, 0, Math.max(containerWidth - tooltipWidth - 4, 0));
+  }
+
+  if (containerHeight > 0 && tooltipHeight > 0) {
+    top = clamp(top, 0, Math.max(containerHeight - tooltipHeight - 4, 0));
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      <div
+        ref={tooltipRef}
+        className="pointer-events-none absolute"
+        style={{ transform: `translate(${left}px, ${top}px)` }}
+      >
+        <IncomeExpenseTooltipContent payload={payload} label={label} />
       </div>
     </div>
   );
@@ -239,9 +286,10 @@ export default function IncomeExpenseChart({ data = [] }) {
   const referenceLineColor = borderColor || cursorFill;
   const highlightColor = ringColor || incomeColor || expenseColor;
 
-  const [containerRef, { width: containerWidth }] = useElementSize();
+  const [containerRef, { width: containerWidth, height: containerHeight }] = useElementSize();
   const [legendHeight, setLegendHeight] = useState(0);
   const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
+  const [tooltipState, setTooltipState] = useState(() => createTooltipState());
 
   const groupCount = chartData.length;
   const seriesPerGroup = 2;
@@ -287,6 +335,11 @@ export default function IncomeExpenseChart({ data = [] }) {
     setActiveBar({ index: null, dataKey: null });
   }, []);
 
+  const hideTooltip = useCallback(() => {
+    resetActiveBar();
+    setTooltipState((previous) => (previous.visible ? createTooltipState() : previous));
+  }, [resetActiveBar]);
+
   const yAxisDomain = useMemo(() => {
     if (!Number.isFinite(maxValue) || maxValue <= 0) {
       return [0, "auto"];
@@ -298,17 +351,45 @@ export default function IncomeExpenseChart({ data = [] }) {
   const handleChartMouseMove = useCallback(
     (state) => {
       if (!state?.isTooltipActive || typeof state.activeTooltipIndex !== "number") {
-        resetActiveBar();
+        hideTooltip();
         return;
       }
+
+      const nextPayload = Array.isArray(state.activePayload)
+        ? state.activePayload.filter(Boolean)
+        : [];
+
+      const nextLabel =
+        state.activeLabel ?? chartData[state.activeTooltipIndex]?.month ?? "";
+
+      const baseX = Number.isFinite(state.chartX) ? state.chartX : 0;
+      const baseY = Number.isFinite(state.chartY) ? state.chartY : 0;
 
       setActiveBar({
         index: state.activeTooltipIndex,
         dataKey: null,
       });
+
+      setTooltipState(
+        createTooltipState({
+          visible: true,
+          label: nextLabel,
+          payload: nextPayload,
+          position: {
+            x: baseX,
+            y: baseY,
+          },
+        })
+      );
     },
-    [resetActiveBar]
+    [chartData, hideTooltip]
   );
+
+  useEffect(() => {
+    if (chartData.length === 0) {
+      hideTooltip();
+    }
+  }, [chartData.length, hideTooltip]);
 
   return (
     <Card>
@@ -351,7 +432,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                 </div>
               </div>
             ) : null}
-            <div ref={containerRef} className="h-full flex-1">
+            <div ref={containerRef} className="relative h-full flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
@@ -360,7 +441,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                   barGap={sizing.barGap}
                   barCategoryGap={sizing.barCategoryGap}
                   onMouseMove={handleChartMouseMove}
-                  onMouseLeave={resetActiveBar}
+                  onMouseLeave={hideTooltip}
                 >
                   <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                   <XAxis
@@ -389,7 +470,8 @@ export default function IncomeExpenseChart({ data = [] }) {
                   />
                   <Tooltip
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
-                    content={<IncomeExpenseTooltip />}
+                    content={() => null}
+                    wrapperStyle={{ display: "none" }}
                   />
                   {scaleMarkers.map((marker) => (
                     <ReferenceLine
@@ -444,6 +526,11 @@ export default function IncomeExpenseChart({ data = [] }) {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              <FloatingIncomeExpenseTooltip
+                tooltip={tooltipState}
+                containerSize={{ width: containerWidth, height: containerHeight }}
+                legendHeight={legendHeight}
+              />
             </div>
           </div>
         )}
