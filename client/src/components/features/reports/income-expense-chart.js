@@ -228,7 +228,7 @@ function FloatingIncomeExpenseTooltip({ tooltip, containerSize, legendHeight = 0
       <div
         ref={tooltipRef}
         className="pointer-events-none absolute"
-        style={{ transform: `translate(${left}px, ${top}px)` }}
+        style={{ left: `${left}px`, top: `${top}px` }}
       >
         <IncomeExpenseTooltipContent payload={payload} label={label} />
       </div>
@@ -362,8 +362,17 @@ export default function IncomeExpenseChart({ data = [] }) {
       const nextLabel =
         state.activeLabel ?? chartData[state.activeTooltipIndex]?.month ?? "";
 
-      const baseX = Number.isFinite(state.chartX) ? state.chartX : 0;
-      const baseY = Number.isFinite(state.chartY) ? state.chartY : 0;
+      const coordinate = state?.activeCoordinate ?? {};
+      const baseX = Number.isFinite(coordinate.x)
+        ? coordinate.x
+        : Number.isFinite(state.chartX)
+          ? state.chartX
+          : 0;
+      const baseY = Number.isFinite(coordinate.y)
+        ? coordinate.y
+        : Number.isFinite(state.chartY)
+          ? state.chartY
+          : 0;
 
       setActiveBar({
         index: state.activeTooltipIndex,
