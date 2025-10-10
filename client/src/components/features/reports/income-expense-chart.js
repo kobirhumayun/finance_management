@@ -334,20 +334,27 @@ export default function IncomeExpenseChart({ data = [] }) {
                   }}
                 >
                   <span className="absolute inset-y-0 left-0 w-px rounded-full bg-border" aria-hidden />
-                  {scaleMarkers.map((marker) => (
-                    <div
-                      key={marker.ratio}
-                      className={`absolute left-2 flex items-center gap-2 ${
-                        marker.ratio === 1 || marker.ratio === 0 ? "" : "-translate-y-1/2"
-                      }`}
-                      style={{ top: `${(1 - marker.ratio) * 100}%` }}
-                    >
-                      <div className="leading-tight">
-                        <div className="font-medium text-foreground">{marker.value}</div>
-                        <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+                  {scaleMarkers.map((marker) => {
+                    const isTopAnchor = marker.ratio === 1;
+                    const isBaseline = marker.ratio === 0;
+                    const translateClass = isTopAnchor || isBaseline ? "" : "-translate-y-1/2";
+                    const positionStyle = isBaseline
+                      ? { bottom: 0 }
+                      : { top: `${(1 - marker.ratio) * 100}%` };
+
+                    return (
+                      <div
+                        key={marker.ratio}
+                        className={`absolute left-2 flex items-center gap-2 ${translateClass}`}
+                        style={positionStyle}
+                      >
+                        <div className="leading-tight">
+                          <div className="font-medium text-foreground">{marker.value}</div>
+                          <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
@@ -391,17 +398,24 @@ export default function IncomeExpenseChart({ data = [] }) {
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
                     content={<IncomeExpenseTooltip />}
                   />
-                  {scaleMarkers.map((marker) => (
-                    <ReferenceLine
-                      key={`marker-${marker.ratio}`}
-                      y={maxValue * marker.ratio}
-                      stroke={referenceLineColor || undefined}
-                      strokeWidth={1.5}
-                      strokeOpacity={0.5}
-                      ifOverflow="extendDomain"
-                      isFront={false}
-                    />
-                  ))}
+                  {scaleMarkers.map((marker) => {
+                    const isBaseline = marker.ratio === 0;
+                    return (
+                      <ReferenceLine
+                        key={`marker-${marker.ratio}`}
+                        y={maxValue * marker.ratio}
+                        stroke={
+                          (isBaseline && (highlightColor || referenceLineColor)) ||
+                          referenceLineColor ||
+                          undefined
+                        }
+                        strokeWidth={isBaseline ? 2 : 1.5}
+                        strokeOpacity={isBaseline ? 0.75 : 0.5}
+                        ifOverflow="extendDomain"
+                        isFront={isBaseline}
+                      />
+                    );
+                  })}
                   <Legend
                     content={(legendProps) => (
                       <ChartLegend
