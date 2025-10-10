@@ -332,10 +332,14 @@ export default function IncomeExpenseChart({ data = [] }) {
       const y = viewBox.y + viewBox.height - baselineStrokeWidth / 2;
       const x1 = viewBox.x;
       const x2 = viewBox.x + viewBox.width;
-      const strokeColor = props?.stroke ?? highlightColor ?? undefined;
+      const strokeColor = highlightColor || props?.stroke || undefined;
+      const { clipPath, className, shapeRendering } = props ?? {};
 
       return (
         <line
+          className={className}
+          clipPath={clipPath}
+          shapeRendering={shapeRendering}
           x1={x1}
           x2={x2}
           y1={y}
