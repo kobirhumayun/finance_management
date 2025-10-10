@@ -223,7 +223,7 @@ export default function IncomeExpenseChart({ data = [] }) {
       return [];
     }
 
-    const anchors = [1, 0.75, 0.5, 0.25];
+    const anchors = [1, 0.75, 0.5, 0.25, 0];
     return anchors.map((ratio) => ({
       ratio,
       label: `${Math.round(ratio * 100)}%`,
@@ -338,7 +338,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                     <div
                       key={marker.ratio}
                       className={`absolute left-2 flex items-center gap-2 ${
-                        marker.ratio === 1 ? "" : "-translate-y-1/2"
+                        marker.ratio === 1 || marker.ratio === 0 ? "" : "-translate-y-1/2"
                       }`}
                       style={{ top: `${(1 - marker.ratio) * 100}%` }}
                     >
