@@ -324,16 +324,44 @@ export default function IncomeExpenseChart({ data = [] }) {
   const renderZeroBaseline = useCallback(
     (props) => {
       const viewBox = props?.viewBox;
-      if (!viewBox) {
+      const baselineStrokeWidth = Number.isFinite(props?.strokeWidth) ? props.strokeWidth : 1;
+      const [startPoint, endPoint] = props?.points ?? [];
+
+      const viewBoxLeft = viewBox?.x ?? 0;
+      const viewBoxRight =
+        viewBox && typeof viewBox.width === "number" ? viewBox.x + viewBox.width : undefined;
+      const viewBoxBottom =
+        viewBox && typeof viewBox.height === "number"
+          ? viewBox.y + viewBox.height - baselineStrokeWidth / 2
+          : undefined;
+
+      const baseY =
+        startPoint?.y ??
+        endPoint?.y ??
+        (typeof props?.y === "number" ? props.y : undefined) ??
+        (typeof viewBoxBottom === "number" ? viewBoxBottom : undefined);
+
+      if (!Number.isFinite(baseY)) {
         return null;
       }
 
-      const baselineStrokeWidth = Number.isFinite(props?.strokeWidth) ? props.strokeWidth : 1;
-      const y = viewBox.y + viewBox.height - baselineStrokeWidth / 2;
-      const x1 = viewBox.x;
-      const x2 = viewBox.x + viewBox.width;
+      const y =
+        typeof viewBoxBottom === "number"
+          ? clamp(baseY, viewBox.y + baselineStrokeWidth / 2, viewBoxBottom)
+          : baseY;
+
+      const x1 = startPoint?.x ?? viewBoxLeft;
+      const x2 = endPoint?.x ?? viewBoxRight ?? x1;
       const strokeColor = highlightColor || props?.stroke || undefined;
-      const { clipPath, className, shapeRendering } = props ?? {};
+      const {
+        clipPath,
+        className,
+        shapeRendering,
+        strokeOpacity,
+        strokeDasharray,
+        strokeLinecap,
+        strokeLinejoin,
+      } = props ?? {};
 
       return (
         <line
@@ -346,8 +374,10 @@ export default function IncomeExpenseChart({ data = [] }) {
           y2={y}
           stroke={strokeColor}
           strokeWidth={baselineStrokeWidth}
-          strokeOpacity={props?.strokeOpacity}
-          strokeDasharray={props?.strokeDasharray}
+          strokeOpacity={strokeOpacity}
+          strokeDasharray={strokeDasharray}
+          strokeLinecap={strokeLinecap}
+          strokeLinejoin={strokeLinejoin}
         />
       );
     },
