@@ -275,12 +275,12 @@ export default function IncomeExpenseChart({ data = [] }) {
                 <span className="font-medium text-foreground">Scale</span>
                 <div className="mt-3 flex flex-1 flex-col justify-between gap-2">
                   {scaleMarkers.map((marker) => (
-                    <div key={marker.ratio} className="flex items-center gap-2">
-                      <span className="h-full w-px rounded-full bg-border" aria-hidden />
+                    <div key={marker.ratio} className="flex w-full flex-col gap-1">
                       <div className="leading-tight">
                         <div className="font-medium text-foreground">{marker.value}</div>
                         <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
                       </div>
+                      <span className="h-px w-full bg-border" aria-hidden />
                     </div>
                   ))}
                 </div>
