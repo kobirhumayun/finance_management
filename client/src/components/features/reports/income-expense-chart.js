@@ -2,7 +2,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 
@@ -102,6 +113,41 @@ const useElementSize = () => {
 
 const formatCurrency = (value) => `$${toNumber(value).toLocaleString()}`;
 
+const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 8 };
+const X_AXIS_HEIGHT = 32;
+
+function ChartLegend({ payload, onHeightChange }) {
+  const [legendRef, { height }] = useElementSize();
+
+  useEffect(() => {
+    if (typeof onHeightChange === "function") {
+      onHeightChange(height);
+    }
+  }, [height, onHeightChange]);
+
+  if (!payload || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      ref={legendRef}
+      className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground"
+    >
+      {payload.map((entry, index) => (
+        <div key={entry.dataKey ?? entry.value ?? index} className="flex items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: entry.color }}
+            aria-hidden
+          />
+          <span className="font-medium text-foreground">{entry.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function IncomeExpenseTooltip({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) {
     return null;
@@ -189,9 +235,12 @@ export default function IncomeExpenseChart({ data = [] }) {
   const expenseColor = useCSSVariable("--chart-expense");
   const ringColor = useCSSVariable("--ring");
   const cursorFill = useCSSVariable("--muted");
+  const borderColor = useCSSVariable("--border");
+  const referenceLineColor = borderColor || cursorFill;
   const highlightColor = ringColor || incomeColor || expenseColor;
 
   const [containerRef, { width: containerWidth }] = useElementSize();
+  const [legendHeight, setLegendHeight] = useState(0);
   const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
 
   const groupCount = chartData.length;
@@ -228,6 +277,11 @@ export default function IncomeExpenseChart({ data = [] }) {
       barCategoryGap: groupGapPx,
     };
   }, [containerWidth, groupCount, seriesPerGroup]);
+
+  const handleLegendSizeChange = useCallback((height) => {
+    const nextHeight = height || 0;
+    setLegendHeight((previous) => (previous === nextHeight ? previous : nextHeight));
+  }, []);
 
   const resetActiveBar = useCallback(() => {
     setActiveBar({ index: null, dataKey: null });
@@ -272,11 +326,22 @@ export default function IncomeExpenseChart({ data = [] }) {
           <div className="flex h-full items-stretch gap-4">
             {scaleMarkers.length > 0 ? (
               <div className="flex w-28 shrink-0 flex-col text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Scale</span>
-                <div className="mt-3 flex flex-1 flex-col justify-between gap-2">
+                <div
+                  className="relative flex-1 pl-4"
+                  style={{
+                    paddingTop: CHART_MARGIN.top + legendHeight,
+                    paddingBottom: CHART_MARGIN.bottom + X_AXIS_HEIGHT,
+                  }}
+                >
+                  <span className="absolute inset-y-0 left-0 w-px rounded-full bg-border" aria-hidden />
                   {scaleMarkers.map((marker) => (
-                    <div key={marker.ratio} className="flex items-center gap-2">
-                      <span className="h-full w-px rounded-full bg-border" aria-hidden />
+                    <div
+                      key={marker.ratio}
+                      className={`absolute left-2 flex items-center gap-2 ${
+                        marker.ratio === 1 ? "" : "-translate-y-1/2"
+                      }`}
+                      style={{ top: `${(1 - marker.ratio) * 100}%` }}
+                    >
                       <div className="leading-tight">
                         <div className="font-medium text-foreground">{marker.value}</div>
                         <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
@@ -290,7 +355,7 @@ export default function IncomeExpenseChart({ data = [] }) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
-                  margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+                  margin={CHART_MARGIN}
                   barSize={sizing.barSize}
                   barGap={sizing.barGap}
                   barCategoryGap={sizing.barCategoryGap}
@@ -304,6 +369,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
+                    height={X_AXIS_HEIGHT}
                   />
                   <YAxis
                     stroke="currentColor"
@@ -325,7 +391,25 @@ export default function IncomeExpenseChart({ data = [] }) {
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
                     content={<IncomeExpenseTooltip />}
                   />
-                  <Legend />
+                  {scaleMarkers.map((marker) => (
+                    <ReferenceLine
+                      key={`marker-${marker.ratio}`}
+                      y={maxValue * marker.ratio}
+                      stroke={referenceLineColor || undefined}
+                      strokeWidth={1.5}
+                      strokeOpacity={0.5}
+                      ifOverflow="extendDomain"
+                      isFront={false}
+                    />
+                  ))}
+                  <Legend
+                    content={(legendProps) => (
+                      <ChartLegend
+                        {...legendProps}
+                        onHeightChange={handleLegendSizeChange}
+                      />
+                    )}
+                  />
                   <Bar dataKey="income" name="Income" fill={incomeColor}>
                     {chartData.map((_, index) => {
                       const isActive =
