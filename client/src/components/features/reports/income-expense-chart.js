@@ -20,6 +20,101 @@ import { toNumeric } from "@/lib/utils/numbers";
 const toNumber = (value) => toNumeric(value);
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+const renderZeroBaseline = (props = {}) => {
+  const {
+    x1,
+    x2,
+    y1,
+    y2,
+    viewBox: viewBoxProp = {},
+    clipPath,
+    stroke,
+    strokeWidth,
+    strokeOpacity,
+    strokeDasharray,
+    strokeDashoffset,
+    strokeLinecap,
+    strokeLinejoin,
+    strokeMiterlimit,
+    shapeRendering,
+    className,
+    pointerEvents,
+    style,
+    fill,
+    opacity,
+  } = props;
+
+  const viewBox = viewBoxProp || {};
+
+  const fallbackX1 = typeof viewBox.x === "number" ? viewBox.x : 0;
+  const fallbackX2 =
+    typeof viewBox.width === "number"
+      ? fallbackX1 + viewBox.width
+      : typeof viewBox.x === "number"
+        ? viewBox.x
+        : fallbackX1;
+
+  const resolvedX1 = typeof x1 === "number" ? x1 : fallbackX1;
+  const resolvedX2 = typeof x2 === "number" ? x2 : fallbackX2;
+
+  const rawY1 =
+    typeof y1 === "number"
+      ? y1
+      : typeof y2 === "number"
+        ? y2
+        : typeof viewBox.y === "number"
+          ? viewBox.y
+          : 0;
+  const rawY2 =
+    typeof y2 === "number"
+      ? y2
+      : typeof y1 === "number"
+        ? y1
+        : rawY1;
+
+  const hasClipBounds =
+    typeof viewBox.y === "number" && typeof viewBox.height === "number";
+  const clipTop = hasClipBounds ? viewBox.y : undefined;
+  const clipBottom = hasClipBounds ? viewBox.y + viewBox.height : undefined;
+
+  const clampWithinBounds = (value) => {
+    if (!hasClipBounds || typeof value !== "number") {
+      return value;
+    }
+
+    const minBound = Math.min(clipTop, clipBottom);
+    const maxBound = Math.max(clipTop, clipBottom);
+    return clamp(value, minBound, maxBound);
+  };
+
+  const clampedY1 = clampWithinBounds(rawY1);
+  const clampedY2 = clampWithinBounds(rawY2);
+
+  return (
+    <line
+      x1={resolvedX1}
+      x2={resolvedX2}
+      y1={clampedY1}
+      y2={clampedY2}
+      clipPath={clipPath}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeOpacity={strokeOpacity}
+      strokeDasharray={strokeDasharray}
+      strokeDashoffset={strokeDashoffset}
+      strokeLinecap={strokeLinecap}
+      strokeLinejoin={strokeLinejoin}
+      strokeMiterlimit={strokeMiterlimit}
+      shapeRendering={shapeRendering}
+      className={className}
+      pointerEvents={pointerEvents}
+      style={style}
+      fill={fill}
+      opacity={opacity}
+    />
+  );
+};
+
 const toMonthLabel = (value) => {
   if (typeof value === "string") {
     return value.trim();
@@ -419,6 +514,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                       ifOverflow="extendDomain"
                       isFront
                       alwaysShow
+                      shape={renderZeroBaseline}
                     />
                   ) : null}
                   {otherScaleMarkers.map((marker) => (
