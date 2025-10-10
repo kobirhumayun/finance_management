@@ -72,7 +72,18 @@ const parseMonthValue = (value) => {
     );
   }
 
-  const normalized = value.replace(/[-/.]/g, " ");
+  const numericPattern = /^(0?[1-9]|1[0-2])\D+(\d{2,4})$/;
+  const numericMatch = value.match(numericPattern);
+  if (numericMatch) {
+    const monthIndex = Number.parseInt(numericMatch[1], 10) - 1;
+    const yearValue = Number.parseInt(numericMatch[2], 10);
+    const year = yearValue < 100 ? 2000 + yearValue : yearValue;
+    if (monthIndex >= 0 && monthIndex < 12) {
+      return new Date(Date.UTC(year, monthIndex, 1));
+    }
+  }
+
+  const normalized = value.replace(/[#_]/g, " ").replace(/[-/.]/g, " ");
   const parts = normalized.split(" ").filter(Boolean);
   if (parts.length >= 2) {
     const [first, second] = parts;
@@ -91,8 +102,8 @@ function CashFlowTooltip({ active, payload }) {
     return null;
   }
 
-  const { label, date, cashIn, cashOut } = payload[0]?.payload ?? {};
-  const displayLabel = label ?? (Number.isFinite(date) ? monthFormatter.format(new Date(date)) : "");
+  const { label, rawLabel, cashIn, cashOut } = payload[0]?.payload ?? {};
+  const displayLabel = label || rawLabel || "";
   const totals = {
     cashIn: toNumber(cashIn),
     cashOut: toNumber(cashOut),
@@ -133,28 +144,55 @@ export default function CashFlowChart({ data = [] }) {
       return [];
     }
 
-    return data
-      .map((item) => {
-        const rawLabel = toLabel(item?.month);
+    const normalised = data
+      .map((item, originalIndex) => {
+        const rawLabel = toLabel(item?.month) || `#${originalIndex + 1}`;
         const monthDate = parseMonthValue(rawLabel);
+        const dateValue = monthDate?.getTime() ?? null;
 
-        if (!monthDate) {
-          return null;
-        }
-
-        const cashIn = toNumber(item?.cashIn);
-        const cashOut = toNumber(item?.cashOut);
+        const rawCashIn = toNumber(item?.cashIn);
+        const rawCashOut = toNumber(item?.cashOut);
+        const cashIn = Number.isFinite(rawCashIn) ? rawCashIn : 0;
+        const cashOut = Number.isFinite(rawCashOut) ? rawCashOut : 0;
+        const net = cashIn - cashOut;
+        const hasValue = Number.isFinite(rawCashIn) || Number.isFinite(rawCashOut);
 
         return {
-          date: monthDate.getTime(),
-          label: monthFormatter.format(monthDate),
+          originalIndex,
+          parsedDate: Number.isFinite(dateValue) ? dateValue : null,
+          rawLabel,
+          label: monthDate ? monthFormatter.format(monthDate) : rawLabel,
           cashIn,
           cashOut,
-          net: cashIn - cashOut,
+          net,
+          hasValue,
         };
       })
-      .filter(Boolean)
-      .sort((a, b) => a.date - b.date);
+      .filter((item) => item.hasValue);
+
+    const ordered = normalised.sort((a, b) => {
+      const hasDateA = Number.isFinite(a.parsedDate);
+      const hasDateB = Number.isFinite(b.parsedDate);
+
+      if (hasDateA && hasDateB) {
+        return a.parsedDate - b.parsedDate;
+      }
+      if (hasDateA) {
+        return -1;
+      }
+      if (hasDateB) {
+        return 1;
+      }
+      return a.originalIndex - b.originalIndex;
+    });
+
+    return ordered.map((item, index) => {
+      const { hasValue, ...rest } = item;
+      return {
+        ...rest,
+        index,
+      };
+    });
   }, [data]);
 
   const yExtents = useMemo(() => {
@@ -201,13 +239,38 @@ export default function CashFlowChart({ data = [] }) {
 
   const [tooltipPosition, setTooltipPosition] = useState(null);
 
-  const xTicks = useMemo(() => chartData.map((item) => item.date), [chartData]);
+  const xTicks = useMemo(() => chartData.map((item) => item.index), [chartData]);
   const labelByDate = useMemo(() => {
     return chartData.reduce((accumulator, item) => {
-      accumulator[item.date] = item.label;
+      accumulator[item.index] = item.label;
       return accumulator;
     }, {});
   }, [chartData]);
+
+  const renderTick = useCallback(
+    (props) => {
+      const { x, y, payload } = props;
+      const label = labelByDate[payload.value];
+      if (!label) {
+        return null;
+      }
+
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <text
+            dy={18}
+            fill="currentColor"
+            fontSize={12}
+            textAnchor="end"
+            transform="rotate(-35)"
+          >
+            {label}
+          </text>
+        </g>
+      );
+    },
+    [labelByDate],
+  );
 
   const handleMouseMove = useCallback((state) => {
     if (!state || !state.isTooltipActive) {
@@ -242,20 +305,27 @@ export default function CashFlowChart({ data = [] }) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+            <LineChart
+              data={chartData}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              margin={{ top: 16, right: 24, bottom: 32, left: 0 }}
+            >
               <CartesianGrid strokeDasharray="4 8" strokeOpacity={0.25} />
               <XAxis
-                dataKey="date"
+                dataKey="index"
                 type="number"
-                scale="time"
+                scale="linear"
                 domain={["dataMin", "dataMax"]}
                 ticks={xTicks}
                 stroke="currentColor"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => labelByDate[value] ?? monthFormatter.format(new Date(value))}
-                tickMargin={12}
+                tick={renderTick}
+                tickMargin={24}
+                interval={0}
+                minTickGap={0}
               />
               <YAxis
                 stroke="currentColor"
