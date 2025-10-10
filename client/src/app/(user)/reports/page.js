@@ -51,6 +51,9 @@ export default function ReportsPage() {
     [project, type, from, to],
   );
 
+  // These queries correspond to the authenticated reports endpoints defined in server/routes/report.js:
+  // - GET /api/reports/filters → fetchReportFilters
+  // - GET /api/reports/charts  → fetchReportCharts
   const [filtersQuery, chartsQuery] = useQueries({
     queries: [
       {
@@ -286,10 +289,9 @@ export default function ReportsPage() {
 
       <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <CashFlowChart data={chartsData?.cashFlow || []} />
-        <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
-      </div>
+      <CashFlowChart data={chartsData?.cashFlow || []} />
+
+      <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
     </div>
   );
 }
