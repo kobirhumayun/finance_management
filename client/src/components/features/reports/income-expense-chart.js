@@ -231,6 +231,17 @@ export default function IncomeExpenseChart({ data = [] }) {
     }));
   }, [maxValue]);
 
+  const [baselineMarker, otherScaleMarkers] = useMemo(() => {
+    if (scaleMarkers.length === 0) {
+      return [null, []];
+    }
+
+    const baseline = scaleMarkers.find((marker) => marker.ratio === 0) ?? null;
+    const others = scaleMarkers.filter((marker) => marker.ratio !== 0);
+
+    return [baseline, others];
+  }, [scaleMarkers]);
+
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
   const ringColor = useCSSVariable("--ring");
@@ -398,24 +409,28 @@ export default function IncomeExpenseChart({ data = [] }) {
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
                     content={<IncomeExpenseTooltip />}
                   />
-                  {scaleMarkers.map((marker) => {
-                    const isBaseline = marker.ratio === 0;
-                    return (
-                      <ReferenceLine
-                        key={`marker-${marker.ratio}`}
-                        y={maxValue * marker.ratio}
-                        stroke={
-                          (isBaseline && (highlightColor || referenceLineColor)) ||
-                          referenceLineColor ||
-                          undefined
-                        }
-                        strokeWidth={isBaseline ? 2 : 1.5}
-                        strokeOpacity={isBaseline ? 0.75 : 0.5}
-                        ifOverflow="extendDomain"
-                        isFront={isBaseline}
-                      />
-                    );
-                  })}
+                  {baselineMarker ? (
+                    <ReferenceLine
+                      key="marker-baseline"
+                      y={0}
+                      stroke={highlightColor || referenceLineColor || undefined}
+                      strokeWidth={2.5}
+                      strokeOpacity={0.9}
+                      ifOverflow="extendDomain"
+                      isFront
+                      alwaysShow
+                    />
+                  ) : null}
+                  {otherScaleMarkers.map((marker) => (
+                    <ReferenceLine
+                      key={`marker-${marker.ratio}`}
+                      y={maxValue * marker.ratio}
+                      stroke={referenceLineColor || undefined}
+                      strokeWidth={1.5}
+                      strokeOpacity={0.5}
+                      ifOverflow="extendDomain"
+                    />
+                  ))}
                   <Legend
                     content={(legendProps) => (
                       <ChartLegend
