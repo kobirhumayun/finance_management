@@ -285,7 +285,6 @@ export default function IncomeExpenseChart({ data = [] }) {
           <div className="flex h-full items-stretch gap-4">
             {scaleMarkers.length > 0 ? (
               <div className="flex w-28 shrink-0 flex-col text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Scale</span>
                 <div className="mt-3 flex flex-1 flex-col justify-between gap-2">
                   {scaleMarkers.map((marker) => (
                     <div key={marker.ratio} className="flex items-center gap-2">
