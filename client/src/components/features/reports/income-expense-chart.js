@@ -321,6 +321,35 @@ export default function IncomeExpenseChart({ data = [] }) {
     [resetActiveBar]
   );
 
+  const renderZeroBaseline = useCallback(
+    (props) => {
+      const viewBox = props?.viewBox;
+      if (!viewBox) {
+        return null;
+      }
+
+      const baselineStrokeWidth = Number.isFinite(props?.strokeWidth) ? props.strokeWidth : 1;
+      const y = viewBox.y + viewBox.height - baselineStrokeWidth / 2;
+      const x1 = viewBox.x;
+      const x2 = viewBox.x + viewBox.width;
+      const strokeColor = props?.stroke ?? highlightColor ?? undefined;
+
+      return (
+        <line
+          x1={x1}
+          x2={x2}
+          y1={y}
+          y2={y}
+          stroke={strokeColor}
+          strokeWidth={baselineStrokeWidth}
+          strokeOpacity={props?.strokeOpacity}
+          strokeDasharray={props?.strokeDasharray}
+        />
+      );
+    },
+    [highlightColor]
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -419,6 +448,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                       ifOverflow="extendDomain"
                       isFront
                       alwaysShow
+                      shape={renderZeroBaseline}
                     />
                   ) : null}
                   {otherScaleMarkers.map((marker) => (
