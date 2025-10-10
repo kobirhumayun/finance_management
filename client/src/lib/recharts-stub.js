@@ -1,5 +1,5 @@
 // File: src/lib/recharts-stub.js
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const DEFAULT_COLORS = [
   "var(--primary)",
@@ -146,6 +146,21 @@ export function ReferenceLine() {
 }
 ReferenceLine.chartType = "ReferenceLine";
 
+const resolveMarginValue = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
+};
+
 export function BarChart({
   data = [],
   children,
@@ -154,8 +169,11 @@ export function BarChart({
   barSize,
   barGap = 12,
   barCategoryGap = "20%",
+  margin = {},
 }) {
   const [hoverState, setHoverState] = useState(null);
+  const plotAreaRef = useRef(null);
+  const [plotAreaHeight, setPlotAreaHeight] = useState(0);
 
   const bars = useMemo(() => parseBars(children), [children]);
   const referenceLines = useMemo(() => collect(children, "ReferenceLine"), [children]);
@@ -170,11 +188,76 @@ export function BarChart({
   const resolvedBarGap = resolveGap(barGap, 12, resolvedBarSize);
   const resolvedCategoryGap = resolveGap(barCategoryGap, 24, resolvedBarSize);
 
+  const marginTop = resolveMarginValue(margin?.top);
+  const marginBottom = resolveMarginValue(margin?.bottom);
+
   const numericValues = data.flatMap((row) => keys.map((key) => Number(row?.[key]) || 0));
   const maxValue = Math.max(...numericValues, 1);
 
   const tooltipElement = buildTooltipElement(tooltipNode, hoverState);
   const cursorStyles = tooltipNode?.props?.cursor || {};
+
+  useEffect(() => {
+    const node = plotAreaRef.current;
+    if (!node) {
+      return undefined;
+    }
+
+    const measure = () => {
+      let height = node.clientHeight;
+      if (typeof height !== "number" || Number.isNaN(height)) {
+        height = node.getBoundingClientRect?.().height || 0;
+      }
+
+      let paddingTop = marginTop;
+      let paddingBottom = marginBottom;
+
+      if (typeof window !== "undefined" && window.getComputedStyle) {
+        const styles = window.getComputedStyle(node);
+        paddingTop = Number.parseFloat(styles?.paddingTop || `${paddingTop}`) || 0;
+        paddingBottom = Number.parseFloat(styles?.paddingBottom || `${paddingBottom}`) || 0;
+      }
+
+      const contentHeight = Math.max(height - paddingTop - paddingBottom, 0);
+
+      setPlotAreaHeight((previous) => {
+        if (!Number.isFinite(contentHeight)) {
+          return previous;
+        }
+
+        if (Math.abs(previous - contentHeight) < 0.5) {
+          return previous;
+        }
+
+        return contentHeight;
+      });
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        measure();
+      });
+
+      observer.observe(node);
+
+      return () => {
+        observer.disconnect();
+      };
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", measure);
+      return () => {
+        window.removeEventListener("resize", measure);
+      };
+    }
+
+    return undefined;
+  }, [marginTop, marginBottom]);
+
+  const availablePlotHeight = plotAreaHeight > 0 ? plotAreaHeight : null;
 
   const payloadForIndex = (groupIndex) =>
     keys.map((key, keyIndex) => ({
@@ -215,10 +298,19 @@ export function BarChart({
   return (
     <div className="relative flex h-full w-full flex-col" role="img" aria-label="Bar chart" onMouseLeave={handleMouseLeave}>
       <div
+        ref={plotAreaRef}
         className="relative flex flex-1 items-end justify-center overflow-hidden px-4"
-        style={{ gap: `${resolvedCategoryGap}px` }}
+        style={{
+          gap: `${resolvedCategoryGap}px`,
+          paddingTop: marginTop ? `${marginTop}px` : undefined,
+          paddingBottom: marginBottom ? `${marginBottom}px` : undefined,
+        }}
       >
-        <div className="pointer-events-none absolute inset-0 z-0 flex flex-col" aria-hidden>
+        <div
+          className="pointer-events-none absolute left-0 right-0 z-0 flex flex-col"
+          style={{ top: marginTop, bottom: marginBottom }}
+          aria-hidden
+        >
           {referenceLines
             .map((line, index) => {
               const value = Number(line?.y);
@@ -228,7 +320,14 @@ export function BarChart({
 
               const clamped = Math.max(0, Math.min(value, maxValue));
               const ratio = maxValue === 0 ? 0 : clamped / maxValue;
-              const top = 100 - ratio * 100;
+              const percentOffset = 100 - ratio * 100;
+              const pixelOffset =
+                availablePlotHeight !== null
+                  ? Math.max(
+                      0,
+                      Math.min(availablePlotHeight, availablePlotHeight * (1 - ratio))
+                    )
+                  : null;
               const strokeColor = line?.stroke || "var(--border)";
               const strokeWidth = Number(line?.strokeWidth) || 1.5;
               const strokeOpacity =
@@ -241,7 +340,10 @@ export function BarChart({
                     position: "absolute",
                     left: 0,
                     right: 0,
-                    top: `${top}%`,
+                    top:
+                      pixelOffset !== null
+                        ? `${pixelOffset}px`
+                        : `${percentOffset}%`,
                     borderTop: `${strokeWidth}px solid ${strokeColor}`,
                     opacity: strokeOpacity,
                   }}
