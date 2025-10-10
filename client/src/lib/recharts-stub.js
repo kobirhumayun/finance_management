@@ -19,7 +19,7 @@ function flattenChildren(children) {
 function collect(children, chartType) {
   return flattenChildren(children)
     .filter((child) => child.type?.chartType === chartType)
-    .map((child) => child.props);
+    .map((child) => ({ ...child.props, __stubKey: child.key }));
 }
 
 function parseBars(children) {
@@ -236,7 +236,7 @@ export function BarChart({
 
               return (
                 <div
-                  key={line?.key ?? `reference-${index}`}
+                  key={line?.__stubKey ?? `reference-${index}`}
                   style={{
                     position: "absolute",
                     left: 0,
