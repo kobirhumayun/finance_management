@@ -23,6 +23,7 @@ export const qk = {
     slowReport: () => ["analytics", "slow-report"],
   },
   dashboard: {
+    overview: () => ["dashboard", "overview"],
     summary: () => ["dashboard", "summary"],
     recentTransactions: () => ["dashboard", "recent-transactions"],
   },

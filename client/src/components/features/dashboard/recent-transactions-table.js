@@ -32,11 +32,13 @@ export default function RecentTransactionsTable({ transactions = [], isLoading }
         </TableHeader>
         <TableBody>
           {transactions.map((transaction) => {
-            const formattedAmount = `${transaction.type === "Expense" ? "-" : "+"}$${transaction.amount.toLocaleString()}`;
+            const projectLabel = transaction.projectName || transaction.projectId || "—";
+            const amountValue = Number.isFinite(transaction.amount) ? transaction.amount : 0;
+            const formattedAmount = `${transaction.type === "Expense" ? "-" : "+"}$${amountValue.toLocaleString()}`;
             return (
               <TableRow key={transaction.id}>
                 <TableCell>{transaction.date}</TableCell>
-                <TableCell>{transaction.projectId}</TableCell>
+                <TableCell>{projectLabel}</TableCell>
                 <TableCell>{transaction.type}</TableCell>
                 <TableCell className="text-right font-medium">{formattedAmount}</TableCell>
               </TableRow>
