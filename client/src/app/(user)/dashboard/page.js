@@ -2,30 +2,58 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, ArrowDownCircle, PiggyBank, Briefcase } from "lucide-react";
+import { Banknote, CreditCard, Wallet, Briefcase } from "lucide-react";
 import SummaryCard from "@/components/features/dashboard/summary-card";
 import RecentTransactionsTable from "@/components/features/dashboard/recent-transactions-table";
 import PageHeader from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { qk } from "@/lib/query-keys";
-import { fetchDashboardSummary, fetchRecentTransactions } from "@/lib/mock-data";
+import { fetchDashboardOverview } from "@/lib/queries/dashboard";
+
+const percentFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1,
+});
 
 // Authenticated user dashboard summarizing key insights.
 export default function DashboardPage() {
-  const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: qk.dashboard.summary(),
-    queryFn: fetchDashboardSummary,
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+  } = useQuery({
+    queryKey: qk.dashboard.overview(),
+    queryFn: ({ signal }) => fetchDashboardOverview({ signal }),
   });
 
-  const { data: recentTransactions = [], isLoading: transactionsLoading } = useQuery({
-    queryKey: qk.dashboard.recentTransactions(),
-    queryFn: fetchRecentTransactions,
-  });
+  const summary = data?.summary;
+  const recentTransactions = data?.recentTransactions ?? [];
+  const projects = data?.projectCount ?? 0;
+  const comparisons = data?.comparisons ?? {};
 
   const income = summary?.income ?? 0;
-  const expenses = summary?.expenses ?? 0;
-  const net = summary?.netBalance ?? 0;
-  const projects = summary?.projects ?? 0;
+  const expenses = summary?.expense ?? 0;
+  const net = summary?.balance ?? income - expenses;
+
+  const isSummaryLoading = isLoading || isFetching;
+  const showSummaryPlaceholder = isSummaryLoading || isError;
+  const isTransactionsLoading = isSummaryLoading;
+
+  const formatTrend = (comparison, { fallbackDirection = "up" } = {}) => {
+    if (!comparison || showSummaryPlaceholder) {
+      return { label: "-- vs last month", direction: fallbackDirection };
+    }
+
+    const percent = Number.isFinite(comparison.percentChange) ? comparison.percentChange : 0;
+    const sign = percent > 0 ? "+" : percent < 0 ? "-" : "";
+    const magnitude = percentFormatter.format(Math.abs(percent));
+
+    return {
+      label: `${sign}${magnitude}% vs last month`,
+      direction: comparison.direction ?? fallbackDirection,
+    };
+  };
 
   return (
     <div className="space-y-8">
@@ -36,28 +64,28 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Income"
-          value={summaryLoading ? "--" : `$${income.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : `BDT ${income.toLocaleString()}`}
           description="Month to date"
-          icon={Wallet}
-          trend={{ label: "+12% vs last month", direction: "up" }}
+          icon={Banknote}
+          trend={formatTrend(comparisons.income, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Total Expenses"
-          value={summaryLoading ? "--" : `$${expenses.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : `BDT ${expenses.toLocaleString()}`}
           description="Month to date"
-          icon={ArrowDownCircle}
-          trend={{ label: "+4% vs last month", direction: "down" }}
+          icon={CreditCard}
+          trend={formatTrend(comparisons.expense, { fallbackDirection: "down" })}
         />
         <SummaryCard
           title="Net Balance"
-          value={summaryLoading ? "--" : `$${net.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : `BDT ${net.toLocaleString()}`}
           description="After expenses"
-          icon={PiggyBank}
-          trend={{ label: "+8% vs last month", direction: "up" }}
+          icon={Wallet}
+          trend={formatTrend(comparisons.balance, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Active Projects"
-          value={summaryLoading ? "--" : projects}
+          value={showSummaryPlaceholder ? "--" : projects.toLocaleString()}
           description="Tracked in FinTrack"
           icon={Briefcase}
         />
@@ -67,7 +95,11 @@ export default function DashboardPage() {
           <CardTitle>Recent transactions</CardTitle>
         </CardHeader>
         <CardContent>
-          <RecentTransactionsTable transactions={recentTransactions} isLoading={transactionsLoading} />
+          {isError ? (
+            <p className="text-sm text-destructive">Unable to load recent transactions.</p>
+          ) : (
+            <RecentTransactionsTable transactions={recentTransactions} isLoading={isTransactionsLoading} />
+          )}
         </CardContent>
       </Card>
     </div>
