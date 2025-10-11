@@ -2,7 +2,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, ArrowDownCircle, PiggyBank, Briefcase } from "lucide-react";
+import { Banknote, CreditCard, Wallet, Briefcase } from "lucide-react";
 import SummaryCard from "@/components/features/dashboard/summary-card";
 import RecentTransactionsTable from "@/components/features/dashboard/recent-transactions-table";
 import PageHeader from "@/components/shared/page-header";
@@ -64,23 +64,23 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Income"
-          value={showSummaryPlaceholder ? "--" : `$${income.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : `BDT ${income.toLocaleString()}`}
           description="Month to date"
-          icon={Wallet}
+          icon={Banknote}
           trend={formatTrend(comparisons.income, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Total Expenses"
-          value={showSummaryPlaceholder ? "--" : `$${expenses.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : `BDT ${expenses.toLocaleString()}`}
           description="Month to date"
-          icon={ArrowDownCircle}
+          icon={CreditCard}
           trend={formatTrend(comparisons.expense, { fallbackDirection: "down" })}
         />
         <SummaryCard
           title="Net Balance"
-          value={showSummaryPlaceholder ? "--" : `$${net.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : `BDT ${net.toLocaleString()}`}
           description="After expenses"
-          icon={PiggyBank}
+          icon={Wallet}
           trend={formatTrend(comparisons.balance, { fallbackDirection: "up" })}
         />
         <SummaryCard
