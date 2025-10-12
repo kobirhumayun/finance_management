@@ -384,12 +384,16 @@ function getPath(points, tension = 0.2) {
   return path;
 }
 
-export function LineChart({ data = [], children }) {
+export function LineChart({ data = [], children, margin = {} }) {
   const [hoverState, setHoverState] = useState(null);
 
   const lines = collect(children, "Line");
   const tooltipNode = useMemo(
     () => flattenChildren(children).find((child) => child.type?.chartType === "Tooltip"),
+    [children]
+  );
+  const referenceLines = useMemo(
+    () => collect(children, "ReferenceLine"),
     [children]
   );
 
@@ -447,15 +451,54 @@ export function LineChart({ data = [], children }) {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col gap-2 px-4" onMouseLeave={handleMouseLeave}>
+    <div
+      className="relative flex h-full w-full flex-col"
+      style={{
+        paddingTop: margin.top,
+        paddingRight: margin.right,
+        paddingBottom: margin.bottom,
+        paddingLeft: margin.left,
+      }}
+      onMouseLeave={handleMouseLeave}
+    >
       <svg
-        className="h-48 w-full"
+        className="w-full flex-1"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         role="img"
         aria-label="Line chart"
         onMouseMove={handleMouseMove}
       >
+        <foreignObject x="0" y="0" width="100" height="100">
+          <div className="pointer-events-none absolute inset-0 z-0 flex h-full w-full flex-col" aria-hidden>
+            {referenceLines
+              .map((line, index) => {
+                const value = Number(line?.y);
+                if (!Number.isFinite(value)) return null;
+
+                const clamped = Math.max(0, Math.min(value, maxValue));
+                const ratio = maxValue === 0 ? 0 : clamped / maxValue;
+                const top = 100 - ratio * 100;
+                const strokeColor = line?.stroke || "var(--border)";
+                const strokeWidth = Number(line?.strokeWidth) || 1;
+                const strokeOpacity = typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.2;
+
+                return (
+                  <div
+                    key={line?.__stubKey ?? `reference-${index}`}
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      top: `${top}%`,
+                      borderTop: `${strokeWidth}px solid ${strokeColor}`,
+                      opacity: strokeOpacity,
+                    }}
+                  />
+                );
+              })}
+          </div>
+        </foreignObject>
         {points.map((linePoints, index) => (
           <path
             key={keys[index]}
@@ -467,16 +510,18 @@ export function LineChart({ data = [], children }) {
         ))}
         <line x1="0" y1="100" x2="100" y2="100" stroke="var(--muted-foreground)" strokeWidth={0.5} />
       </svg>
-      <div
-        className="grid gap-2 text-xs text-muted-foreground"
-        style={{ gridTemplateColumns: `repeat(${data.length || 1}, minmax(0, 1fr))` }}
-      >
-        {data.map((row, index) => (
-          <span key={index} className="text-center">
-            {row.month || row.name || `#${index + 1}`}
-          </span>
-        ))}
-      </div>
+      {data.length > 0 && (
+        <div
+          className="grid gap-2 pt-2 text-xs text-muted-foreground"
+          style={{ gridTemplateColumns: `repeat(${data.length || 1}, minmax(0, 1fr))` }}
+        >
+          {data.map((row, index) => (
+            <span key={index} className="text-center">
+              {row.month || row.name || `#${index + 1}`}
+            </span>
+          ))}
+        </div>
+      )}
       {tooltipElement ? <div className="pointer-events-none z-10" style={tooltipStyle}>{tooltipElement}</div> : null}
     </div>
   );
