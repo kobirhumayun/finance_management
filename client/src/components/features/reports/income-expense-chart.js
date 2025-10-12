@@ -129,16 +129,9 @@ function IncomeExpenseTooltip({ active, payload, label }) {
     return null;
   }
 
-  const net = payload.reduce((total, entry) => {
-    if (entry.dataKey === "income") {
-      return total + toNumber(entry.value);
-    }
-    if (entry.dataKey === "expense") {
-      return total - toNumber(entry.value);
-    }
-    return total;
-  }, 0);
-
+  const income = payload.find((p) => p.dataKey === "income")?.value ?? 0;
+  const expense = payload.find((p) => p.dataKey === "expense")?.value ?? 0;
+  const balance = toNumber(income) - toNumber(expense);
   return (
     <div className="min-w-[200px] rounded-md border bg-popover p-3 text-sm shadow-md">
       <div className="mb-2 font-medium">{label}</div>
@@ -158,8 +151,8 @@ function IncomeExpenseTooltip({ active, payload, label }) {
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between border-t pt-2 text-xs text-muted-foreground">
-        <span>Net</span>
-        <span className="font-medium text-foreground">{formatCurrency(net)}</span>
+        <span>Net Balance</span>
+        <span className="font-medium text-foreground">{formatCurrency(balance)}</span>
       </div>
     </div>
   );
