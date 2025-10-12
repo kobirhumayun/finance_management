@@ -1,7 +1,7 @@
 // File: src/components/features/reports/income-expense-chart.js
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -210,8 +210,10 @@ export default function IncomeExpenseChart({ data = [] }) {
   const highlightColor = ringColor || incomeColor || expenseColor;
 
   const [containerRef, { width: containerWidth, height: containerHeight }] = useElementSize();
+  const scaleTrackRef = useRef(null);
   const [legendHeight, setLegendHeight] = useState(0);
   const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
+  const [baselinePosition, setBaselinePosition] = useState(null);
 
   const groupCount = chartData.length;
   const seriesPerGroup = 2;
@@ -263,21 +265,108 @@ export default function IncomeExpenseChart({ data = [] }) {
     () => ({ ...CHART_MARGIN, bottom: chartBottomPadding, left: 0 }),
     [chartBottomPadding]
   );
-  const plotHeight = useMemo(() => {
+
+  const chartInnerHeight = useMemo(() => {
     if (!containerHeight) {
       return null;
     }
-    return Math.max(containerHeight - CHART_MARGIN.top - chartBottomPadding, 0);
-  }, [containerHeight, chartBottomPadding]);
+
+    return Math.max(containerHeight - chartMargin.top - chartMargin.bottom, 0);
+  }, [containerHeight, chartMargin.bottom, chartMargin.top]);
+
+  const plotHeight = useMemo(() => {
+    if (chartInnerHeight === null) {
+      return null;
+    }
+
+    const adjusted = chartInnerHeight - X_AXIS_HEIGHT;
+    return Math.max(adjusted, 0);
+  }, [chartInnerHeight]);
+
+  useLayoutEffect(() => {
+    if (!containerRef.current || !scaleTrackRef.current) {
+      return;
+    }
+
+    const measure = () => {
+      const svg = containerRef.current.querySelector("svg");
+      const scaleRect = scaleTrackRef.current.getBoundingClientRect?.();
+
+      if (!svg || !scaleRect) {
+        setBaselinePosition(null);
+        return;
+      }
+
+      let baselineY = null;
+      const barGroups = svg.querySelectorAll(".recharts-bar-rectangle");
+      barGroups.forEach((group) => {
+        const shape =
+          group.querySelector(".recharts-rectangle") ?? group.querySelector("path") ?? group.firstElementChild;
+        if (!shape?.getBoundingClientRect) {
+          return;
+        }
+        const rect = shape.getBoundingClientRect();
+        if (!Number.isFinite(rect.bottom)) {
+          return;
+        }
+        baselineY = baselineY === null ? rect.bottom : Math.max(baselineY, rect.bottom);
+      });
+
+      if (baselineY === null) {
+        const baselineNode =
+          svg.querySelector(".baseline-reference-line line") ??
+          svg.querySelector(".baseline-reference-line path");
+
+        if (baselineNode?.getBoundingClientRect) {
+          const baselineRect = baselineNode.getBoundingClientRect();
+          baselineY = baselineRect.top + baselineRect.height / 2;
+        }
+      }
+
+      if (baselineY === null || !Number.isFinite(baselineY)) {
+        setBaselinePosition(null);
+        return;
+      }
+
+      const rawOffset = baselineY - scaleRect.top - CHART_MARGIN.top;
+      const contentHeight =
+        (scaleTrackRef.current?.clientHeight ?? 0) - CHART_MARGIN.top - chartBottomPadding;
+      const normalized = clamp(rawOffset, 0, Math.max(contentHeight, 0));
+
+      if (Number.isFinite(normalized)) {
+        setBaselinePosition(normalized);
+      } else {
+        setBaselinePosition(null);
+      }
+    };
+
+    measure();
+    const frame = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(frame);
+  }, [
+    chartBottomPadding,
+    chartData,
+    containerHeight,
+    containerWidth,
+    legendHeight,
+    scaleMarkers.length,
+  ]);
   const markerLayout = useMemo(() => {
     if (!scaleMarkers.length) {
       return [];
     }
-    return scaleMarkers.map((marker) => ({
-      ...marker,
-      position: plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio),
-    }));
-  }, [plotHeight, scaleMarkers]);
+
+    return scaleMarkers.map((marker) => {
+      if (marker.ratio === 0 && baselinePosition !== null) {
+        return { ...marker, position: baselinePosition };
+      }
+
+      const position =
+        plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
+
+      return { ...marker, position };
+    });
+  }, [baselinePosition, plotHeight, scaleMarkers]);
 
   const yAxisDomain = useMemo(() => {
     if (!Number.isFinite(maxValue) || maxValue <= 0) {
@@ -319,10 +408,17 @@ export default function IncomeExpenseChart({ data = [] }) {
             <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground">
               <div
                 className="relative flex-1"
+                ref={scaleTrackRef}
                 style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
               >
                 <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
                 {markerLayout.map((marker) => {
+                  const isTop = marker.ratio === 1;
+                  const isBottom = marker.ratio === 0;
+                  const translateClass = isTop ? "" : isBottom ? "-translate-y-full" : "-translate-y-1/2";
+                  const alignClass = isTop ? "items-start" : isBottom ? "items-end" : "items-center";
+                  const lineAlignClass = isTop ? "self-start" : isBottom ? "self-end" : "self-center";
+
                   const topStyle =
                     marker.position === null
                       ? { top: `${(1 - marker.ratio) * 100}%` }
@@ -331,15 +427,14 @@ export default function IncomeExpenseChart({ data = [] }) {
                   return (
                     <div
                       key={marker.ratio}
-                      className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
-                        }`}
+                      className={`absolute right-2 flex gap-2 ${translateClass} ${alignClass}`}
                       style={topStyle}
                     >
                       <div className="text-right leading-tight">
                         <div className="font-medium text-foreground">{marker.value}</div>
                         <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
                       </div>
-                      <div className="h-px w-2 bg-border" aria-hidden />
+                      <div className={`h-px w-2 bg-border ${lineAlignClass}`} aria-hidden />
                     </div>
                   );
                 })}
@@ -384,10 +479,12 @@ export default function IncomeExpenseChart({ data = [] }) {
                     ))}
                   <ReferenceLine
                     y={0}
-                    stroke={highlightColor || referenceLineColor || undefined}
+                    className="baseline-reference-line"
+                    stroke={referenceLineColor || highlightColor || undefined}
                     strokeWidth={2}
+                    strokeOpacity={0.8}
                     ifOverflow="extendDomain"
-                    isFront={false}
+                    isFront
                   />
                   <Legend
                     content={(legendProps) => (
