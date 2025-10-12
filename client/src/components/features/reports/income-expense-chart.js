@@ -209,7 +209,7 @@ export default function IncomeExpenseChart({ data = [] }) {
   const referenceLineColor = borderColor || cursorFill;
   const highlightColor = ringColor || incomeColor || expenseColor;
 
-  const [containerRef, { width: containerWidth }] = useElementSize();
+  const [containerRef, { width: containerWidth, height: containerHeight }] = useElementSize();
   const [legendHeight, setLegendHeight] = useState(0);
   const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
 
@@ -257,6 +257,28 @@ export default function IncomeExpenseChart({ data = [] }) {
     setActiveBar({ index: null, dataKey: null });
   }, []);
 
+  const chartBottomPadding = X_AXIS_HEIGHT + (legendHeight || 0);
+
+  const chartMargin = useMemo(
+    () => ({ ...CHART_MARGIN, bottom: chartBottomPadding, left: 0 }),
+    [chartBottomPadding]
+  );
+  const plotHeight = useMemo(() => {
+    if (!containerHeight) {
+      return null;
+    }
+    return Math.max(containerHeight - CHART_MARGIN.top - chartBottomPadding, 0);
+  }, [containerHeight, chartBottomPadding]);
+  const markerLayout = useMemo(() => {
+    if (!scaleMarkers.length) {
+      return [];
+    }
+    return scaleMarkers.map((marker) => ({
+      ...marker,
+      position: plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio),
+    }));
+  }, [plotHeight, scaleMarkers]);
+
   const yAxisDomain = useMemo(() => {
     if (!Number.isFinite(maxValue) || maxValue <= 0) {
       return [0, "auto"];
@@ -294,30 +316,40 @@ export default function IncomeExpenseChart({ data = [] }) {
           </div>
         ) : (
           <div className="flex h-full items-stretch">
-            <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
-              <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
+            <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground">
+              <div
+                className="relative flex-1"
+                style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
+              >
                 <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
-                {scaleMarkers.map((marker) => (
-                  <div
-                    key={marker.ratio}
-                    className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
-                      }`}
-                    style={{ top: `${(1 - marker.ratio) * 100}%` }}
-                  >
-                    <div className="text-right leading-tight">
-                      <div className="font-medium text-foreground">{marker.value}</div>
-                      <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+                {markerLayout.map((marker) => {
+                  const topStyle =
+                    marker.position === null
+                      ? { top: `${(1 - marker.ratio) * 100}%` }
+                      : { top: marker.position };
+
+                  return (
+                    <div
+                      key={marker.ratio}
+                      className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
+                        }`}
+                      style={topStyle}
+                    >
+                      <div className="text-right leading-tight">
+                        <div className="font-medium text-foreground">{marker.value}</div>
+                        <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+                      </div>
+                      <div className="h-px w-2 bg-border" aria-hidden />
                     </div>
-                    <div className="h-px w-2 bg-border" aria-hidden />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <div ref={containerRef} className="h-full flex-1 pl-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
-                  margin={{ ...CHART_MARGIN, left: 0 }}
+                  margin={chartMargin}
                   barSize={sizing.barSize}
                   barGap={sizing.barGap}
                   barCategoryGap={sizing.barCategoryGap}
@@ -326,27 +358,37 @@ export default function IncomeExpenseChart({ data = [] }) {
                 >
                   <XAxis
                     dataKey="month"
+                    height={X_AXIS_HEIGHT}
                     stroke="currentColor"
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
                   />
-                  <YAxis hide domain={[0, maxValue]} />
+                  <YAxis hide domain={yAxisDomain} />
                   <Tooltip
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
                     content={<IncomeExpenseTooltip />}
                   />
-                  {scaleMarkers.map((marker) => (
-                    <ReferenceLine
-                      key={`marker-${marker.ratio}`}
-                      y={marker.y}
-                      stroke={referenceLineColor || undefined}
-                      strokeWidth={1.5}
-                      strokeOpacity={0.5}
-                      ifOverflow="extendDomain"
-                      isFront={false}
-                    />
-                  ))}
+                  {scaleMarkers
+                    .filter((marker) => marker.ratio > 0)
+                    .map((marker) => (
+                      <ReferenceLine
+                        key={`marker-${marker.ratio}`}
+                        y={marker.y}
+                        stroke={referenceLineColor || undefined}
+                        strokeWidth={1.5}
+                        strokeOpacity={0.5}
+                        ifOverflow="extendDomain"
+                        isFront={false}
+                      />
+                    ))}
+                  <ReferenceLine
+                    y={0}
+                    stroke={highlightColor || referenceLineColor || undefined}
+                    strokeWidth={2}
+                    ifOverflow="extendDomain"
+                    isFront={false}
+                  />
                   <Legend
                     content={(legendProps) => (
                       <ChartLegend
