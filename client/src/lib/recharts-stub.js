@@ -360,42 +360,169 @@ export function Cell() {
 }
 Cell.chartType = "Cell";
 
-export function LineChart({ data = [], children }) {
+function getPath(points, tension = 0.2) {
+  if (points.length < 2) return "";
+
+  const path = points.reduce((acc, point, i, a) => {
+    if (i === 0) return `M ${point.x},${point.y}`;
+
+    const prev = a[i - 1];
+    const next = a[i + 1];
+    const p0 = a[i - 2] || prev;
+    const p1 = prev;
+    const p2 = point;
+    const p3 = next || p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+    return `${acc} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }, "");
+
+  return path;
+}
+
+export function LineChart({ data = [], children, margin = {} }) {
+  const [hoverState, setHoverState] = useState(null);
+
   const lines = collect(children, "Line");
+  const tooltipNode = useMemo(
+    () => flattenChildren(children).find((child) => child.type?.chartType === "Tooltip"),
+    [children]
+  );
+  const referenceLines = useMemo(
+    () => collect(children, "ReferenceLine"),
+    [children]
+  );
+
   const keys = lines.map((line) => line.dataKey);
   const colors = lines.map((line, index) => line.stroke || DEFAULT_COLORS[index % DEFAULT_COLORS.length]);
   const numericValues = data.flatMap((row) => keys.map((key) => Number(row[key]) || 0));
   const maxValue = Math.max(...numericValues, 1);
 
+  const tooltipElement = buildTooltipElement(tooltipNode, hoverState);
+
   const points = keys.map((key) =>
     data.map((row, index) => {
       const x = data.length > 1 ? (index / (data.length - 1)) * 100 : 0;
-      const y = 100 - (Math.max(0, Number(row[key]) || 0) / maxValue) * 100;
-      return `${x},${y}`;
+      const y = 100 - ((Math.max(0, Number(row[key]) || 0) / maxValue) * 100);
+      return { x, y };
     })
   );
 
+  const handleMouseMove = (event) => {
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - left;
+    const ratio = x / width;
+    const index = Math.round(ratio * (data.length - 1));
+
+    if (index >= 0 && index < data.length) {
+      const item = data[index];
+      const payload = keys.map((key, keyIndex) => ({
+        dataKey: key,
+        name: lines[keyIndex]?.name ?? key,
+        value: Number(item?.[key]) || 0,
+        color: colors[keyIndex],
+        payload: item,
+      }));
+      setHoverState({
+        index,
+        label: item.month || item.name || `#${index + 1}`,
+        payload,
+        coordinate: { x: event.clientX, y: event.clientY },
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoverState(null);
+  };
+
+  const tooltipStyle = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    transform: `translate(${hoverState?.coordinate.x ?? 0}px, ${hoverState?.coordinate.y ?? 0}px)`,
+    transition: "transform 150ms ease-out",
+    opacity: hoverState ? 1 : 0,
+    visibility: hoverState ? "visible" : "hidden",
+  };
+
   return (
-    <div className="flex h-full w-full flex-col gap-2 px-4">
-      <svg className="h-48 w-full" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Line chart">
+    <div
+      className="relative flex h-full w-full flex-col"
+      style={{
+        paddingTop: margin.top || 0,
+        paddingRight: margin.right,
+        paddingBottom: margin.bottom,
+        paddingLeft: margin.left,
+      }}
+      onMouseLeave={handleMouseLeave}
+    >
+      <svg
+        className="w-full flex-1"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Line chart"
+        onMouseMove={handleMouseMove}
+      >
+        <foreignObject x="0" y="0" width="100" height="100">
+          <div className="pointer-events-none absolute inset-0 z-0 flex h-full w-full flex-col" aria-hidden>
+            {referenceLines
+              .map((line, index) => {
+                const value = Number(line?.y);
+                if (!Number.isFinite(value)) return null;
+
+                const clamped = Math.max(0, Math.min(value, maxValue));
+                const ratio = maxValue === 0 ? 0 : clamped / maxValue;
+                const top = 100 - ratio * 100;
+                const strokeColor = line?.stroke || "var(--border)";
+                const strokeWidth = Number(line?.strokeWidth) || 1;
+                const strokeOpacity = typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.2;
+
+                return (
+                  <div
+                    key={line?.__stubKey ?? `reference-${index}`}
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      top: `${top}%`,
+                      borderTop: `${strokeWidth}px solid ${strokeColor}`,
+                      opacity: strokeOpacity,
+                    }}
+                  />
+                );
+              })}
+          </div>
+        </foreignObject>
         {points.map((linePoints, index) => (
-          <polyline
+          <path
             key={keys[index]}
-            points={linePoints.join(" ")}
+            d={getPath(linePoints, 0.2)}
             fill="none"
             stroke={colors[index]}
-            strokeWidth={2}
+            strokeWidth={0.2}
           />
         ))}
         <line x1="0" y1="100" x2="100" y2="100" stroke="var(--muted-foreground)" strokeWidth={0.5} />
       </svg>
-      <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground">
-        {data.map((row, index) => (
-          <span key={index} className="text-center">
-            {row.month || row.name || `#${index + 1}`}
-          </span>
-        ))}
-      </div>
+      {data.length > 0 && (
+        <div
+          className="grid gap-2 pt-2 text-xs text-muted-foreground"
+          style={{ gridTemplateColumns: `repeat(${data.length || 1}, minmax(0, 1fr))` }}
+        >
+          {data.map((row, index) => (
+            <span key={index} className="text-center">
+              {row.month || row.name || `#${index + 1}`}
+            </span>
+          ))}
+        </div>
+      )}
+      {tooltipElement ? <div className="pointer-events-none z-10" style={tooltipStyle}>{tooltipElement}</div> : null}
     </div>
   );
 }

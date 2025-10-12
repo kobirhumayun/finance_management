@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
+import { useCSSVariable } from "@/hooks/use-css-variable";
 
 const toNumber = (value) => toNumeric(value);
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -36,6 +37,9 @@ const formatCurrencyTick = (value) => {
   }
 
   const absolute = Math.abs(value);
+  if (absolute >= 1_000_000_000_000) {
+    return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
+  }
   if (absolute >= 1_000_000_000) {
     return `$${(value / 1_000_000_000).toFixed(1)}B`;
   }
@@ -46,34 +50,6 @@ const formatCurrencyTick = (value) => {
     return `$${(value / 1_000).toFixed(1)}k`;
   }
   return `$${value.toLocaleString()}`;
-};
-
-const useCSSVariable = (variableName) => {
-  const getValue = useCallback(() => {
-    if (typeof window === "undefined") return "";
-    return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
-  }, [variableName]);
-
-  const [value, setValue] = useState(() => getValue());
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const updateValue = () => {
-      setValue(getValue());
-    };
-
-    updateValue();
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", updateValue);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateValue);
-    };
-  }, [getValue]);
-
-  return value;
 };
 
 const useElementSize = () => {
@@ -337,9 +313,8 @@ export default function IncomeExpenseChart({ data = [] }) {
                   {scaleMarkers.map((marker) => (
                     <div
                       key={marker.ratio}
-                      className={`absolute left-2 flex items-center gap-2 ${
-                        marker.ratio === 1 ? "" : "-translate-y-1/2"
-                      }`}
+                      className={`absolute left-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : "-translate-y-1/2"
+                        }`}
                       style={{ top: `${(1 - marker.ratio) * 100}%` }}
                     >
                       <div className="leading-tight">
