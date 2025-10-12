@@ -65,7 +65,7 @@ export default function CashFlowChart({ data = [] }) {
       return { maxValue: 0, scaleMarkers: [] };
     }
 
-    const anchors = [1, 0.75, 0.5, 0.25];
+    const anchors = [1, 0.75, 0.5, 0.25, 0];
     const markers = anchors.map((ratio) => ({
       ratio,
       label: `${Math.round(ratio * 100)}%`,
@@ -83,19 +83,22 @@ export default function CashFlowChart({ data = [] }) {
       <CardContent className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
           <div className="flex h-full items-stretch gap-4">
-            <div className="flex w-28 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
-              <div className="relative flex-1 pl-4" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
-                <span className="absolute inset-y-0 left-0 w-px rounded-full bg-border" aria-hidden />
+            <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
+              <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
+                <div className="absolute inset-y-0 right-0 w-px rounded-full bg-border" aria-hidden />
                 {scaleMarkers.map((marker) => (
                   <div
                     key={marker.ratio}
-                    className={`absolute left-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : "-translate-y-1/2"}`}
+                    className={`absolute right-2 flex items-center gap-2 ${
+                      marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
+                    }`}
                     style={{ top: `${(1 - marker.ratio) * 100}%` }}
                   >
-                    <div className="leading-tight">
+                    <div className="text-right leading-tight">
                       <div className="font-medium text-foreground">{marker.value}</div>
                       <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
                     </div>
+                    <div className="h-px w-2 bg-border" aria-hidden />
                   </div>
                 ))}
               </div>
@@ -109,7 +112,6 @@ export default function CashFlowChart({ data = [] }) {
                 {scaleMarkers.map((marker) => (
                   <ReferenceLine key={`marker-${marker.ratio}`} y={marker.y} stroke={borderColor} strokeOpacity={0.5} />
                 ))}
-                <ReferenceLine y={0} stroke={borderColor} strokeOpacity={1} />
                 <Line type="monotone" dataKey="cashIn" name="Cash In" stroke={incomeColor} strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="cashOut" name="Cash Out" stroke={expenseColor} strokeWidth={2} dot={false} />
               </LineChart>
