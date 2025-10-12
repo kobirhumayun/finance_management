@@ -37,6 +37,9 @@ const formatCurrencyTick = (value) => {
   }
 
   const absolute = Math.abs(value);
+  if (absolute >= 1_000_000_000_000) {
+    return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
+  }
   if (absolute >= 1_000_000_000) {
     return `$${(value / 1_000_000_000).toFixed(1)}B`;
   }
@@ -310,9 +313,8 @@ export default function IncomeExpenseChart({ data = [] }) {
                   {scaleMarkers.map((marker) => (
                     <div
                       key={marker.ratio}
-                      className={`absolute left-2 flex items-center gap-2 ${
-                        marker.ratio === 1 ? "" : "-translate-y-1/2"
-                      }`}
+                      className={`absolute left-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : "-translate-y-1/2"
+                        }`}
                       style={{ top: `${(1 - marker.ratio) * 100}%` }}
                     >
                       <div className="leading-tight">
