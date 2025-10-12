@@ -466,16 +466,6 @@ export function LineChart({ data = [], children }) {
           />
         ))}
         <line x1="0" y1="100" x2="100" y2="100" stroke="var(--muted-foreground)" strokeWidth={0.5} />
-        {hoverState && (
-          <line
-            x1={hoverState.index / (data.length - 1) * 100}
-            y1="0"
-            x2={hoverState.index / (data.length - 1) * 100}
-            y2="100"
-            stroke="var(--primary)"
-            strokeWidth={0.2}
-          />
-        )}
       </svg>
       <div
         className="grid gap-2 text-xs text-muted-foreground"
