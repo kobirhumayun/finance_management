@@ -15,7 +15,7 @@ const formatCurrencyTick = (value) => {
   return `$${value.toLocaleString()}`;
 };
 
-const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 8 };
+const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 0 };
 
 const formatCurrency = (value) => `$${toNumeric(value).toLocaleString()}`;
 
@@ -101,7 +101,7 @@ export default function CashFlowChart({ data = [] }) {
               ))}
             </div>
           </div>
-          <div className="h-full flex-1 pl-4">
+          <div className="h-full flex-1 pl-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={CHART_MARGIN}>
                 <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
