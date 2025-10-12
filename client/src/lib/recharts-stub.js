@@ -454,7 +454,7 @@ export function LineChart({ data = [], children, margin = {} }) {
     <div
       className="relative flex h-full w-full flex-col"
       style={{
-        paddingTop: margin.top,
+        paddingTop: margin.top || 0,
         paddingRight: margin.right,
         paddingBottom: margin.bottom,
         paddingLeft: margin.left,

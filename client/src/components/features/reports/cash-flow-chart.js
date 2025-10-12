@@ -81,29 +81,28 @@ export default function CashFlowChart({ data = [] }) {
         <CardTitle>Cash Flow Trend</CardTitle>
       </CardHeader>
       <CardContent className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <div className="flex h-full items-stretch">
-            <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
-              <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
-                <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
-                {scaleMarkers.map((marker) => (
-                  <div
-                    key={marker.ratio}
-                    className={`absolute right-2 flex items-center gap-2 ${
-                      marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
+        <div className="flex h-full items-stretch">
+          <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
+            <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
+              <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
+              {scaleMarkers.map((marker) => (
+                <div
+                  key={marker.ratio}
+                  className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
                     }`}
-                    style={{ top: `${(1 - marker.ratio) * 100}%` }}
-                  >
-                    <div className="text-right leading-tight">
-                      <div className="font-medium text-foreground">{marker.value}</div>
-                      <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
-                    </div>
-                    <div className="h-px w-2 bg-border" aria-hidden />
+                  style={{ top: `${(1 - marker.ratio) * 100}%` }}
+                >
+                  <div className="text-right leading-tight">
+                    <div className="font-medium text-foreground">{marker.value}</div>
+                    <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
                   </div>
-                ))}
-              </div>
+                  <div className="h-px w-2 bg-border" aria-hidden />
+                </div>
+              ))}
             </div>
-            <div className="h-full flex-1 pl-4">
+          </div>
+          <div className="h-full flex-1 pl-4">
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={CHART_MARGIN}>
                 <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis hide domain={[0, maxValue]} />
@@ -115,9 +114,9 @@ export default function CashFlowChart({ data = [] }) {
                 <Line type="monotone" dataKey="cashIn" name="Cash In" stroke={incomeColor} strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="cashOut" name="Cash Out" stroke={expenseColor} strokeWidth={2} dot={false} />
               </LineChart>
-            </div>
+            </ResponsiveContainer>
           </div>
-        </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );
