@@ -4,6 +4,7 @@
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts"; // recharts-stub
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
+import { useCSSVariable } from "@/hooks/use-css-variable";
 
 const formatCurrency = (value) => `$${toNumeric(value).toLocaleString()}`;
 
@@ -40,6 +41,9 @@ function CashFlowTooltip({ active, payload, label }) {
 
 // Line chart visualizing cash flow trends.
 export default function CashFlowChart({ data = [] }) {
+  const incomeColor = useCSSVariable("--chart-income");
+  const expenseColor = useCSSVariable("--chart-expense");
+
   return (
     <Card>
       <CardHeader>
@@ -53,8 +57,8 @@ export default function CashFlowChart({ data = [] }) {
             <YAxis stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value / 1000}k`} />
             <Tooltip content={<CashFlowTooltip />} cursor={{ stroke: "var(--primary)" }} />
             <Legend />
-            <Line type="monotone" dataKey="cashIn" stroke="var(--primary)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="cashOut" stroke="var(--chart-3)" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="cashIn" name="Cash In" stroke={incomeColor} strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="cashOut" name="Cash Out" stroke={expenseColor} strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </CardContent>

@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
+import { useCSSVariable } from "@/hooks/use-css-variable";
 
 const toNumber = (value) => toNumeric(value);
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -46,34 +47,6 @@ const formatCurrencyTick = (value) => {
     return `$${(value / 1_000).toFixed(1)}k`;
   }
   return `$${value.toLocaleString()}`;
-};
-
-const useCSSVariable = (variableName) => {
-  const getValue = useCallback(() => {
-    if (typeof window === "undefined") return "";
-    return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
-  }, [variableName]);
-
-  const [value, setValue] = useState(() => getValue());
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const updateValue = () => {
-      setValue(getValue());
-    };
-
-    updateValue();
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", updateValue);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateValue);
-    };
-  }, [getValue]);
-
-  return value;
 };
 
 const useElementSize = () => {
