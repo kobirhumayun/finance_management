@@ -181,24 +181,25 @@ export default function IncomeExpenseChart({ data = [] }) {
   }, [data]);
 
   const hasSeries = chartData.some((item) => item.income !== 0 || item.expense !== 0);
-  const maxValue = useMemo(() => {
-    return chartData.reduce((max, item) => {
+
+  const { maxValue, scaleMarkers } = useMemo(() => {
+    const maxVal = chartData.reduce((max, item) => {
       return Math.max(max, Math.abs(item.income || 0), Math.abs(item.expense || 0));
     }, 0);
-  }, [chartData]);
 
-  const scaleMarkers = useMemo(() => {
-    if (!Number.isFinite(maxValue) || maxValue <= 0) {
-      return [];
+    if (maxVal <= 0) {
+      return { maxValue: 0, scaleMarkers: [] };
     }
 
-    const anchors = [1, 0.75, 0.5, 0.25];
-    return anchors.map((ratio) => ({
+    const anchors = [1, 0.75, 0.5, 0.25, 0];
+    const markers = anchors.map((ratio) => ({
       ratio,
       label: `${Math.round(ratio * 100)}%`,
-      value: formatCurrencyTick(maxValue * ratio),
+      value: formatCurrencyTick(maxVal * ratio),
+      y: maxVal * ratio,
     }));
-  }, [maxValue]);
+    return { maxValue: maxVal, scaleMarkers: markers };
+  }, [chartData]);
 
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
@@ -292,69 +293,45 @@ export default function IncomeExpenseChart({ data = [] }) {
               : "No recorded income or expenses for the selected period."}
           </div>
         ) : (
-          <div className="flex h-full items-stretch gap-4">
-            {scaleMarkers.length > 0 ? (
-              <div className="flex w-28 shrink-0 flex-col text-xs text-muted-foreground">
-                <div
-                  className="relative flex-1 pl-4"
-                  style={{
-                    paddingTop: CHART_MARGIN.top + legendHeight,
-                    paddingBottom: CHART_MARGIN.bottom + X_AXIS_HEIGHT,
-                  }}
-                >
-                  <span className="absolute inset-y-0 left-0 w-px rounded-full bg-border" aria-hidden />
-                  {scaleMarkers.map((marker) => (
-                    <div
-                      key={marker.ratio}
-                      className={`absolute left-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : "-translate-y-1/2"
-                        }`}
-                      style={{ top: `${(1 - marker.ratio) * 100}%` }}
-                    >
-                      <div className="leading-tight">
-                        <div className="font-medium text-foreground">{marker.value}</div>
-                        <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
-                      </div>
+          <div className="flex h-full items-stretch">
+            <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
+              <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
+                <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
+                {scaleMarkers.map((marker) => (
+                  <div
+                    key={marker.ratio}
+                    className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
+                      }`}
+                    style={{ top: `${(1 - marker.ratio) * 100}%` }}
+                  >
+                    <div className="text-right leading-tight">
+                      <div className="font-medium text-foreground">{marker.value}</div>
+                      <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
                     </div>
-                  ))}
-                </div>
+                    <div className="h-px w-2 bg-border" aria-hidden />
+                  </div>
+                ))}
               </div>
-            ) : null}
-            <div ref={containerRef} className="h-full flex-1">
+            </div>
+            <div ref={containerRef} className="h-full flex-1 pl-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
-                  margin={CHART_MARGIN}
+                  margin={{ ...CHART_MARGIN, left: 0 }}
                   barSize={sizing.barSize}
                   barGap={sizing.barGap}
                   barCategoryGap={sizing.barCategoryGap}
                   onMouseMove={handleChartMouseMove}
                   onMouseLeave={resetActiveBar}
                 >
-                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                   <XAxis
                     dataKey="month"
                     stroke="currentColor"
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
-                    height={X_AXIS_HEIGHT}
                   />
-                  <YAxis
-                    stroke="currentColor"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={formatCurrencyTick}
-                    domain={yAxisDomain}
-                    label={{
-                      value: "Amount (USD)",
-                      angle: -90,
-                      position: "insideLeft",
-                      offset: -4,
-                      fill: "currentColor",
-                      fontSize: 12,
-                    }}
-                  />
+                  <YAxis hide domain={[0, maxValue]} />
                   <Tooltip
                     cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
                     content={<IncomeExpenseTooltip />}
@@ -362,7 +339,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                   {scaleMarkers.map((marker) => (
                     <ReferenceLine
                       key={`marker-${marker.ratio}`}
-                      y={maxValue * marker.ratio}
+                      y={marker.y}
                       stroke={referenceLineColor || undefined}
                       strokeWidth={1.5}
                       strokeOpacity={0.5}
