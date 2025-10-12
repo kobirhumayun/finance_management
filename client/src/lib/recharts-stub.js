@@ -385,11 +385,20 @@ function getPath(points, tension = 0.2) {
 }
 
 export function LineChart({ data = [], children }) {
+  const [hoverState, setHoverState] = useState(null);
+
   const lines = collect(children, "Line");
+  const tooltipNode = useMemo(
+    () => flattenChildren(children).find((child) => child.type?.chartType === "Tooltip"),
+    [children]
+  );
+
   const keys = lines.map((line) => line.dataKey);
   const colors = lines.map((line, index) => line.stroke || DEFAULT_COLORS[index % DEFAULT_COLORS.length]);
   const numericValues = data.flatMap((row) => keys.map((key) => Number(row[key]) || 0));
   const maxValue = Math.max(...numericValues, 1);
+
+  const tooltipElement = buildTooltipElement(tooltipNode, hoverState);
 
   const points = keys.map((key) =>
     data.map((row, index) => {
@@ -399,14 +408,53 @@ export function LineChart({ data = [], children }) {
     })
   );
 
+  const handleMouseMove = (event) => {
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - left;
+    const ratio = x / width;
+    const index = Math.round(ratio * (data.length - 1));
+
+    if (index >= 0 && index < data.length) {
+      const item = data[index];
+      const payload = keys.map((key, keyIndex) => ({
+        dataKey: key,
+        name: lines[keyIndex]?.name ?? key,
+        value: Number(item?.[key]) || 0,
+        color: colors[keyIndex],
+        payload: item,
+      }));
+      setHoverState({
+        index,
+        label: item.month || item.name || `#${index + 1}`,
+        payload,
+        coordinate: { x: event.clientX, y: event.clientY },
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoverState(null);
+  };
+
+  const tooltipStyle = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    transform: `translate(${hoverState?.coordinate.x ?? 0}px, ${hoverState?.coordinate.y ?? 0}px)`,
+    transition: "transform 150ms ease-out",
+    opacity: hoverState ? 1 : 0,
+    visibility: hoverState ? "visible" : "hidden",
+  };
+
   return (
-    <div className="flex h-full w-full flex-col gap-2 px-4">
+    <div className="relative flex h-full w-full flex-col gap-2 px-4" onMouseLeave={handleMouseLeave}>
       <svg
         className="h-48 w-full"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         role="img"
         aria-label="Line chart"
+        onMouseMove={handleMouseMove}
       >
         {points.map((linePoints, index) => (
           <path
@@ -418,6 +466,16 @@ export function LineChart({ data = [], children }) {
           />
         ))}
         <line x1="0" y1="100" x2="100" y2="100" stroke="var(--muted-foreground)" strokeWidth={0.5} />
+        {hoverState && (
+          <line
+            x1={hoverState.index / (data.length - 1) * 100}
+            y1="0"
+            x2={hoverState.index / (data.length - 1) * 100}
+            y2="100"
+            stroke="var(--primary)"
+            strokeWidth={0.2}
+          />
+        )}
       </svg>
       <div
         className="grid gap-2 text-xs text-muted-foreground"
@@ -429,6 +487,7 @@ export function LineChart({ data = [], children }) {
           </span>
         ))}
       </div>
+      {tooltipElement ? <div className="pointer-events-none z-10" style={tooltipStyle}>{tooltipElement}</div> : null}
     </div>
   );
 }
