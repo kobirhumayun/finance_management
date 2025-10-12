@@ -82,10 +82,10 @@ export default function CashFlowChart({ data = [] }) {
       </CardHeader>
       <CardContent className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <div className="flex h-full items-stretch gap-4">
+          <div className="flex h-full items-stretch">
             <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
               <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
-                <div className="absolute inset-y-0 right-0 w-px rounded-full bg-border" aria-hidden />
+                <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
                 {scaleMarkers.map((marker) => (
                   <div
                     key={marker.ratio}
@@ -103,7 +103,7 @@ export default function CashFlowChart({ data = [] }) {
                 ))}
               </div>
             </div>
-            <div className="h-full flex-1">
+            <div className="h-full flex-1 pl-4">
               <LineChart data={data} margin={CHART_MARGIN}>
                 <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis hide domain={[0, maxValue]} />
