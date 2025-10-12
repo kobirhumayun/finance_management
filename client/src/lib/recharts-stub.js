@@ -360,6 +360,30 @@ export function Cell() {
 }
 Cell.chartType = "Cell";
 
+function getPath(points, tension = 0.2) {
+  if (points.length < 2) return "";
+
+  const path = points.reduce((acc, point, i, a) => {
+    if (i === 0) return `M ${point.x},${point.y}`;
+
+    const prev = a[i - 1];
+    const next = a[i + 1];
+    const p0 = a[i - 2] || prev;
+    const p1 = prev;
+    const p2 = point;
+    const p3 = next || p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+    return `${acc} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }, "");
+
+  return path;
+}
+
 export function LineChart({ data = [], children }) {
   const lines = collect(children, "Line");
   const keys = lines.map((line) => line.dataKey);
@@ -370,26 +394,35 @@ export function LineChart({ data = [], children }) {
   const points = keys.map((key) =>
     data.map((row, index) => {
       const x = data.length > 1 ? (index / (data.length - 1)) * 100 : 0;
-      const y = 100 - (Math.max(0, Number(row[key]) || 0) / maxValue) * 100;
-      return `${x},${y}`;
+      const y = 100 - ((Math.max(0, Number(row[key]) || 0) / maxValue) * 100);
+      return { x, y };
     })
   );
 
   return (
     <div className="flex h-full w-full flex-col gap-2 px-4">
-      <svg className="h-48 w-full" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Line chart">
+      <svg
+        className="h-48 w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Line chart"
+      >
         {points.map((linePoints, index) => (
-          <polyline
+          <path
             key={keys[index]}
-            points={linePoints.join(" ")}
+            d={getPath(linePoints, 0.2)}
             fill="none"
             stroke={colors[index]}
-            strokeWidth={2}
+            strokeWidth={0.2}
           />
         ))}
         <line x1="0" y1="100" x2="100" y2="100" stroke="var(--muted-foreground)" strokeWidth={0.5} />
       </svg>
-      <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground">
+      <div
+        className="grid gap-2 text-xs text-muted-foreground"
+        style={{ gridTemplateColumns: `repeat(${data.length || 1}, minmax(0, 1fr))` }}
+      >
         {data.map((row, index) => (
           <span key={index} className="text-center">
             {row.month || row.name || `#${index + 1}`}
