@@ -203,35 +203,36 @@ export default function CashFlowChart({ data = [] }) {
       </CardHeader>
       <CardContent className="h-[320px]">
         <div className="flex h-full items-stretch">
-          <div
-            className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground"
-            style={{ paddingBottom: chartBottomPadding }}
-          >
-            <div
-              className="relative flex-1"
-              style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
-            >
-              <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
-              {markerLayout.map((marker) => (
-                <div
-                  key={marker.ratio}
-                  className={`absolute right-2 flex items-center gap-2 ${
-                    marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
-                  }`}
-                  style={
-                    marker.position === null
-                      ? { top: `${(1 - marker.ratio) * 100}%` }
-                      : { top: marker.position }
-                  }
-                >
-                  <div className="text-right leading-tight">
-                    <div className="font-medium text-foreground">{marker.value}</div>
-                    <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+          <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground">
+            <div style={{ height: CHART_MARGIN.top }} aria-hidden />
+            <div className="relative flex-1">
+              <div
+                className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border"
+                aria-hidden
+              />
+              {markerLayout.map((marker) => {
+                const fallbackTop = `${(1 - marker.ratio) * 100}%`;
+                const resolvedTop =
+                  marker.position === null ? fallbackTop : `${marker.position - CHART_MARGIN.top}px`;
+
+                return (
+                  <div
+                    key={marker.ratio}
+                    className={`absolute right-2 flex items-center gap-2 ${
+                      marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
+                    }`}
+                    style={{ top: resolvedTop }}
+                  >
+                    <div className="text-right leading-tight">
+                      <div className="font-medium text-foreground">{marker.value}</div>
+                      <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
+                    </div>
+                    <div className="h-px w-2 bg-border" aria-hidden />
                   </div>
-                  <div className="h-px w-2 bg-border" aria-hidden />
-                </div>
-              ))}
+                );
+              })}
             </div>
+            <div style={{ height: chartBottomPadding }} aria-hidden />
           </div>
           <div ref={containerRef} className="h-full flex-1 pl-2">
             <ResponsiveContainer width="100%" height="100%">
