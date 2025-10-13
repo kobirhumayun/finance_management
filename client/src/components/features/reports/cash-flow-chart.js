@@ -1,11 +1,20 @@
 // File: src/components/features/reports/cash-flow-chart.js
 "use client";
 
-import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts"; // recharts-stub
+import {
+  Legend,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"; // recharts-stub
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) return "$0";
@@ -20,32 +29,76 @@ const formatCurrencyTick = (value) => {
 };
 
 const X_AXIS_HEIGHT = 32;
-const CHART_MARGIN = { top: 8, right: 16, bottom: X_AXIS_HEIGHT, left: 0 };
+const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 0 };
 
-const formatPercentage = (value) => {
-  const formatted = Number.parseFloat(value.toFixed(4));
-  if (Number.isNaN(formatted)) {
-    return "0";
-  }
+const useElementSize = () => {
+  const [element, setElement] = useState(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
-  return `${formatted}`.replace(/\.0+$/, "");
+  useEffect(() => {
+    if (!element || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const updateSizeFromEntry = (entry) => {
+      if (!entry) return;
+
+      const rect = entry.contentRect ?? entry;
+      const { width, height } = rect || {};
+      if (typeof width === "number" && typeof height === "number") {
+        setSize({ width, height });
+      }
+    };
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      updateSizeFromEntry(entry);
+    });
+
+    observer.observe(element);
+
+    if (element.getBoundingClientRect) {
+      updateSizeFromEntry(element.getBoundingClientRect());
+    }
+
+    return () => observer.disconnect();
+  }, [element]);
+
+  return [
+    useCallback((node) => {
+      setElement(node ?? null);
+    }, []),
+    size,
+  ];
 };
 
-const resolveMarkerPosition = (ratio) => {
-  const constrainedRatio = Math.min(Math.max(ratio, 0), 1);
-  const percent = formatPercentage((1 - constrainedRatio) * 100);
-  const topAdjustment = CHART_MARGIN.top * constrainedRatio;
-  const bottomAdjustment = (1 - constrainedRatio) * CHART_MARGIN.bottom;
-  const offset = topAdjustment - bottomAdjustment;
+function ChartLegend({ payload, onHeightChange }) {
+  const [legendRef, { height }] = useElementSize();
 
-  if (offset === 0) {
-    return `${percent}%`;
+  useEffect(() => {
+    if (typeof onHeightChange === "function") {
+      onHeightChange(height || 0);
+    }
+  }, [height, onHeightChange]);
+
+  if (!payload || payload.length === 0) {
+    return null;
   }
 
-  const absoluteOffset = Math.abs(offset).toFixed(2).replace(/\.0+$/, "");
-  const operator = offset > 0 ? "+" : "-";
-  return `calc(${percent}% ${operator} ${absoluteOffset}px)`;
-};
+  return (
+    <div
+      ref={legendRef}
+      className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground"
+    >
+      {payload.map((entry, index) => (
+        <div key={entry.dataKey ?? entry.value ?? index} className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden />
+          <span className="font-medium text-foreground">{entry.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const formatCurrency = (value) => `$${toNumeric(value).toLocaleString()}`;
 
@@ -86,6 +139,16 @@ export default function CashFlowChart({ data = [] }) {
   const expenseColor = useCSSVariable("--chart-expense");
   const borderColor = useCSSVariable("--border");
 
+  const [containerRef, { height: containerHeight }] = useElementSize();
+  const [legendHeight, setLegendHeight] = useState(0);
+
+  const handleLegendSizeChange = useCallback((height) => {
+    setLegendHeight((previous) => {
+      const nextHeight = height || 0;
+      return previous === nextHeight ? previous : nextHeight;
+    });
+  }, []);
+
   const { maxValue, scaleMarkers } = useMemo(() => {
     const maxVal = data.reduce((max, item) => {
       return Math.max(max, toNumeric(item.cashIn), toNumeric(item.cashOut));
@@ -105,6 +168,34 @@ export default function CashFlowChart({ data = [] }) {
     return { maxValue: maxVal, scaleMarkers: markers };
   }, [data]);
 
+  const chartBottomPadding = X_AXIS_HEIGHT + (legendHeight || 0);
+
+  const chartMargin = useMemo(
+    () => ({ ...CHART_MARGIN, bottom: chartBottomPadding }),
+    [chartBottomPadding]
+  );
+
+  const plotHeight = useMemo(() => {
+    if (!containerHeight) {
+      return null;
+    }
+
+    return Math.max(containerHeight - chartMargin.top - chartMargin.bottom, 0);
+  }, [containerHeight, chartMargin.bottom, chartMargin.top]);
+
+  const markerLayout = useMemo(() => {
+    if (scaleMarkers.length === 0) {
+      return [];
+    }
+
+    return scaleMarkers.map((marker) => {
+      const position =
+        plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
+
+      return { ...marker, position };
+    });
+  }, [plotHeight, scaleMarkers]);
+
   return (
     <Card>
       <CardHeader>
@@ -114,20 +205,24 @@ export default function CashFlowChart({ data = [] }) {
         <div className="flex h-full items-stretch">
           <div
             className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground"
-            style={{ paddingBottom: CHART_MARGIN.bottom }}
+            style={{ paddingBottom: chartBottomPadding }}
           >
             <div
               className="relative flex-1"
-              style={{ paddingTop: CHART_MARGIN.top, paddingBottom: CHART_MARGIN.bottom }}
+              style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
             >
               <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
-              {scaleMarkers.map((marker) => (
+              {markerLayout.map((marker) => (
                 <div
                   key={marker.ratio}
                   className={`absolute right-2 flex items-center gap-2 ${
                     marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
                   }`}
-                  style={{ top: resolveMarkerPosition(marker.ratio) }}
+                  style={
+                    marker.position === null
+                      ? { top: `${(1 - marker.ratio) * 100}%` }
+                      : { top: marker.position }
+                  }
                 >
                   <div className="text-right leading-tight">
                     <div className="font-medium text-foreground">{marker.value}</div>
@@ -138,9 +233,9 @@ export default function CashFlowChart({ data = [] }) {
               ))}
             </div>
           </div>
-          <div className="h-full flex-1 pl-2">
+          <div ref={containerRef} className="h-full flex-1 pl-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={CHART_MARGIN}>
+              <LineChart data={data} margin={chartMargin}>
                 <XAxis
                   dataKey="month"
                   stroke="currentColor"
@@ -151,7 +246,11 @@ export default function CashFlowChart({ data = [] }) {
                 />
                 <YAxis hide domain={[0, maxValue]} />
                 <Tooltip content={<CashFlowTooltip />} cursor={{ stroke: "var(--primary)" }} />
-                <Legend />
+                <Legend
+                  content={(legendProps) => (
+                    <ChartLegend {...legendProps} onHeightChange={handleLegendSizeChange} />
+                  )}
+                />
                 {scaleMarkers.map((marker) => (
                   <ReferenceLine key={`marker-${marker.ratio}`} y={marker.y} stroke={borderColor} strokeOpacity={0.5} />
                 ))}
