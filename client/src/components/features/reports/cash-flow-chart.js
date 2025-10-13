@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) return "$0";
@@ -69,6 +69,7 @@ const useElementSize = () => {
       setElement(node ?? null);
     }, []),
     size,
+    element,
   ];
 };
 
@@ -139,9 +140,11 @@ export default function CashFlowChart({ data = [] }) {
   const expenseColor = useCSSVariable("--chart-expense");
   const borderColor = useCSSVariable("--border");
 
-  const [containerRef, { height: containerHeight }] = useElementSize();
-  const [scaleTrackRef, { height: scaleTrackHeight }] = useElementSize();
+  const [containerRef, { height: containerHeight, width: containerWidth }, containerNode] =
+    useElementSize();
+  const [scaleTrackRef, { height: scaleTrackHeight }, scaleTrackNode] = useElementSize();
   const [legendHeight, setLegendHeight] = useState(0);
+  const [markerPositions, setMarkerPositions] = useState({});
 
   const handleLegendSizeChange = useCallback((height) => {
     setLegendHeight((previous) => {
@@ -185,18 +188,109 @@ export default function CashFlowChart({ data = [] }) {
     return Math.max(measuredHeight - chartMargin.top - chartMargin.bottom, 0);
   }, [chartMargin.bottom, chartMargin.top, containerHeight, scaleTrackHeight]);
 
+  useLayoutEffect(() => {
+    if (!containerNode || !scaleTrackNode || scaleMarkers.length === 0) {
+      return;
+    }
+
+    const measure = () => {
+      const svg = containerNode.querySelector("svg");
+      const trackRect = scaleTrackNode.getBoundingClientRect?.();
+
+      if (!svg || !trackRect) {
+        return;
+      }
+
+      const nextPositions = {};
+
+      scaleMarkers.forEach((marker) => {
+        const ratioKey = marker.ratio.toString();
+        const selector = `.cashflow-reference-line[data-ratio="${ratioKey}"]`;
+        const node = svg.querySelector(selector);
+
+        if (!node) {
+          return;
+        }
+
+        const line = node.querySelector("line") ?? node.querySelector("path") ?? node;
+        const rect = line?.getBoundingClientRect?.();
+
+        if (!rect) {
+          return;
+        }
+
+        const centerY = rect.top + rect.height / 2;
+        const offset = centerY - trackRect.top;
+
+        if (Number.isFinite(offset)) {
+          nextPositions[ratioKey] = offset;
+        }
+      });
+
+      setMarkerPositions((previous) => {
+        const keys = new Set([...Object.keys(previous), ...Object.keys(nextPositions)]);
+        let changed = false;
+
+        keys.forEach((key) => {
+          const prevVal = previous[key];
+          const nextVal = nextPositions[key];
+
+          if (Number.isFinite(prevVal) || Number.isFinite(nextVal)) {
+            const prevNumber = Number.isFinite(prevVal) ? prevVal : null;
+            const nextNumber = Number.isFinite(nextVal) ? nextVal : null;
+
+            if (prevNumber === null && nextNumber !== null) {
+              changed = true;
+            } else if (prevNumber !== null && nextNumber === null) {
+              changed = true;
+            } else if (
+              prevNumber !== null &&
+              nextNumber !== null &&
+              Math.abs(prevNumber - nextNumber) > 0.5
+            ) {
+              changed = true;
+            }
+          } else if (prevVal !== nextVal) {
+            changed = true;
+          }
+        });
+
+        return changed ? nextPositions : previous;
+      });
+    };
+
+    measure();
+    const frame = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(frame);
+  }, [
+    containerNode,
+    containerHeight,
+    containerWidth,
+    scaleTrackNode,
+    scaleTrackHeight,
+    chartBottomPadding,
+    legendHeight,
+    scaleMarkers,
+    data,
+  ]);
+
   const markerLayout = useMemo(() => {
     if (scaleMarkers.length === 0) {
       return [];
     }
 
     return scaleMarkers.map((marker) => {
-      const position =
+      const ratioKey = marker.ratio.toString();
+      const measuredPosition = markerPositions[ratioKey];
+
+      const fallbackPosition =
         plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
+
+      const position = Number.isFinite(measuredPosition) ? measuredPosition : fallbackPosition;
 
       return { ...marker, position };
     });
-  }, [plotHeight, scaleMarkers]);
+  }, [markerPositions, plotHeight, scaleMarkers]);
 
   return (
     <Card>
@@ -212,13 +306,14 @@ export default function CashFlowChart({ data = [] }) {
               style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
             >
               <div
-                className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border"
+                className="absolute right-[calc(0.5rem-1px)] w-px rounded-full bg-border"
+                style={{ top: CHART_MARGIN.top, bottom: chartBottomPadding }}
                 aria-hidden
               />
               {markerLayout.map((marker) => {
                 const fallbackTop = { top: `${(1 - marker.ratio) * 100}%` };
                 const resolvedTop =
-                  marker.position === null ? fallbackTop : { top: marker.position };
+                  marker.position === null ? fallbackTop : { top: `${marker.position}px` };
 
                 const isTop = marker.ratio === 1;
                 const isBottom = marker.ratio === 0;
@@ -265,6 +360,8 @@ export default function CashFlowChart({ data = [] }) {
                   .map((marker) => (
                     <ReferenceLine
                       key={`marker-${marker.ratio}`}
+                      className="cashflow-reference-line"
+                      data-ratio={marker.ratio.toString()}
                       y={marker.y}
                       stroke={borderColor}
                       strokeWidth={1.5}
@@ -274,6 +371,8 @@ export default function CashFlowChart({ data = [] }) {
                     />
                   ))}
                 <ReferenceLine
+                  className="cashflow-reference-line"
+                  data-ratio="0"
                   y={0}
                   stroke={borderColor}
                   strokeWidth={1.5}
