@@ -196,6 +196,9 @@ export default function CashFlowChart({ data = [] }) {
     const measure = () => {
       const svg = containerNode.querySelector("svg");
       const trackRect = scaleTrackNode.getBoundingClientRect?.();
+      const rawContentHeight =
+        (scaleTrackNode?.clientHeight ?? 0) - CHART_MARGIN.top - chartBottomPadding;
+      const contentHeight = Math.max(rawContentHeight, 0);
 
       if (!svg || !trackRect) {
         return;
@@ -220,10 +223,18 @@ export default function CashFlowChart({ data = [] }) {
         }
 
         const centerY = rect.top + rect.height / 2;
-        const offset = centerY - trackRect.top;
+        const paddedTop = trackRect.top + CHART_MARGIN.top;
+        const paddedBottom = paddedTop + contentHeight;
 
-        if (Number.isFinite(offset)) {
-          nextPositions[ratioKey] = offset;
+        if (Number.isFinite(centerY)) {
+          const clampedCenter = Math.min(
+            Math.max(centerY, paddedTop),
+            Math.max(paddedBottom, paddedTop)
+          );
+          const offset = clampedCenter - paddedTop;
+          if (Number.isFinite(offset)) {
+            nextPositions[ratioKey] = CHART_MARGIN.top + offset;
+          }
         }
       });
 
