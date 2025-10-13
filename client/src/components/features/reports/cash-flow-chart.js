@@ -19,7 +19,33 @@ const formatCurrencyTick = (value) => {
   return `$${value.toLocaleString()}`;
 };
 
-const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 0 };
+const X_AXIS_HEIGHT = 32;
+const CHART_MARGIN = { top: 8, right: 16, bottom: X_AXIS_HEIGHT, left: 0 };
+
+const formatPercentage = (value) => {
+  const formatted = Number.parseFloat(value.toFixed(4));
+  if (Number.isNaN(formatted)) {
+    return "0";
+  }
+
+  return `${formatted}`.replace(/\.0+$/, "");
+};
+
+const resolveMarkerPosition = (ratio) => {
+  const constrainedRatio = Math.min(Math.max(ratio, 0), 1);
+  const percent = formatPercentage((1 - constrainedRatio) * 100);
+  const topAdjustment = CHART_MARGIN.top * constrainedRatio;
+  const bottomAdjustment = (1 - constrainedRatio) * CHART_MARGIN.bottom;
+  const offset = topAdjustment - bottomAdjustment;
+
+  if (offset === 0) {
+    return `${percent}%`;
+  }
+
+  const absoluteOffset = Math.abs(offset).toFixed(2).replace(/\.0+$/, "");
+  const operator = offset > 0 ? "+" : "-";
+  return `calc(${percent}% ${operator} ${absoluteOffset}px)`;
+};
 
 const formatCurrency = (value) => `$${toNumeric(value).toLocaleString()}`;
 
@@ -86,15 +112,22 @@ export default function CashFlowChart({ data = [] }) {
       </CardHeader>
       <CardContent className="h-[320px]">
         <div className="flex h-full items-stretch">
-          <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
-            <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
+          <div
+            className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground"
+            style={{ paddingBottom: CHART_MARGIN.bottom }}
+          >
+            <div
+              className="relative flex-1"
+              style={{ paddingTop: CHART_MARGIN.top, paddingBottom: CHART_MARGIN.bottom }}
+            >
               <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
               {scaleMarkers.map((marker) => (
                 <div
                   key={marker.ratio}
-                  className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
-                    }`}
-                  style={{ top: `${(1 - marker.ratio) * 100}%` }}
+                  className={`absolute right-2 flex items-center gap-2 ${
+                    marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
+                  }`}
+                  style={{ top: resolveMarkerPosition(marker.ratio) }}
                 >
                   <div className="text-right leading-tight">
                     <div className="font-medium text-foreground">{marker.value}</div>
@@ -108,7 +141,14 @@ export default function CashFlowChart({ data = [] }) {
           <div className="h-full flex-1 pl-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={CHART_MARGIN}>
-                <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="month"
+                  stroke="currentColor"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  height={X_AXIS_HEIGHT}
+                />
                 <YAxis hide domain={[0, maxValue]} />
                 <Tooltip content={<CashFlowTooltip />} cursor={{ stroke: "var(--primary)" }} />
                 <Legend />
