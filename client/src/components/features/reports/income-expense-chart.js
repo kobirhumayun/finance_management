@@ -323,16 +323,21 @@ export default function IncomeExpenseChart({ data = [] }) {
         }
       }
 
+      const trackHeight = scaleTrackRef.current?.clientHeight ?? scaleRect.height ?? 0;
+      const contentHeight = trackHeight - CHART_MARGIN.top - chartBottomPadding;
+      const fallbackPosition =
+        trackHeight === 0
+          ? plotHeight === null
+            ? null
+            : CHART_MARGIN.top + Math.max(plotHeight, 0)
+          : CHART_MARGIN.top + Math.max(contentHeight, 0);
+
       if (baselineY === null || !Number.isFinite(baselineY)) {
-        const fallbackPosition =
-          plotHeight === null ? null : CHART_MARGIN.top + Math.max(plotHeight, 0);
         setBaselinePosition(fallbackPosition);
         return;
       }
 
       const rawPosition = baselineY - scaleRect.top;
-      const contentHeight =
-        (scaleTrackRef.current?.clientHeight ?? 0) - CHART_MARGIN.top - chartBottomPadding;
       const minPosition = CHART_MARGIN.top;
       const maxPosition = CHART_MARGIN.top + Math.max(contentHeight, 0);
       const normalized = clamp(rawPosition, minPosition, maxPosition);
@@ -340,8 +345,6 @@ export default function IncomeExpenseChart({ data = [] }) {
       if (Number.isFinite(normalized)) {
         setBaselinePosition(normalized);
       } else {
-        const fallbackPosition =
-          plotHeight === null ? null : CHART_MARGIN.top + Math.max(plotHeight, 0);
         setBaselinePosition(fallbackPosition);
       }
     };
@@ -358,22 +361,46 @@ export default function IncomeExpenseChart({ data = [] }) {
     plotHeight,
     scaleMarkers.length,
   ]);
+  const effectiveBaseline = useMemo(() => {
+    if (baselinePosition !== null) {
+      return baselinePosition;
+    }
+
+    const trackHeight = scaleTrackRef.current?.clientHeight ?? 0;
+    if (trackHeight > 0) {
+      return CHART_MARGIN.top + Math.max(trackHeight - CHART_MARGIN.top - chartBottomPadding, 0);
+    }
+
+    if (plotHeight !== null) {
+      return CHART_MARGIN.top + Math.max(plotHeight, 0);
+    }
+
+    return null;
+  }, [baselinePosition, chartBottomPadding, plotHeight]);
+
   const markerLayout = useMemo(() => {
     if (!scaleMarkers.length) {
       return [];
     }
 
     return scaleMarkers.map((marker) => {
-      if (marker.ratio === 0 && baselinePosition !== null) {
-        return { ...marker, position: baselinePosition };
+      if (marker.ratio === 0) {
+        return { ...marker, position: effectiveBaseline };
       }
 
+      const baseline = effectiveBaseline;
+      const trackSpan = baseline === null ? null : baseline - CHART_MARGIN.top;
+
       const position =
-        plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
+        baseline === null
+          ? plotHeight === null
+            ? null
+            : CHART_MARGIN.top + Math.max(plotHeight, 0) * (1 - marker.ratio)
+          : CHART_MARGIN.top + Math.max(trackSpan, 0) * (1 - marker.ratio);
 
       return { ...marker, position };
     });
-  }, [baselinePosition, plotHeight, scaleMarkers]);
+  }, [effectiveBaseline, plotHeight, scaleMarkers]);
 
   const yAxisDomain = useMemo(() => {
     if (!Number.isFinite(maxValue) || maxValue <= 0) {
