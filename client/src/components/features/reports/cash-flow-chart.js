@@ -140,6 +140,7 @@ export default function CashFlowChart({ data = [] }) {
   const borderColor = useCSSVariable("--border");
 
   const [containerRef, { height: containerHeight }] = useElementSize();
+  const [scaleTrackRef, { height: scaleTrackHeight }] = useElementSize();
   const [legendHeight, setLegendHeight] = useState(0);
 
   const handleLegendSizeChange = useCallback((height) => {
@@ -176,12 +177,13 @@ export default function CashFlowChart({ data = [] }) {
   );
 
   const plotHeight = useMemo(() => {
-    if (!containerHeight) {
+    const measuredHeight = scaleTrackHeight || containerHeight;
+    if (!measuredHeight) {
       return null;
     }
 
-    return Math.max(containerHeight - chartMargin.top - chartMargin.bottom, 0);
-  }, [containerHeight, chartMargin.bottom, chartMargin.top]);
+    return Math.max(measuredHeight - chartMargin.top - chartMargin.bottom, 0);
+  }, [chartMargin.bottom, chartMargin.top, containerHeight, scaleTrackHeight]);
 
   const markerLayout = useMemo(() => {
     if (scaleMarkers.length === 0) {
@@ -204,35 +206,41 @@ export default function CashFlowChart({ data = [] }) {
       <CardContent className="h-[320px]">
         <div className="flex h-full items-stretch">
           <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground">
-            <div style={{ height: CHART_MARGIN.top }} aria-hidden />
-            <div className="relative flex-1">
+            <div
+              ref={scaleTrackRef}
+              className="relative flex-1"
+              style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
+            >
               <div
                 className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border"
                 aria-hidden
               />
               {markerLayout.map((marker) => {
-                const fallbackTop = `${(1 - marker.ratio) * 100}%`;
+                const fallbackTop = { top: `${(1 - marker.ratio) * 100}%` };
                 const resolvedTop =
-                  marker.position === null ? fallbackTop : `${marker.position - CHART_MARGIN.top}px`;
+                  marker.position === null ? fallbackTop : { top: marker.position };
+
+                const isTop = marker.ratio === 1;
+                const isBottom = marker.ratio === 0;
+                const translateClass = isTop ? "" : isBottom ? "-translate-y-full" : "-translate-y-1/2";
+                const alignClass = isTop ? "items-start" : isBottom ? "items-end" : "items-center";
+                const lineAlignClass = isTop ? "self-start" : isBottom ? "self-end" : "self-center";
 
                 return (
                   <div
                     key={marker.ratio}
-                    className={`absolute right-2 flex items-center gap-2 ${
-                      marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
-                    }`}
-                    style={{ top: resolvedTop }}
+                    className={`absolute right-2 flex gap-2 ${translateClass} ${alignClass}`}
+                    style={resolvedTop}
                   >
                     <div className="text-right leading-tight">
                       <div className="font-medium text-foreground">{marker.value}</div>
                       <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
                     </div>
-                    <div className="h-px w-2 bg-border" aria-hidden />
+                    <div className={`h-px w-2 bg-border ${lineAlignClass}`} aria-hidden />
                   </div>
                 );
               })}
             </div>
-            <div style={{ height: chartBottomPadding }} aria-hidden />
           </div>
           <div ref={containerRef} className="h-full flex-1 pl-2">
             <ResponsiveContainer width="100%" height="100%">
@@ -252,9 +260,27 @@ export default function CashFlowChart({ data = [] }) {
                     <ChartLegend {...legendProps} onHeightChange={handleLegendSizeChange} />
                   )}
                 />
-                {scaleMarkers.map((marker) => (
-                  <ReferenceLine key={`marker-${marker.ratio}`} y={marker.y} stroke={borderColor} strokeOpacity={0.5} />
-                ))}
+                {scaleMarkers
+                  .filter((marker) => marker.ratio > 0)
+                  .map((marker) => (
+                    <ReferenceLine
+                      key={`marker-${marker.ratio}`}
+                      y={marker.y}
+                      stroke={borderColor}
+                      strokeWidth={1.5}
+                      strokeOpacity={0.5}
+                      ifOverflow="extendDomain"
+                      isFront={false}
+                    />
+                  ))}
+                <ReferenceLine
+                  y={0}
+                  stroke={borderColor}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.5}
+                  ifOverflow="extendDomain"
+                  isFront={false}
+                />
                 <Line type="monotone" dataKey="cashIn" name="Cash In" stroke={incomeColor} strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="cashOut" name="Cash Out" stroke={expenseColor} strokeWidth={2} dot={false} />
               </LineChart>
