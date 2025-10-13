@@ -258,10 +258,15 @@ export function BarChart({
               const strokeWidth = Number(line?.strokeWidth) || 1.5;
               const strokeOpacity =
                 typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.5;
+              const className = ["recharts-reference-line", line?.className]
+                .filter(Boolean)
+                .join(" ");
 
               return (
                 <div
                   key={line?.__stubKey ?? `reference-${index}`}
+                  className={className || undefined}
+                  data-value={value}
                   style={{
                     position: "absolute",
                     left: 0,
@@ -311,20 +316,28 @@ export function BarChart({
 
                   return (
                     <div
+                      className="recharts-bar-rectangle flex flex-1 items-end justify-center"
                       key={`${key}-${index}`}
                       style={{
-                        height: `${height}%`,
                         flex: "1 1 0%",
                         minWidth: 0,
                         maxWidth: `${resolvedBarSize}px`,
-                        backgroundColor: fill,
-                        opacity,
-                        boxShadow: shadow,
-                        transition: "opacity 150ms ease, box-shadow 150ms ease",
-                        ...radiusStyle,
                       }}
                       title={`${barDefinition.name || key}: ${value.toLocaleString()}`}
-                    />
+                    >
+                      <div
+                        className="recharts-rectangle"
+                        style={{
+                          height: `${height}%`,
+                          width: "100%",
+                          backgroundColor: fill,
+                          opacity,
+                          boxShadow: shadow,
+                          transition: "opacity 150ms ease, box-shadow 150ms ease",
+                          ...radiusStyle,
+                        }}
+                      />
+                    </div>
                   );
                 })}
               </div>
@@ -507,10 +520,15 @@ export function LineChart({ data = [], children, margin = {} }) {
                 const strokeColor = line?.stroke || "var(--border)";
                 const strokeWidth = Number(line?.strokeWidth) || 1;
                 const strokeOpacity = typeof line?.strokeOpacity === "number" ? line.strokeOpacity : 0.2;
+                const className = ["recharts-reference-line", line?.className]
+                  .filter(Boolean)
+                  .join(" ");
 
                 return (
                   <div
                     key={line?.__stubKey ?? `reference-${index}`}
+                    className={className || undefined}
+                    data-value={value}
                     style={{
                       position: "absolute",
                       left: 0,
