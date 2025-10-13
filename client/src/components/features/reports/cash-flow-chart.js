@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) return "$0";
@@ -139,9 +139,27 @@ export default function CashFlowChart({ data = [] }) {
   const expenseColor = useCSSVariable("--chart-expense");
   const borderColor = useCSSVariable("--border");
 
-  const [containerRef, { height: containerHeight }] = useElementSize();
-  const [scaleTrackRef, { height: scaleTrackHeight }] = useElementSize();
+  const [containerSizeRef, { width: containerWidth, height: containerHeight }] = useElementSize();
+  const [scaleTrackSizeRef, { height: scaleTrackHeight }] = useElementSize();
   const [legendHeight, setLegendHeight] = useState(0);
+  const containerNodeRef = useRef(null);
+  const scaleTrackNodeRef = useRef(null);
+
+  const handleContainerRef = useCallback(
+    (node) => {
+      containerNodeRef.current = node ?? null;
+      containerSizeRef(node ?? null);
+    },
+    [containerSizeRef]
+  );
+
+  const handleScaleTrackRef = useCallback(
+    (node) => {
+      scaleTrackNodeRef.current = node ?? null;
+      scaleTrackSizeRef(node ?? null);
+    },
+    [scaleTrackSizeRef]
+  );
 
   const handleLegendSizeChange = useCallback((height) => {
     setLegendHeight((previous) => {
@@ -192,18 +210,107 @@ export default function CashFlowChart({ data = [] }) {
     return Math.max(totalTrackHeight - CHART_MARGIN.top - chartBottomPadding, 0);
   }, [chartBottomPadding, totalTrackHeight]);
 
+  const [markerPositions, setMarkerPositions] = useState({});
+
+  useEffect(() => {
+    if (!containerNodeRef.current || !scaleTrackNodeRef.current || scaleMarkers.length === 0) {
+      setMarkerPositions({});
+      return undefined;
+    }
+
+    let cancelled = false;
+    let frame = null;
+
+    const measure = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const trackRect = scaleTrackNodeRef.current?.getBoundingClientRect();
+      if (!trackRect) {
+        return;
+      }
+
+      const nextPositions = {};
+      let measuredCount = 0;
+
+      scaleMarkers.forEach((marker) => {
+        const ratioKey = marker.ratio.toString();
+        const line = containerNodeRef.current?.querySelector(
+          `.cashflow-reference-line[data-ratio="${ratioKey}"]`
+        );
+
+        if (!line) {
+          return;
+        }
+
+        const rect = line.getBoundingClientRect();
+        if (!rect) {
+          return;
+        }
+
+        let anchor;
+        if (marker.ratio === 1) {
+          anchor = rect.top;
+        } else if (marker.ratio === 0) {
+          anchor = rect.bottom;
+        } else {
+          anchor = rect.top + rect.height / 2;
+        }
+
+        const offset = anchor - trackRect.top;
+
+        if (Number.isFinite(offset)) {
+          nextPositions[ratioKey] = offset;
+          measuredCount += 1;
+        }
+      });
+
+      if (!cancelled && measuredCount > 0) {
+        setMarkerPositions((previous) => {
+          const hasSameCount = Object.keys(previous).length === Object.keys(nextPositions).length;
+          const hasSameValues = hasSameCount
+            ? Object.entries(nextPositions).every(([key, value]) => previous[key] === value)
+            : false;
+
+          return hasSameValues ? previous : nextPositions;
+        });
+      }
+
+      if (!cancelled && measuredCount < scaleMarkers.length) {
+        frame = requestAnimationFrame(measure);
+      }
+    };
+
+    frame = requestAnimationFrame(measure);
+
+    return () => {
+      cancelled = true;
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+      }
+    };
+  }, [chartBottomPadding, containerHeight, containerWidth, scaleMarkers, scaleTrackHeight]);
+
   const markerLayout = useMemo(() => {
     if (scaleMarkers.length === 0) {
       return [];
     }
 
     return scaleMarkers.map((marker) => {
-      const position =
+      const ratioKey = marker.ratio.toString();
+      const measured = markerPositions[ratioKey];
+
+      if (Number.isFinite(measured)) {
+        return { ...marker, position: measured };
+      }
+
+      const fallback =
         plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
 
-      return { ...marker, position };
+      return { ...marker, position: fallback };
     });
-  }, [plotHeight, scaleMarkers]);
+  }, [markerPositions, plotHeight, scaleMarkers]);
 
   return (
     <Card>
@@ -214,19 +321,18 @@ export default function CashFlowChart({ data = [] }) {
         <div className="flex h-full items-stretch">
           <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground">
             <div
-              ref={scaleTrackRef}
+              ref={handleScaleTrackRef}
               className="relative flex-1"
               style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
             >
               <div
-                className="absolute right-[calc(0.5rem-1px)] w-px rounded-full bg-border"
-                style={{ top: CHART_MARGIN.top, bottom: chartBottomPadding }}
+                className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border"
                 aria-hidden
               />
               {markerLayout.map((marker) => {
                 const fallbackTop = { top: `${(1 - marker.ratio) * 100}%` };
                 const resolvedTop =
-                  marker.position === null ? fallbackTop : { top: `${marker.position}px` };
+                  marker.position === null ? fallbackTop : { top: marker.position };
 
                 const isTop = marker.ratio === 1;
                 const isBottom = marker.ratio === 0;
@@ -250,7 +356,7 @@ export default function CashFlowChart({ data = [] }) {
               })}
             </div>
           </div>
-          <div ref={containerRef} className="h-full flex-1 pl-2">
+          <div ref={handleContainerRef} className="h-full flex-1 pl-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={chartMargin}>
                 <XAxis
