@@ -188,32 +188,57 @@ export function BarChart({
   const labelForIndex = (groupIndex) =>
     data[groupIndex]?.month || data[groupIndex]?.name || `#${groupIndex + 1}`;
 
-  const handleBarHover = (groupIndex, dataKey = null, keyIndex = 0) => (event) => {
-    const payload = payloadForIndex(groupIndex);
-    const label = labelForIndex(groupIndex);
+  const handleBarHover = (groupIndex) => (event) => {
+    const state = {
+      isTooltipActive: true,
+      activeTooltipIndex: groupIndex,
+      activeLabel: labelForIndex(groupIndex),
+      activePayload: payloadForIndex(groupIndex),
+      chartX: event.clientX,
+      chartY: event.clientY,
+    };
+    onMouseMove?.(state, event);
+    handleChartMouseMove(state);
+  };
 
-    setHoverState({ index: groupIndex, dataKey, payload, label });
-
-    onMouseMove?.(
-      {
-        isTooltipActive: true,
-        activeTooltipIndex: groupIndex,
-        activeLabel: label,
-        activePayload: payload,
-        chartX: keyIndex,
-        tooltipCoordinate: { x: keyIndex + 0.5 },
-      },
-      event
-    );
+  const handleChartMouseMove = (event) => {
+    const { isTooltipActive, activeTooltipIndex, activePayload, activeLabel } = event;
+    if (isTooltipActive) {
+      setHoverState({
+        index: activeTooltipIndex,
+        payload: activePayload,
+        label: activeLabel,
+        coordinate: { x: event.chartX, y: event.chartY },
+      });
+    } else {
+      setHoverState(null);
+    }
   };
 
   const handleMouseLeave = (event) => {
     setHoverState(null);
+    onMouseMove?.({ isTooltipActive: false }, event);
     onMouseLeave?.(event);
   };
 
+  const tooltipStyle = {
+    position: "fixed",
+    top: hoverState?.coordinate?.y ?? 0,
+    left: hoverState?.coordinate?.x ?? 0,
+    transform: "translate(1rem, -50%)",
+    transition: "transform 150ms ease-out, top 150ms ease-out, left 150ms ease-out",
+    opacity: hoverState ? 1 : 0,
+    visibility: hoverState ? "visible" : "hidden",
+    pointerEvents: "none",
+  };
+
   return (
-    <div className="relative flex h-full w-full flex-col" role="img" aria-label="Bar chart" onMouseLeave={handleMouseLeave}>
+    <div
+      className="relative flex h-full w-full flex-col"
+      role="img"
+      aria-label="Bar chart"
+      onMouseLeave={handleMouseLeave}
+    >
       <div
         className="relative flex flex-1 items-end justify-center overflow-hidden px-4"
         style={{ gap: `${resolvedCategoryGap}px` }}
@@ -308,7 +333,7 @@ export function BarChart({
           );
         })}
       </div>
-      {tooltipElement ? <div className="pointer-events-none absolute right-4 top-4 z-10">{tooltipElement}</div> : null}
+      {tooltipElement ? <div className="z-10" style={tooltipStyle}>{tooltipElement}</div> : null}
     </div>
   );
 }
