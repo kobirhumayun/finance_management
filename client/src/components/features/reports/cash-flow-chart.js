@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) return "$0";
@@ -69,7 +69,6 @@ const useElementSize = () => {
       setElement(node ?? null);
     }, []),
     size,
-    element,
   ];
 };
 
@@ -140,11 +139,9 @@ export default function CashFlowChart({ data = [] }) {
   const expenseColor = useCSSVariable("--chart-expense");
   const borderColor = useCSSVariable("--border");
 
-  const [containerRef, { height: containerHeight, width: containerWidth }, containerNode] =
-    useElementSize();
-  const [scaleTrackRef, { height: scaleTrackHeight }, scaleTrackNode] = useElementSize();
+  const [containerRef, { height: containerHeight }] = useElementSize();
+  const [scaleTrackRef, { height: scaleTrackHeight }] = useElementSize();
   const [legendHeight, setLegendHeight] = useState(0);
-  const [markerPositions, setMarkerPositions] = useState({});
 
   const handleLegendSizeChange = useCallback((height) => {
     setLegendHeight((previous) => {
@@ -188,120 +185,18 @@ export default function CashFlowChart({ data = [] }) {
     return Math.max(measuredHeight - chartMargin.top - chartMargin.bottom, 0);
   }, [chartMargin.bottom, chartMargin.top, containerHeight, scaleTrackHeight]);
 
-  useLayoutEffect(() => {
-    if (!containerNode || !scaleTrackNode || scaleMarkers.length === 0) {
-      return;
-    }
-
-    const measure = () => {
-      const svg = containerNode.querySelector("svg");
-      const trackRect = scaleTrackNode.getBoundingClientRect?.();
-      const rawContentHeight =
-        (scaleTrackNode?.clientHeight ?? 0) - CHART_MARGIN.top - chartBottomPadding;
-      const contentHeight = Math.max(rawContentHeight, 0);
-
-      if (!svg || !trackRect) {
-        return;
-      }
-
-      const nextPositions = {};
-
-      scaleMarkers.forEach((marker) => {
-        const ratioKey = marker.ratio.toString();
-        const selector = `.cashflow-reference-line[data-ratio="${ratioKey}"]`;
-        const node = svg.querySelector(selector);
-
-        if (!node) {
-          return;
-        }
-
-        const line = node.querySelector("line") ?? node.querySelector("path") ?? node;
-        const rect = line?.getBoundingClientRect?.();
-
-        if (!rect) {
-          return;
-        }
-
-        const centerY = rect.top + rect.height / 2;
-        const paddedTop = trackRect.top + CHART_MARGIN.top;
-        const paddedBottom = paddedTop + contentHeight;
-
-        if (Number.isFinite(centerY)) {
-          const clampedCenter = Math.min(
-            Math.max(centerY, paddedTop),
-            Math.max(paddedBottom, paddedTop)
-          );
-          const offset = clampedCenter - paddedTop;
-          if (Number.isFinite(offset)) {
-            nextPositions[ratioKey] = CHART_MARGIN.top + offset;
-          }
-        }
-      });
-
-      setMarkerPositions((previous) => {
-        const keys = new Set([...Object.keys(previous), ...Object.keys(nextPositions)]);
-        let changed = false;
-
-        keys.forEach((key) => {
-          const prevVal = previous[key];
-          const nextVal = nextPositions[key];
-
-          if (Number.isFinite(prevVal) || Number.isFinite(nextVal)) {
-            const prevNumber = Number.isFinite(prevVal) ? prevVal : null;
-            const nextNumber = Number.isFinite(nextVal) ? nextVal : null;
-
-            if (prevNumber === null && nextNumber !== null) {
-              changed = true;
-            } else if (prevNumber !== null && nextNumber === null) {
-              changed = true;
-            } else if (
-              prevNumber !== null &&
-              nextNumber !== null &&
-              Math.abs(prevNumber - nextNumber) > 0.5
-            ) {
-              changed = true;
-            }
-          } else if (prevVal !== nextVal) {
-            changed = true;
-          }
-        });
-
-        return changed ? nextPositions : previous;
-      });
-    };
-
-    measure();
-    const frame = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(frame);
-  }, [
-    containerNode,
-    containerHeight,
-    containerWidth,
-    scaleTrackNode,
-    scaleTrackHeight,
-    chartBottomPadding,
-    legendHeight,
-    scaleMarkers,
-    data,
-  ]);
-
   const markerLayout = useMemo(() => {
     if (scaleMarkers.length === 0) {
       return [];
     }
 
     return scaleMarkers.map((marker) => {
-      const ratioKey = marker.ratio.toString();
-      const measuredPosition = markerPositions[ratioKey];
-
-      const fallbackPosition =
+      const position =
         plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
-
-      const position = Number.isFinite(measuredPosition) ? measuredPosition : fallbackPosition;
 
       return { ...marker, position };
     });
-  }, [markerPositions, plotHeight, scaleMarkers]);
+  }, [plotHeight, scaleMarkers]);
 
   return (
     <Card>
