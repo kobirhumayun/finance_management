@@ -324,19 +324,25 @@ export default function IncomeExpenseChart({ data = [] }) {
       }
 
       if (baselineY === null || !Number.isFinite(baselineY)) {
-        setBaselinePosition(null);
+        const fallbackPosition =
+          plotHeight === null ? null : CHART_MARGIN.top + Math.max(plotHeight, 0);
+        setBaselinePosition(fallbackPosition);
         return;
       }
 
-      const rawOffset = baselineY - scaleRect.top - CHART_MARGIN.top;
+      const rawPosition = baselineY - scaleRect.top;
       const contentHeight =
         (scaleTrackRef.current?.clientHeight ?? 0) - CHART_MARGIN.top - chartBottomPadding;
-      const normalized = clamp(rawOffset, 0, Math.max(contentHeight, 0));
+      const minPosition = CHART_MARGIN.top;
+      const maxPosition = CHART_MARGIN.top + Math.max(contentHeight, 0);
+      const normalized = clamp(rawPosition, minPosition, maxPosition);
 
       if (Number.isFinite(normalized)) {
         setBaselinePosition(normalized);
       } else {
-        setBaselinePosition(null);
+        const fallbackPosition =
+          plotHeight === null ? null : CHART_MARGIN.top + Math.max(plotHeight, 0);
+        setBaselinePosition(fallbackPosition);
       }
     };
 
@@ -349,6 +355,7 @@ export default function IncomeExpenseChart({ data = [] }) {
     containerHeight,
     containerWidth,
     legendHeight,
+    plotHeight,
     scaleMarkers.length,
   ]);
   const markerLayout = useMemo(() => {
