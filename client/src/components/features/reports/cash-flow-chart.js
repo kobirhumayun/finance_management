@@ -176,14 +176,21 @@ export default function CashFlowChart({ data = [] }) {
     [chartBottomPadding]
   );
 
+  const totalTrackHeight = useMemo(() => {
+    if (scaleTrackHeight) {
+      return scaleTrackHeight + CHART_MARGIN.top + chartBottomPadding;
+    }
+
+    return containerHeight || null;
+  }, [chartBottomPadding, containerHeight, scaleTrackHeight]);
+
   const plotHeight = useMemo(() => {
-    const measuredHeight = scaleTrackHeight || containerHeight;
-    if (!measuredHeight) {
+    if (!totalTrackHeight) {
       return null;
     }
 
-    return Math.max(measuredHeight - chartMargin.top - chartMargin.bottom, 0);
-  }, [chartMargin.bottom, chartMargin.top, containerHeight, scaleTrackHeight]);
+    return Math.max(totalTrackHeight - CHART_MARGIN.top - chartBottomPadding, 0);
+  }, [chartBottomPadding, totalTrackHeight]);
 
   const markerLayout = useMemo(() => {
     if (scaleMarkers.length === 0) {
