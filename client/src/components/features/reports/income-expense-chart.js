@@ -91,23 +91,15 @@ const formatCurrency = (value) => `$${toNumber(value).toLocaleString()}`;
 
 const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 8 };
 const X_AXIS_HEIGHT = 32;
+const LEGEND_HEIGHT = 40;
 
-function ChartLegend({ payload, onHeightChange }) {
-  const [legendRef, { height }] = useElementSize();
-
-  useEffect(() => {
-    if (typeof onHeightChange === "function") {
-      onHeightChange(height);
-    }
-  }, [height, onHeightChange]);
-
+function ChartLegend({ payload }) {
   if (!payload || payload.length === 0) {
     return null;
   }
 
   return (
     <div
-      ref={legendRef}
       className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground"
     >
       {payload.map((entry, index) => (
@@ -211,7 +203,6 @@ export default function IncomeExpenseChart({ data = [] }) {
 
   const [containerRef, { width: containerWidth, height: containerHeight }] = useElementSize();
   const scaleTrackRef = useRef(null);
-  const [legendHeight, setLegendHeight] = useState(0);
   const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
   const [baselinePosition, setBaselinePosition] = useState(null);
 
@@ -250,16 +241,11 @@ export default function IncomeExpenseChart({ data = [] }) {
     };
   }, [containerWidth, groupCount, seriesPerGroup]);
 
-  const handleLegendSizeChange = useCallback((height) => {
-    const nextHeight = height || 0;
-    setLegendHeight((previous) => (previous === nextHeight ? previous : nextHeight));
-  }, []);
-
   const resetActiveBar = useCallback(() => {
     setActiveBar({ index: null, dataKey: null });
   }, []);
 
-  const chartBottomPadding = X_AXIS_HEIGHT + (legendHeight || 0);
+  const chartBottomPadding = X_AXIS_HEIGHT + LEGEND_HEIGHT;
 
   const chartMargin = useMemo(
     () => ({ ...CHART_MARGIN, bottom: chartBottomPadding, left: 0 }),
@@ -347,9 +333,10 @@ export default function IncomeExpenseChart({ data = [] }) {
     chartBottomPadding,
     chartData,
     containerHeight,
+    containerRef,
     containerWidth,
-    legendHeight,
     scaleMarkers.length,
+    scaleTrackRef,
   ]);
   const markerLayout = useMemo(() => {
     if (!scaleMarkers.length) {
@@ -486,14 +473,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                     ifOverflow="extendDomain"
                     isFront
                   />
-                  <Legend
-                    content={(legendProps) => (
-                      <ChartLegend
-                        {...legendProps}
-                        onHeightChange={handleLegendSizeChange}
-                      />
-                    )}
-                  />
+                  <Legend content={(legendProps) => <ChartLegend {...legendProps} />} />
                   <Bar dataKey="income" name="Income" fill={incomeColor}>
                     {chartData.map((_, index) => {
                       const isActive =
