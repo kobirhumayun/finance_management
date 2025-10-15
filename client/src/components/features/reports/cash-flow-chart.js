@@ -1,35 +1,127 @@
-// File: src/components/features/reports/cash-flow-chart.js
 "use client";
 
-import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts";
+import { useMemo } from "react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { useMemo } from "react";
+
+const CHART_MARGIN = { top: 16, right: 24, bottom: 16, left: 0 };
 
 const formatCurrencyTick = (value) => {
-  if (!Number.isFinite(value)) return "$0";
+  if (!Number.isFinite(value)) {
+    return "৳0";
+  }
 
   const absolute = Math.abs(value);
-  if (absolute >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
-  if (absolute >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (absolute >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (absolute >= 1_000) return `$${(value / 1_000).toFixed(1)}k`;
+  if (absolute >= 1_000_000_000_000) return `৳${(value / 1_000_000_000_000).toFixed(1)}T`;
+  if (absolute >= 1_000_000_000) return `৳${(value / 1_000_000_000).toFixed(1)}B`;
+  if (absolute >= 1_000_000) return `৳${(value / 1_000_000).toFixed(1)}M`;
+  if (absolute >= 1_000) return `৳${(value / 1_000).toFixed(1)}k`;
 
-  return `$${value.toLocaleString()}`;
+  return `৳${value.toLocaleString()}`;
 };
 
-const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 0 };
+const formatCurrency = (value) => `৳${toNumeric(value).toLocaleString()}`;
 
-const formatCurrency = (value) => `$${toNumeric(value).toLocaleString()}`;
+const normalizeMonth = (value) => {
+  if (typeof value === "string") {
+    return value.trim();
+  }
 
-function CashFlowTooltip({ active, payload, label }) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value);
+};
+
+const buildChartData = (rows) => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows
+    .map((entry) => {
+      const month = normalizeMonth(entry?.month);
+      if (!month) return null;
+
+      return {
+        month,
+        cashIn: toNumeric(entry?.cashIn),
+        cashOut: toNumeric(entry?.cashOut),
+      };
+    })
+    .filter(Boolean);
+};
+
+const getYAxisDomain = (rows) => {
+  if (!rows.length) {
+    return [0, "auto"];
+  }
+
+  let minValue = 0;
+  let maxValue = 0;
+
+  rows.forEach((row) => {
+    const income = toNumeric(row.cashIn);
+    const expense = toNumeric(row.cashOut);
+
+    minValue = Math.min(minValue, income, expense);
+    maxValue = Math.max(maxValue, income, expense);
+  });
+
+  if (minValue === maxValue) {
+    if (maxValue === 0) {
+      return [0, "auto"];
+    }
+
+    const padding = Math.abs(maxValue) * 0.1;
+    return [minValue - padding, maxValue + padding];
+  }
+
+  const padding = Math.max(Math.abs(maxValue), Math.abs(minValue)) * 0.1;
+  return [minValue - padding, maxValue + padding];
+};
+
+function ChartLegend({ payload }) {
+  if (!payload || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      {payload.map((entry, index) => (
+        <div key={entry.dataKey ?? entry.value ?? index} className="flex items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: entry.color }}
+            aria-hidden
+          />
+          <span className="font-medium text-foreground">{entry.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CashFlowTooltipContent({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
 
-  const cashIn = payload.find((p) => p.dataKey === "cashIn")?.value ?? 0;
-  const cashOut = payload.find((p) => p.dataKey === "cashOut")?.value ?? 0;
+  const cashIn = payload.find((item) => item.dataKey === "cashIn")?.value ?? 0;
+  const cashOut = payload.find((item) => item.dataKey === "cashOut")?.value ?? 0;
   const balance = toNumeric(cashIn) - toNumeric(cashOut);
 
   return (
@@ -39,7 +131,11 @@ function CashFlowTooltip({ active, payload, label }) {
         {payload.map((entry) => (
           <div key={entry.dataKey} className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden />
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: entry.color }}
+                aria-hidden
+              />
               {entry.name}
             </span>
             <span className="font-medium">{formatCurrency(entry.value)}</span>
@@ -54,30 +150,17 @@ function CashFlowTooltip({ active, payload, label }) {
   );
 }
 
-// Line chart visualizing cash flow trends.
 export default function CashFlowChart({ data = [] }) {
+  const chartData = useMemo(() => buildChartData(data), [data]);
+  const yAxisDomain = useMemo(() => getYAxisDomain(chartData), [chartData]);
+
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
   const borderColor = useCSSVariable("--border");
+  const ringColor = useCSSVariable("--ring");
 
-  const { maxValue, scaleMarkers } = useMemo(() => {
-    const maxVal = data.reduce((max, item) => {
-      return Math.max(max, toNumeric(item.cashIn), toNumeric(item.cashOut));
-    }, 0);
-
-    if (maxVal <= 0) {
-      return { maxValue: 0, scaleMarkers: [] };
-    }
-
-    const anchors = [1, 0.75, 0.5, 0.25, 0];
-    const markers = anchors.map((ratio) => ({
-      ratio,
-      label: `${Math.round(ratio * 100)}%`,
-      value: formatCurrencyTick(maxVal * ratio),
-      y: maxVal * ratio,
-    }));
-    return { maxValue: maxVal, scaleMarkers: markers };
-  }, [data]);
+  const highlightColor = ringColor || incomeColor || expenseColor;
+  const shouldRenderZeroLine = yAxisDomain[0] < 0 && yAxisDomain[1] > 0;
 
   return (
     <Card>
@@ -85,42 +168,54 @@ export default function CashFlowChart({ data = [] }) {
         <CardTitle>Cash Flow Trend</CardTitle>
       </CardHeader>
       <CardContent className="h-[320px]">
-        <div className="flex h-full items-stretch">
-          <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground" style={{ paddingBottom: 24 }}>
-            <div className="relative flex-1" style={{ paddingTop: CHART_MARGIN.top, paddingBottom: 24 }}>
-              <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
-              {scaleMarkers.map((marker) => (
-                <div
-                  key={marker.ratio}
-                  className={`absolute right-2 flex items-center gap-2 ${marker.ratio === 1 ? "" : marker.ratio === 0 ? "-translate-y-full" : "-translate-y-1/2"
-                    }`}
-                  style={{ top: `${(1 - marker.ratio) * 100}%` }}
-                >
-                  <div className="text-right leading-tight">
-                    <div className="font-medium text-foreground">{marker.value}</div>
-                    <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
-                  </div>
-                  <div className="h-px w-2 bg-border" aria-hidden />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="h-full flex-1 pl-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={CHART_MARGIN}>
-                <XAxis dataKey="month" stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis hide domain={[0, maxValue]} />
-                <Tooltip content={<CashFlowTooltip />} cursor={{ stroke: "var(--primary)" }} />
-                <Legend />
-                {scaleMarkers.map((marker) => (
-                  <ReferenceLine key={`marker-${marker.ratio}`} y={marker.y} stroke={borderColor} strokeOpacity={0.5} />
-                ))}
-                <Line type="monotone" dataKey="cashIn" name="Cash In" stroke={incomeColor} strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="cashOut" name="Cash Out" stroke={expenseColor} strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={CHART_MARGIN}>
+            <CartesianGrid stroke={borderColor} strokeDasharray="4 4" vertical={false} />
+            <XAxis
+              dataKey="month"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={12}
+              stroke="currentColor"
+              fontSize={12}
+            />
+            <YAxis
+              width={80}
+              tickFormatter={formatCurrencyTick}
+              tickLine={false}
+              axisLine={false}
+              tickMargin={12}
+              stroke="currentColor"
+              domain={yAxisDomain}
+            />
+            <Tooltip
+              cursor={{ stroke: highlightColor, strokeWidth: 1.5 }}
+              content={<CashFlowTooltipContent />}
+            />
+            <Legend verticalAlign="bottom" content={<ChartLegend />} />
+            {shouldRenderZeroLine ? (
+              <ReferenceLine y={0} stroke={borderColor} strokeDasharray="4 4" />
+            ) : null}
+            <Line
+              type="monotone"
+              dataKey="cashIn"
+              name="Cash In"
+              stroke={incomeColor}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5, strokeWidth: 1, stroke: highlightColor }}
+            />
+            <Line
+              type="monotone"
+              dataKey="cashOut"
+              name="Cash Out"
+              stroke={expenseColor}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5, strokeWidth: 1, stroke: highlightColor }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   );
