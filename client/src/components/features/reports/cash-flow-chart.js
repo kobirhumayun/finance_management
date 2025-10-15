@@ -135,28 +135,21 @@ function CashFlowTooltipContent({ active, payload, label }) {
 }
 
 function CashFlowTooltipCursor({
+  activeCoordinate,
+  bandSize,
   fill,
   fillOpacity = 0.16,
+  height,
   itemCount = 1,
   points,
+  viewBox,
+  width,
   x,
   y,
-  width,
-  height,
-  viewBox,
-  activeCoordinate,
 }) {
   const color = fill || "var(--ring)";
 
-  const plotHeight = Number.isFinite(height) && height > 0
-    ? height
-    : Number.isFinite(viewBox?.height) && viewBox.height > 0
-      ? viewBox.height
-      : null;
-
-  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
-    return null;
-  }
+  const finite = (value) => Number.isFinite(value) && value > 0;
 
   const plotTop = Number.isFinite(y)
     ? y
@@ -165,47 +158,18 @@ function CashFlowTooltipCursor({
       : 0;
 
   const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
-  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
-  const segments = Math.max(Number(itemCount) || 0, 1);
+  const plotHeight = finite(height)
+    ? height
+    : finite(viewBox?.height)
+      ? viewBox.height
+      : null;
 
-  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
-
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
-      resolvedWidth = viewBoxWidth / segments;
-    }
-  }
-
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    const pointXs = Array.isArray(points)
-      ? points
-          .map((point) => (Number.isFinite(point?.x) ? point.x : null))
-          .filter((value) => Number.isFinite(value))
-      : [];
-
-    if (pointXs.length > 1) {
-      const sorted = [...pointXs].sort((a, b) => a - b);
-      const gaps = sorted
-        .slice(1)
-        .map((value, index) => value - sorted[index])
-        .filter((gap) => Number.isFinite(gap) && gap > 0);
-
-      if (gaps.length > 0) {
-        resolvedWidth = Math.min(...gaps);
-      }
-    }
-  }
-
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+  if (!finite(plotHeight)) {
     return null;
   }
 
-  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
-    const maxWidth = viewBoxWidth / segments;
-    if (resolvedWidth > maxWidth * 1.5) {
-      resolvedWidth = maxWidth;
-    }
-  }
+  const viewBoxWidth = finite(viewBox?.width) ? viewBox.width : null;
+  const segments = Math.max(Number(itemCount) || 0, 1);
 
   const pointXs = Array.isArray(points)
     ? points
@@ -217,6 +181,43 @@ function CashFlowTooltipCursor({
     ? pointXs.reduce((sum, value) => sum + value, 0) / pointXs.length
     : null;
 
+  const firstFinite = (...candidates) => {
+    for (const candidate of candidates) {
+      if (Number.isFinite(candidate) && candidate > 0) {
+        return candidate;
+      }
+    }
+    return null;
+  };
+
+  const gapWidth = (() => {
+    if (pointXs.length > 1) {
+      const sorted = [...pointXs].sort((a, b) => a - b);
+      const gaps = sorted
+        .slice(1)
+        .map((value, index) => value - sorted[index])
+        .filter((gap) => Number.isFinite(gap) && gap > 0);
+      if (gaps.length > 0) {
+        return Math.min(...gaps);
+      }
+    }
+    return null;
+  })();
+
+  const expectedWidth = firstFinite(
+    Number.isFinite(width) && width > 0 ? width : null,
+    Number.isFinite(bandSize) && bandSize > 0 ? bandSize : null,
+    viewBoxWidth && segments > 0 ? viewBoxWidth / segments : null,
+    gapWidth,
+  );
+
+  if (!finite(expectedWidth)) {
+    return null;
+  }
+
+  const maxWidth = viewBoxWidth && segments > 0 ? viewBoxWidth / segments : null;
+  const resolvedWidth = maxWidth && expectedWidth > maxWidth * 1.25 ? maxWidth : expectedWidth;
+
   let resolvedX = Number.isFinite(x)
     ? x
     : Number.isFinite(activeCoordinate?.x)
@@ -225,7 +226,7 @@ function CashFlowTooltipCursor({
         ? averagePoint - resolvedWidth / 2
         : plotLeft;
 
-  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+  if (viewBoxWidth) {
     const maxX = plotLeft + viewBoxWidth - resolvedWidth;
     resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
   } else {
