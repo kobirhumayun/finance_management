@@ -6,6 +6,7 @@ import {
   Legend,
   Line,
   LineChart,
+  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -133,6 +134,37 @@ function CashFlowTooltipContent({ active, payload, label }) {
   );
 }
 
+function SmartTooltipCursor({ points, viewBox, itemCount = 1, fill, fillOpacity = 0.12 }) {
+  if (!points || points.length === 0 || !viewBox) {
+    return null;
+  }
+
+  const { x: viewX = 0, width: viewWidth = 0, y: viewY = 0, height: viewHeight = 0 } = viewBox;
+  if (viewWidth <= 0 || viewHeight <= 0) {
+    return null;
+  }
+
+  const segments = Math.max(itemCount, 1);
+  const segmentWidth = viewWidth / segments;
+  const cursorX = points[0]?.x ?? viewX;
+  const rawX = cursorX - segmentWidth / 2;
+  const boundedX = Math.min(Math.max(rawX, viewX), viewX + viewWidth - segmentWidth);
+
+  return (
+    <Rectangle
+      x={boundedX}
+      y={viewY}
+      width={segmentWidth}
+      height={viewHeight}
+      fill={fill || "currentColor"}
+      fillOpacity={fillOpacity}
+      stroke={fill || "currentColor"}
+      strokeOpacity={0.35}
+      pointerEvents="none"
+    />
+  );
+}
+
 export default function CashFlowChart({ data = [] }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const yAxisDomain = useMemo(() => getYAxisDomain(chartData), [chartData]);
@@ -171,7 +203,12 @@ export default function CashFlowChart({ data = [] }) {
               fontSize={12}
             />
             <Tooltip
-              cursor={{ stroke: highlightColor, strokeWidth: 1.5 }}
+              cursor={
+                <SmartTooltipCursor
+                  itemCount={chartData.length}
+                  fill={highlightColor || incomeColor || expenseColor || "currentColor"}
+                />
+              }
               content={<CashFlowTooltipContent />}
             />
             <Legend
