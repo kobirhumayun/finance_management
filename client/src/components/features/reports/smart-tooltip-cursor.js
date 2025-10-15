@@ -14,6 +14,8 @@ export function SmartTooltipCursor({
   viewBox,
   bandSize,
   activeCoordinate,
+  x,
+  y,
 }) {
   const pointList = Array.isArray(points) ? points.filter(Boolean) : [];
   const color = fill || "var(--ring)";
@@ -36,35 +38,35 @@ export function SmartTooltipCursor({
     return null;
   }
 
-  let segmentWidth = null;
-  if (Number.isFinite(plotWidth) && plotWidth > 0) {
-    segmentWidth = plotWidth / segments;
-  } else if (Number.isFinite(bandSize) && bandSize > 0) {
-    segmentWidth = bandSize;
-  }
+  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(plotWidth) && plotWidth > 0) {
+      resolvedWidth = plotWidth / segments;
+    } else if (Number.isFinite(bandSize) && bandSize > 0) {
+      resolvedWidth = bandSize;
+    }
 
-  if (!Number.isFinite(segmentWidth) || segmentWidth <= 0) {
-    const sortedPoints = pointList
-      .map((point) => point?.x)
-      .filter((x) => Number.isFinite(x))
-      .sort((a, b) => a - b);
+    if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+      const sortedPoints = pointList
+        .map((point) => point?.x)
+        .filter((value) => Number.isFinite(value))
+        .sort((a, b) => a - b);
 
-    if (sortedPoints.length > 1) {
-      const minGap = sortedPoints
-        .slice(1)
-        .reduce((min, value, index) => Math.min(min, value - sortedPoints[index]), Infinity);
+      if (sortedPoints.length > 1) {
+        const minGap = sortedPoints
+          .slice(1)
+          .reduce((min, value, index) => Math.min(min, value - sortedPoints[index]), Infinity);
 
-      if (Number.isFinite(minGap) && minGap > 0) {
-        segmentWidth = minGap;
+        if (Number.isFinite(minGap) && minGap > 0) {
+          resolvedWidth = minGap;
+        }
       }
     }
   }
 
-  if (!Number.isFinite(segmentWidth) || segmentWidth <= 0) {
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
     return null;
   }
-
-  const resolvedWidth = segmentWidth;
 
   const plotLeft = Number.isFinite(left)
     ? left
@@ -72,11 +74,13 @@ export function SmartTooltipCursor({
       ? viewBox.x
       : 0;
 
-  const plotTop = Number.isFinite(top)
-    ? top
-    : Number.isFinite(viewBox?.y)
-      ? viewBox.y
-      : 0;
+  const plotTop = Number.isFinite(y)
+    ? y
+    : Number.isFinite(top)
+      ? top
+      : Number.isFinite(viewBox?.y)
+        ? viewBox.y
+        : 0;
 
   const totalWidth = Number.isFinite(plotWidth) && plotWidth > 0
     ? plotWidth
@@ -90,13 +94,16 @@ export function SmartTooltipCursor({
     pointList.length > 0
       ? pointList.reduce((sum, point) => sum + (point?.x ?? 0), 0) / pointList.length
       : null;
-  const coordinateX = Number.isFinite(activeCoordinate?.x)
-    ? activeCoordinate.x
-    : Number.isFinite(averageX)
-      ? averageX
-      : plotLeft;
 
-  const rawX = coordinateX - resolvedWidth / 2;
+  const coordinateX = Number.isFinite(x)
+    ? x
+    : Number.isFinite(activeCoordinate?.x)
+      ? activeCoordinate.x
+      : Number.isFinite(averageX)
+        ? averageX
+        : plotLeft;
+
+  const rawX = Number.isFinite(x) ? coordinateX : coordinateX - resolvedWidth / 2;
   const boundedX = Math.min(Math.max(rawX, plotLeft), plotRight);
 
   return (
