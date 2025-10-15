@@ -134,32 +134,51 @@ function CashFlowTooltipContent({ active, payload, label }) {
   );
 }
 
-function SmartTooltipCursor({ points, viewBox, itemCount = 1, fill, fillOpacity = 0.12 }) {
-  if (!points || points.length === 0 || !viewBox) {
+function SmartTooltipCursor({
+  points,
+  itemCount = 1,
+  fill,
+  fillOpacity = 0.16,
+  strokeOpacity = 0.45,
+  width,
+  height,
+  left,
+  top,
+}) {
+  if (!points || points.length === 0) {
     return null;
   }
 
-  const { x: viewX = 0, width: viewWidth = 0, y: viewY = 0, height: viewHeight = 0 } = viewBox;
-  if (viewWidth <= 0 || viewHeight <= 0) {
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
     return null;
   }
 
-  const segments = Math.max(itemCount, 1);
-  const segmentWidth = viewWidth / segments;
-  const cursorX = points[0]?.x ?? viewX;
+  const segments = Math.max(Number(itemCount) || 0, 1);
+  const segmentWidth = width / segments;
+
+  if (!Number.isFinite(segmentWidth) || segmentWidth <= 0) {
+    return null;
+  }
+
+  const plotLeft = Number.isFinite(left) ? left : 0;
+  const plotTop = Number.isFinite(top) ? top : 0;
+  const plotRight = plotLeft + width - segmentWidth;
+
+  const cursorX = points[0]?.x ?? plotLeft;
   const rawX = cursorX - segmentWidth / 2;
-  const boundedX = Math.min(Math.max(rawX, viewX), viewX + viewWidth - segmentWidth);
+  const boundedX = Math.min(Math.max(rawX, plotLeft), plotRight);
+  const color = fill || "var(--ring)";
 
   return (
     <Rectangle
       x={boundedX}
-      y={viewY}
+      y={plotTop}
       width={segmentWidth}
-      height={viewHeight}
-      fill={fill || "currentColor"}
+      height={height}
+      fill={color}
       fillOpacity={fillOpacity}
-      stroke={fill || "currentColor"}
-      strokeOpacity={0.35}
+      stroke={color}
+      strokeOpacity={strokeOpacity}
       pointerEvents="none"
     />
   );
