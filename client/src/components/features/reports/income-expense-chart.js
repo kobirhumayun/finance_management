@@ -19,19 +19,19 @@ import { useCSSVariable } from "@/hooks/use-css-variable";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) {
-    return "$0";
+    return "৳0";
   }
 
   const absolute = Math.abs(value);
-  if (absolute >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
-  if (absolute >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (absolute >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (absolute >= 1_000) return `$${(value / 1_000).toFixed(1)}k`;
+  if (absolute >= 1_000_000_000_000) return `৳${(value / 1_000_000_000_000).toFixed(1)}T`;
+  if (absolute >= 1_000_000_000) return `৳${(value / 1_000_000_000).toFixed(1)}B`;
+  if (absolute >= 1_000_000) return `৳${(value / 1_000_000).toFixed(1)}M`;
+  if (absolute >= 1_000) return `৳${(value / 1_000).toFixed(1)}k`;
 
-  return `$${value.toLocaleString()}`;
+  return `৳${value.toLocaleString()}`;
 };
 
-const formatCurrency = (value) => `$${toNumeric(value).toLocaleString()}`;
+const formatCurrency = (value) => `৳${toNumeric(value).toLocaleString()}`;
 
 const normalizeMonth = (value) => {
   if (typeof value === "string") {
