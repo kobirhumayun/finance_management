@@ -15,10 +15,7 @@ export function SmartTooltipCursor({
   bandSize,
   activeCoordinate,
 }) {
-  if (!points || points.length === 0) {
-    return null;
-  }
-
+  const pointList = Array.isArray(points) ? points.filter(Boolean) : [];
   const color = fill || "var(--ring)";
 
   const segments = Math.max(Number(itemCount) || 0, 1);
@@ -47,7 +44,7 @@ export function SmartTooltipCursor({
   }
 
   if (!Number.isFinite(segmentWidth) || segmentWidth <= 0) {
-    const sortedPoints = points
+    const sortedPoints = pointList
       .map((point) => point?.x)
       .filter((x) => Number.isFinite(x))
       .sort((a, b) => a - b);
@@ -89,7 +86,10 @@ export function SmartTooltipCursor({
 
   const plotRight = plotLeft + totalWidth - resolvedWidth;
 
-  const averageX = points.reduce((sum, point) => sum + (point?.x ?? 0), 0) / points.length;
+  const averageX =
+    pointList.length > 0
+      ? pointList.reduce((sum, point) => sum + (point?.x ?? 0), 0) / pointList.length
+      : null;
   const coordinateX = Number.isFinite(activeCoordinate?.x)
     ? activeCoordinate.x
     : Number.isFinite(averageX)
