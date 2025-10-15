@@ -159,6 +159,7 @@ export default function CashFlowChart({ data = [] }) {
               fontSize={12}
               tickLine={false}
               axisLine={false}
+              padding={{ left: 24, right: 24 }}
             />
             <YAxis
               width={72}
@@ -167,6 +168,7 @@ export default function CashFlowChart({ data = [] }) {
               domain={yAxisDomain}
               tickLine={false}
               axisLine={false}
+              fontSize={12}
             />
             <Tooltip
               cursor={{ stroke: highlightColor, strokeWidth: 1.5 }}
