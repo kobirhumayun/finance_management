@@ -17,50 +17,50 @@ export function SmartTooltipCursor({
   x,
   y,
 }) {
-  const pointList = Array.isArray(points) ? points.filter(Boolean) : [];
   const color = fill || "var(--ring)";
+  const pointList = Array.isArray(points) ? points.filter(Boolean) : [];
+  const pointXs = pointList
+    .map((point) => point?.x)
+    .filter((value) => Number.isFinite(value));
 
-  const segments = Math.max(Number(itemCount) || 0, 1);
-
-  const plotWidth = Number.isFinite(width) && width > 0
-    ? width
-    : Number.isFinite(viewBox?.width) && viewBox.width > 0
-      ? viewBox.width
-      : null;
-
-  const plotHeight = Number.isFinite(height) && height > 0
+  const resolvedHeight = Number.isFinite(height) && height > 0
     ? height
     : Number.isFinite(viewBox?.height) && viewBox.height > 0
       ? viewBox.height
-      : null;
+      : Number.isFinite(top)
+        ? top
+        : null;
 
-  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
+  if (!Number.isFinite(resolvedHeight) || resolvedHeight <= 0) {
     return null;
   }
 
+  const segments = Math.max(Number(itemCount) || 0, 1);
+  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
+
   let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+
   if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    if (Number.isFinite(plotWidth) && plotWidth > 0) {
-      resolvedWidth = plotWidth / segments;
-    } else if (Number.isFinite(bandSize) && bandSize > 0) {
+    if (Number.isFinite(bandSize) && bandSize > 0) {
       resolvedWidth = bandSize;
     }
+  }
 
-    if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-      const sortedPoints = pointList
-        .map((point) => point?.x)
-        .filter((value) => Number.isFinite(value))
-        .sort((a, b) => a - b);
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (pointXs.length > 1) {
+      const minGap = pointXs
+        .slice(1)
+        .reduce((min, value, index) => Math.min(min, value - pointXs[index]), Infinity);
 
-      if (sortedPoints.length > 1) {
-        const minGap = sortedPoints
-          .slice(1)
-          .reduce((min, value, index) => Math.min(min, value - sortedPoints[index]), Infinity);
-
-        if (Number.isFinite(minGap) && minGap > 0) {
-          resolvedWidth = minGap;
-        }
+      if (Number.isFinite(minGap) && minGap > 0 && minGap < Infinity) {
+        resolvedWidth = minGap;
       }
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+      resolvedWidth = viewBoxWidth / segments;
     }
   }
 
@@ -76,42 +76,40 @@ export function SmartTooltipCursor({
 
   const plotTop = Number.isFinite(y)
     ? y
-    : Number.isFinite(top)
-      ? top
-      : Number.isFinite(viewBox?.y)
-        ? viewBox.y
+    : Number.isFinite(viewBox?.y)
+      ? viewBox.y
+      : Number.isFinite(top)
+        ? top
         : 0;
 
-  const totalWidth = Number.isFinite(plotWidth) && plotWidth > 0
-    ? plotWidth
-    : Number.isFinite(viewBox?.width) && viewBox.width > 0
-      ? viewBox.width
-      : resolvedWidth * segments;
+  const rightBoundary = Number.isFinite(viewBoxWidth)
+    ? plotLeft + viewBoxWidth - resolvedWidth
+    : null;
 
-  const plotRight = plotLeft + totalWidth - resolvedWidth;
+  const averageX = pointXs.length > 0
+    ? pointXs.reduce((sum, value) => sum + value, 0) / pointXs.length
+    : null;
 
-  const averageX =
-    pointList.length > 0
-      ? pointList.reduce((sum, point) => sum + (point?.x ?? 0), 0) / pointList.length
-      : null;
+  const fallbackX = Number.isFinite(averageX)
+    ? averageX - resolvedWidth / 2
+    : plotLeft;
 
-  const coordinateX = Number.isFinite(x)
+  const derivedX = Number.isFinite(x)
     ? x
     : Number.isFinite(activeCoordinate?.x)
-      ? activeCoordinate.x
-      : Number.isFinite(averageX)
-        ? averageX
-        : plotLeft;
+      ? activeCoordinate.x - resolvedWidth / 2
+      : fallbackX;
 
-  const rawX = Number.isFinite(x) ? coordinateX : coordinateX - resolvedWidth / 2;
-  const boundedX = Math.min(Math.max(rawX, plotLeft), plotRight);
+  const boundedX = Number.isFinite(rightBoundary)
+    ? Math.min(Math.max(derivedX, plotLeft), rightBoundary)
+    : Math.max(derivedX, plotLeft);
 
   return (
     <Rectangle
       x={boundedX}
       y={plotTop}
       width={resolvedWidth}
-      height={plotHeight}
+      height={resolvedHeight}
       fill={color}
       fillOpacity={fillOpacity}
       pointerEvents="none"
