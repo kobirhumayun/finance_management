@@ -6,7 +6,6 @@ import {
   Legend,
   Line,
   LineChart,
-  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -16,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
+import { SmartTooltipCursor } from "./smart-tooltip-cursor";
 
 const CHART_MARGIN = { top: 16, right: 16, bottom: 48, left: 16 };
 
@@ -131,53 +131,6 @@ function CashFlowTooltipContent({ active, payload, label }) {
         <span className="font-medium text-foreground">{formatCurrency(balance)}</span>
       </div>
     </div>
-  );
-}
-
-function SmartTooltipCursor({
-  points,
-  itemCount = 1,
-  fill,
-  fillOpacity = 0.16,
-  width,
-  height,
-  left,
-  top,
-}) {
-  if (!points || points.length === 0) {
-    return null;
-  }
-
-  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-    return null;
-  }
-
-  const segments = Math.max(Number(itemCount) || 0, 1);
-  const segmentWidth = width / segments;
-
-  if (!Number.isFinite(segmentWidth) || segmentWidth <= 0) {
-    return null;
-  }
-
-  const plotLeft = Number.isFinite(left) ? left : 0;
-  const plotTop = Number.isFinite(top) ? top : 0;
-  const plotRight = plotLeft + width - segmentWidth;
-
-  const cursorX = points[0]?.x ?? plotLeft;
-  const rawX = cursorX - segmentWidth / 2;
-  const boundedX = Math.min(Math.max(rawX, plotLeft), plotRight);
-  const color = fill || "var(--ring)";
-
-  return (
-    <Rectangle
-      x={boundedX}
-      y={plotTop}
-      width={segmentWidth}
-      height={height}
-      fill={color}
-      fillOpacity={fillOpacity}
-      pointerEvents="none"
-    />
   );
 }
 

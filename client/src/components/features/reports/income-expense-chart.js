@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
+import { SmartTooltipCursor } from "./smart-tooltip-cursor";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) {
@@ -148,7 +149,6 @@ export default function IncomeExpenseChart({ data = [] }) {
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
   const borderColor = useCSSVariable("--border");
-  const mutedColor = useCSSVariable("--muted");
   const ringColor = useCSSVariable("--ring");
 
   const highlightColor = ringColor || incomeColor || expenseColor;
@@ -216,7 +216,12 @@ export default function IncomeExpenseChart({ data = [] }) {
                 axisLine={false}
               />
               <Tooltip
-                cursor={{ fill: mutedColor || undefined, fillOpacity: 0.18 }}
+                cursor={
+                  <SmartTooltipCursor
+                    itemCount={chartData.length}
+                    fill={highlightColor || incomeColor || expenseColor || "currentColor"}
+                  />
+                }
                 content={<IncomeExpenseTooltipContent />}
               />
               <ReferenceLine
