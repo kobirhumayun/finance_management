@@ -6,6 +6,7 @@ import {
   Legend,
   Line,
   LineChart,
+  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -15,7 +16,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { SmartTooltipCursor } from "./smart-tooltip-cursor";
 
 const CHART_MARGIN = { top: 16, right: 16, bottom: 48, left: 16 };
 
@@ -134,6 +134,117 @@ function CashFlowTooltipContent({ active, payload, label }) {
   );
 }
 
+function CashFlowTooltipCursor({
+  fill,
+  fillOpacity = 0.16,
+  itemCount = 1,
+  points,
+  x,
+  y,
+  width,
+  height,
+  viewBox,
+  activeCoordinate,
+}) {
+  const color = fill || "var(--ring)";
+
+  const plotHeight = Number.isFinite(height) && height > 0
+    ? height
+    : Number.isFinite(viewBox?.height) && viewBox.height > 0
+      ? viewBox.height
+      : null;
+
+  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
+    return null;
+  }
+
+  const plotTop = Number.isFinite(y)
+    ? y
+    : Number.isFinite(viewBox?.y)
+      ? viewBox.y
+      : 0;
+
+  const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
+  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
+  const segments = Math.max(Number(itemCount) || 0, 1);
+
+  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+      resolvedWidth = viewBoxWidth / segments;
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    const pointXs = Array.isArray(points)
+      ? points
+          .map((point) => (Number.isFinite(point?.x) ? point.x : null))
+          .filter((value) => Number.isFinite(value))
+      : [];
+
+    if (pointXs.length > 1) {
+      const sorted = [...pointXs].sort((a, b) => a - b);
+      const gaps = sorted
+        .slice(1)
+        .map((value, index) => value - sorted[index])
+        .filter((gap) => Number.isFinite(gap) && gap > 0);
+
+      if (gaps.length > 0) {
+        resolvedWidth = Math.min(...gaps);
+      }
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    return null;
+  }
+
+  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const maxWidth = viewBoxWidth / segments;
+    if (resolvedWidth > maxWidth * 1.5) {
+      resolvedWidth = maxWidth;
+    }
+  }
+
+  const pointXs = Array.isArray(points)
+    ? points
+        .map((point) => (Number.isFinite(point?.x) ? point.x : null))
+        .filter((value) => Number.isFinite(value))
+    : [];
+
+  const averagePoint = pointXs.length > 0
+    ? pointXs.reduce((sum, value) => sum + value, 0) / pointXs.length
+    : null;
+
+  let resolvedX = Number.isFinite(x)
+    ? x
+    : Number.isFinite(activeCoordinate?.x)
+      ? activeCoordinate.x - resolvedWidth / 2
+      : Number.isFinite(averagePoint)
+        ? averagePoint - resolvedWidth / 2
+        : plotLeft;
+
+  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const maxX = plotLeft + viewBoxWidth - resolvedWidth;
+    resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
+  } else {
+    resolvedX = Math.max(resolvedX, plotLeft);
+  }
+
+  return (
+    <Rectangle
+      x={resolvedX}
+      y={plotTop}
+      width={resolvedWidth}
+      height={plotHeight}
+      fill={color}
+      fillOpacity={fillOpacity}
+      pointerEvents="none"
+    />
+  );
+}
+
 export default function CashFlowChart({ data = [] }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const yAxisDomain = useMemo(() => getYAxisDomain(chartData), [chartData]);
@@ -173,7 +284,7 @@ export default function CashFlowChart({ data = [] }) {
             />
             <Tooltip
               cursor={
-                <SmartTooltipCursor
+                <CashFlowTooltipCursor
                   itemCount={chartData.length}
                   fill={highlightColor || incomeColor || expenseColor || "currentColor"}
                 />

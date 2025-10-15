@@ -7,6 +7,7 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -16,7 +17,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
-import { SmartTooltipCursor } from "./smart-tooltip-cursor";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) {
@@ -139,6 +139,104 @@ function IncomeExpenseTooltipContent({ active, payload, label }) {
   );
 }
 
+function IncomeExpenseTooltipCursor({
+  fill,
+  fillOpacity = 0.16,
+  itemCount = 1,
+  bandSize,
+  points,
+  x,
+  y,
+  width,
+  height,
+  viewBox,
+  activeCoordinate,
+}) {
+  const color = fill || "var(--ring)";
+
+  const plotHeight = Number.isFinite(height) && height > 0
+    ? height
+    : Number.isFinite(viewBox?.height) && viewBox.height > 0
+      ? viewBox.height
+      : null;
+
+  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
+    return null;
+  }
+
+  const plotTop = Number.isFinite(y)
+    ? y
+    : Number.isFinite(viewBox?.y)
+      ? viewBox.y
+      : 0;
+
+  const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
+  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
+  const segments = Math.max(Number(itemCount) || 0, 1);
+
+  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(bandSize) && bandSize > 0) {
+      resolvedWidth = bandSize;
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+      resolvedWidth = viewBoxWidth / segments;
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    return null;
+  }
+
+  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const maxWidth = viewBoxWidth / segments;
+    if (resolvedWidth > maxWidth * 1.5) {
+      resolvedWidth = maxWidth;
+    }
+  }
+
+  const pointXs = Array.isArray(points)
+    ? points
+        .map((point) => (Number.isFinite(point?.x) ? point.x : null))
+        .filter((value) => Number.isFinite(value))
+    : [];
+
+  const averagePoint = pointXs.length > 0
+    ? pointXs.reduce((sum, value) => sum + value, 0) / pointXs.length
+    : null;
+
+  let resolvedX = Number.isFinite(x)
+    ? x
+    : Number.isFinite(activeCoordinate?.x)
+      ? activeCoordinate.x - resolvedWidth / 2
+      : Number.isFinite(averagePoint)
+        ? averagePoint - resolvedWidth / 2
+        : plotLeft;
+
+  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const maxX = plotLeft + viewBoxWidth - resolvedWidth;
+    resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
+  } else {
+    resolvedX = Math.max(resolvedX, plotLeft);
+  }
+
+  return (
+    <Rectangle
+      x={resolvedX}
+      y={plotTop}
+      width={resolvedWidth}
+      height={plotHeight}
+      fill={color}
+      fillOpacity={fillOpacity}
+      pointerEvents="none"
+    />
+  );
+}
+
 export default function IncomeExpenseChart({ data = [] }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const hasSeries = chartData.some((row) => row.income !== 0 || row.expense !== 0);
@@ -229,7 +327,7 @@ export default function IncomeExpenseChart({ data = [] }) {
               />
               <Tooltip
                 cursor={
-                  <SmartTooltipCursor
+                  <IncomeExpenseTooltipCursor
                     itemCount={chartData.length}
                     fill={highlightColor || incomeColor || expenseColor || "currentColor"}
                     bandSize={cursorBandSize}
