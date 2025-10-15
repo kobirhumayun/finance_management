@@ -40,6 +40,14 @@ export function SmartTooltipCursor({
 
   let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
 
+  if (Number.isFinite(resolvedWidth) && Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const expectedBand = viewBoxWidth / segments;
+
+    if (resolvedWidth >= viewBoxWidth || (expectedBand > 0 && resolvedWidth > expectedBand * 1.5)) {
+      resolvedWidth = null;
+    }
+  }
+
   if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
     if (Number.isFinite(bandSize) && bandSize > 0) {
       resolvedWidth = bandSize;
