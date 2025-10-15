@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
 
-const CHART_MARGIN = { top: 16, right: 24, bottom: 16, left: 0 };
+const CHART_MARGIN = { top: 16, right: 16, bottom: 48, left: 16 };
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) {
@@ -66,32 +66,15 @@ const buildChartData = (rows) => {
 };
 
 const getYAxisDomain = (rows) => {
-  if (!rows.length) {
+  const maxSeriesValue = rows.reduce((max, item) => {
+    return Math.max(max, Math.abs(item.cashIn ?? 0), Math.abs(item.cashOut ?? 0));
+  }, 0);
+
+  if (!Number.isFinite(maxSeriesValue) || maxSeriesValue <= 0) {
     return [0, "auto"];
   }
 
-  let minValue = 0;
-  let maxValue = 0;
-
-  rows.forEach((row) => {
-    const income = toNumeric(row.cashIn);
-    const expense = toNumeric(row.cashOut);
-
-    minValue = Math.min(minValue, income, expense);
-    maxValue = Math.max(maxValue, income, expense);
-  });
-
-  if (minValue === maxValue) {
-    if (maxValue === 0) {
-      return [0, "auto"];
-    }
-
-    const padding = Math.abs(maxValue) * 0.1;
-    return [minValue - padding, maxValue + padding];
-  }
-
-  const padding = Math.max(Math.abs(maxValue), Math.abs(minValue)) * 0.1;
-  return [minValue - padding, maxValue + padding];
+  return [0, maxSeriesValue];
 };
 
 function ChartLegend({ payload }) {
@@ -160,8 +143,6 @@ export default function CashFlowChart({ data = [] }) {
   const ringColor = useCSSVariable("--ring");
 
   const highlightColor = ringColor || incomeColor || expenseColor;
-  const shouldRenderZeroLine = yAxisDomain[0] < 0 && yAxisDomain[1] > 0;
-
   return (
     <Card>
       <CardHeader>
@@ -170,32 +151,40 @@ export default function CashFlowChart({ data = [] }) {
       <CardContent className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={CHART_MARGIN}>
-            <CartesianGrid stroke={borderColor} strokeDasharray="4 4" vertical={false} />
+            <CartesianGrid stroke={borderColor || undefined} vertical={false} strokeDasharray="3 3" />
             <XAxis
               dataKey="month"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={12}
+              height={32}
               stroke="currentColor"
               fontSize={12}
-            />
-            <YAxis
-              width={80}
-              tickFormatter={formatCurrencyTick}
               tickLine={false}
               axisLine={false}
-              tickMargin={12}
+            />
+            <YAxis
+              width={72}
+              tickFormatter={formatCurrencyTick}
               stroke="currentColor"
               domain={yAxisDomain}
+              tickLine={false}
+              axisLine={false}
             />
             <Tooltip
               cursor={{ stroke: highlightColor, strokeWidth: 1.5 }}
               content={<CashFlowTooltipContent />}
             />
-            <Legend verticalAlign="bottom" content={<ChartLegend />} />
-            {shouldRenderZeroLine ? (
-              <ReferenceLine y={0} stroke={borderColor} strokeDasharray="4 4" />
-            ) : null}
+            <Legend
+              verticalAlign="bottom"
+              height={40}
+              content={(props) => <ChartLegend {...props} />}
+            />
+            <ReferenceLine
+              y={0}
+              stroke={borderColor || highlightColor || undefined}
+              strokeWidth={2}
+              strokeOpacity={0.85}
+              ifOverflow="extendDomain"
+              isFront
+            />
             <Line
               type="monotone"
               dataKey="cashIn"
