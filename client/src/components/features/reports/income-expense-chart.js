@@ -145,6 +145,18 @@ export default function IncomeExpenseChart({ data = [] }) {
 
   const yAxisDomain = useMemo(() => getYAxisDomain(chartData), [chartData]);
   const barSizing = useMemo(() => getBarSizing(chartData.length), [chartData.length]);
+  const cursorBandSize = useMemo(() => {
+    const totalBarWidth = (barSizing?.barSize ?? 0) * 2;
+    const gap = typeof barSizing?.barGap === "number" ? barSizing.barGap : 0;
+
+    const estimatedWidth = totalBarWidth + gap;
+
+    if (!Number.isFinite(estimatedWidth) || estimatedWidth <= 0) {
+      return undefined;
+    }
+
+    return estimatedWidth;
+  }, [barSizing]);
 
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
@@ -220,6 +232,7 @@ export default function IncomeExpenseChart({ data = [] }) {
                   <SmartTooltipCursor
                     itemCount={chartData.length}
                     fill={highlightColor || incomeColor || expenseColor || "currentColor"}
+                    bandSize={cursorBandSize}
                   />
                 }
                 content={<IncomeExpenseTooltipContent />}
