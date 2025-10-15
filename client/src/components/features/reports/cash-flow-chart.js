@@ -139,7 +139,6 @@ function SmartTooltipCursor({
   itemCount = 1,
   fill,
   fillOpacity = 0.16,
-  strokeOpacity = 0.45,
   width,
   height,
   left,
@@ -177,8 +176,6 @@ function SmartTooltipCursor({
       height={height}
       fill={color}
       fillOpacity={fillOpacity}
-      stroke={color}
-      strokeOpacity={strokeOpacity}
       pointerEvents="none"
     />
   );
