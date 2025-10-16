@@ -135,110 +135,45 @@ function CashFlowTooltipContent({ active, payload, label }) {
 }
 
 function CashFlowTooltipCursor({
-  activeCoordinate,
-  bandSize,
+  points,
+  itemCount = 1,
   fill,
   fillOpacity = 0.16,
-  height,
-  itemCount = 1,
-  points,
-  viewBox,
   width,
-  x,
-  y,
+  height,
+  left,
+  top,
 }) {
-  const color = fill || "var(--ring)";
-
-  const finite = (value) => Number.isFinite(value) && value > 0;
-
-  const plotTop = Number.isFinite(y)
-    ? y
-    : Number.isFinite(viewBox?.y)
-      ? viewBox.y
-      : 0;
-
-  const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
-  const plotHeight = finite(height)
-    ? height
-    : finite(viewBox?.height)
-      ? viewBox.height
-      : null;
-
-  if (!finite(plotHeight)) {
+  if (!points || points.length === 0) {
     return null;
   }
 
-  const viewBoxWidth = finite(viewBox?.width) ? viewBox.width : null;
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+    return null;
+  }
+
   const segments = Math.max(Number(itemCount) || 0, 1);
+  const segmentWidth = width / segments;
 
-  const pointXs = Array.isArray(points)
-    ? points
-        .map((point) => (Number.isFinite(point?.x) ? point.x : null))
-        .filter((value) => Number.isFinite(value))
-    : [];
-
-  const averagePoint = pointXs.length > 0
-    ? pointXs.reduce((sum, value) => sum + value, 0) / pointXs.length
-    : null;
-
-  const firstFinite = (...candidates) => {
-    for (const candidate of candidates) {
-      if (Number.isFinite(candidate) && candidate > 0) {
-        return candidate;
-      }
-    }
-    return null;
-  };
-
-  const gapWidth = (() => {
-    if (pointXs.length > 1) {
-      const sorted = [...pointXs].sort((a, b) => a - b);
-      const gaps = sorted
-        .slice(1)
-        .map((value, index) => value - sorted[index])
-        .filter((gap) => Number.isFinite(gap) && gap > 0);
-      if (gaps.length > 0) {
-        return Math.min(...gaps);
-      }
-    }
-    return null;
-  })();
-
-  const expectedWidth = firstFinite(
-    Number.isFinite(width) && width > 0 ? width : null,
-    Number.isFinite(bandSize) && bandSize > 0 ? bandSize : null,
-    viewBoxWidth && segments > 0 ? viewBoxWidth / segments : null,
-    gapWidth,
-  );
-
-  if (!finite(expectedWidth)) {
+  if (!Number.isFinite(segmentWidth) || segmentWidth <= 0) {
     return null;
   }
 
-  const maxWidth = viewBoxWidth && segments > 0 ? viewBoxWidth / segments : null;
-  const resolvedWidth = maxWidth && expectedWidth > maxWidth * 1.25 ? maxWidth : expectedWidth;
+  const plotLeft = Number.isFinite(left) ? left : 0;
+  const plotTop = Number.isFinite(top) ? top : 0;
+  const plotRight = plotLeft + width - segmentWidth;
 
-  let resolvedX = Number.isFinite(x)
-    ? x
-    : Number.isFinite(activeCoordinate?.x)
-      ? activeCoordinate.x - resolvedWidth / 2
-      : Number.isFinite(averagePoint)
-        ? averagePoint - resolvedWidth / 2
-        : plotLeft;
-
-  if (viewBoxWidth) {
-    const maxX = plotLeft + viewBoxWidth - resolvedWidth;
-    resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
-  } else {
-    resolvedX = Math.max(resolvedX, plotLeft);
-  }
+  const cursorX = points[0]?.x ?? plotLeft;
+  const rawX = cursorX - segmentWidth / 2;
+  const boundedX = Math.min(Math.max(rawX, plotLeft), plotRight);
+  const color = fill || "var(--ring)";
 
   return (
     <Rectangle
-      x={resolvedX}
+      x={boundedX}
       y={plotTop}
-      width={resolvedWidth}
-      height={plotHeight}
+      width={segmentWidth}
+      height={height}
       fill={color}
       fillOpacity={fillOpacity}
       pointerEvents="none"
