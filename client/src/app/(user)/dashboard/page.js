@@ -86,7 +86,11 @@ export default function DashboardPage() {
         />
         <SummaryCard
           title="Active Projects"
-          value={showSummaryPlaceholder ? "--" : formatNumber(projects)}
+          value={
+            showSummaryPlaceholder
+              ? "--"
+              : formatNumber(projects, { minimumFractionDigits: 0 })
+          }
           description="Tracked in FinTrack"
           icon={Briefcase}
         />
