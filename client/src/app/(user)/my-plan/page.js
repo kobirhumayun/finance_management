@@ -10,28 +10,34 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { myPlanQueryOptions } from "@/lib/queries/plans";
 
-function formatCurrency(value, currency) {
-  const numericValue = Number(value ?? 0);
-  if (!Number.isFinite(numericValue)) {
+const formatUsageValue = (input) => {
+  if (input === null || input === undefined) {
     return "—";
   }
-  if (numericValue === 0) {
-    return "Free";
+
+  if (typeof input === "number") {
+    return formatNumber(input, { fallback: "—" });
   }
 
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(numericValue);
-  } catch (error) {
-    return `${currency || ""} ${numericValue}`.trim();
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (trimmed === "") {
+      return "—";
+    }
+
+    const numericValue = Number(trimmed);
+    if (Number.isFinite(numericValue)) {
+      return formatNumber(numericValue, { fallback: "—" });
+    }
+
+    return trimmed;
   }
-}
+
+  return "—";
+};
 
 function formatBillingCycle(cycle) {
   if (!cycle) return "";
@@ -100,7 +106,7 @@ export default function MyPlanPage() {
   const plan = data?.plan ?? null;
   const status = data?.status ?? plan?.status ?? null;
   const billingCycleLabel = formatBillingCycle(plan?.billingCycle);
-  const priceLabel = plan ? formatCurrency(plan.price, plan.currency) : "—";
+  const priceLabel = plan ? formatCurrency(plan.price, { fallback: "—" }) : "—";
   const formattedStatus = formatStatus(status);
   const statusVariant = resolveStatusVariant(status);
   const renewalDate = formatDate(data?.endDate ?? data?.renewalDate ?? plan?.endDate);
@@ -210,13 +216,14 @@ export default function MyPlanPage() {
                 </TableHeader>
                 <TableBody>
                   {usageEntries.map(([key, value]) => {
-                    const used = value.used ?? value.current ?? value.value ?? "—";
-                    const limit = value.limit ?? value.max ?? value.capacity ?? "—";
+                    const used = value.used ?? value.current ?? value.value ?? null;
+                    const limit = value.limit ?? value.max ?? value.capacity ?? null;
+
                     return (
                       <TableRow key={key}>
                         <TableCell className="capitalize">{key.replace(/[_-]+/g, " ")}</TableCell>
-                        <TableCell>{used}</TableCell>
-                        <TableCell>{limit}</TableCell>
+                        <TableCell>{formatUsageValue(used)}</TableCell>
+                        <TableCell>{formatUsageValue(limit)}</TableCell>
                       </TableRow>
                     );
                   })}
