@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCSSVariable } from "@/hooks/use-css-variable";
+import { formatCurrency } from "@/lib/formatters";
 import { toNumeric } from "@/lib/utils/numbers";
 import { ChartLoadingOverlay } from "./chart-loading-overlay";
 
@@ -50,8 +51,6 @@ const buildChartData = (data) => {
     .filter(Boolean)
     .sort((a, b) => b.value - a.value);
 };
-
-const formatCurrency = (value) => `৳${toNumeric(value).toLocaleString()}`;
 
 const calculatePercent = (value, total) => {
   if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) {

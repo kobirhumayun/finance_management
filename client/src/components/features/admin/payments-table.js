@@ -4,6 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatCurrencyWithCode } from "@/lib/formatters";
 
 const toTitleCase = (value) => {
   if (typeof value !== "string" || !value.trim()) return value;
@@ -14,19 +15,8 @@ const toTitleCase = (value) => {
     .join(" ");
 };
 
-const formatAmount = (amount, currency) => {
-  if (amount == null) return "—";
-  const numericAmount = typeof amount === "number" ? amount : Number(amount);
-  if (!Number.isFinite(numericAmount)) {
-    return currency ? `${amount} ${currency}` : String(amount);
-  }
-  const safeCurrency = currency || "USD";
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: safeCurrency }).format(numericAmount);
-  } catch {
-    return currency ? `${numericAmount} ${currency}` : String(numericAmount);
-  }
-};
+const formatAmount = (amount, currency) =>
+  formatCurrencyWithCode(amount, currency, { fallback: "—" });
 
 const formatDateTime = (value) => {
   if (!value) return "—";

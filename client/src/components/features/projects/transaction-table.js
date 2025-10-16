@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 // Responsive table displaying transactions for the currently selected project.
@@ -93,9 +94,24 @@ export default function TransactionTable({
             <TableBody>
               {displayTransactions.map((transaction, index) => {
                 const transactionId = transaction?.id ?? `transaction-${index}`;
-                const amountValue = Number.isFinite(Number(transaction?.amount)) ? Number(transaction.amount) : 0;
-                const formattedAmount = `${transaction?.type === "Expense" ? "-" : "+"}$${amountValue.toLocaleString()}`;
-                const transactionType = transaction?.type === "Income" ? "Income" : "Expense";
+
+                let parsedAmount = null;
+                if (typeof transaction?.amount === "number" && Number.isFinite(transaction.amount)) {
+                  parsedAmount = transaction.amount;
+                } else if (typeof transaction?.amount === "string" && transaction.amount.trim() !== "") {
+                  const numericValue = Number(transaction.amount);
+                  if (Number.isFinite(numericValue)) {
+                    parsedAmount = numericValue;
+                  }
+                }
+
+                const normalizedType = typeof transaction?.type === "string" ? transaction.type.toLowerCase() : "";
+                const isExpense = normalizedType === "expense";
+                const transactionType = normalizedType === "income" ? "Income" : "Expense";
+                const formattedAmount =
+                  parsedAmount === null
+                    ? formatCurrency(null)
+                    : `${isExpense ? "-" : "+"}${formatCurrency(Math.abs(parsedAmount))}`;
                 const description =
                   typeof transaction?.description === "string" && transaction.description.trim().length
                     ? transaction.description
@@ -161,9 +177,24 @@ export default function TransactionTable({
         ) : displayTransactions.length ? (
           displayTransactions.map((transaction, index) => {
             const transactionId = transaction?.id ?? `transaction-${index}`;
-            const amountValue = Number.isFinite(Number(transaction?.amount)) ? Number(transaction.amount) : 0;
-            const formattedAmount = `${transaction?.type === "Expense" ? "-" : "+"}$${amountValue.toLocaleString()}`;
-            const transactionType = transaction?.type === "Income" ? "Income" : "Expense";
+
+            let parsedAmount = null;
+            if (typeof transaction?.amount === "number" && Number.isFinite(transaction.amount)) {
+              parsedAmount = transaction.amount;
+            } else if (typeof transaction?.amount === "string" && transaction.amount.trim() !== "") {
+              const numericValue = Number(transaction.amount);
+              if (Number.isFinite(numericValue)) {
+                parsedAmount = numericValue;
+              }
+            }
+
+            const normalizedType = typeof transaction?.type === "string" ? transaction.type.toLowerCase() : "";
+            const isExpense = normalizedType === "expense";
+            const transactionType = normalizedType === "income" ? "Income" : "Expense";
+            const formattedAmount =
+              parsedAmount === null
+                ? formatCurrency(null)
+                : `${isExpense ? "-" : "+"}${formatCurrency(Math.abs(parsedAmount))}`;
             const description =
               typeof transaction?.description === "string" && transaction.description.trim().length
                 ? transaction.description
