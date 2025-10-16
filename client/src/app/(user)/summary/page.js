@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { qk } from "@/lib/query-keys";
 import { fetchSummaryFilters, fetchSummaryReport } from "@/lib/queries/reports";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 const PAGE_SIZE = 20;
 
@@ -431,18 +432,24 @@ export default function SummaryPage() {
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1 rounded-lg border p-4">
             <p className="text-sm text-muted-foreground">Income</p>
-            <p className="text-2xl font-semibold">${summaryTotals.income.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">{summaryCounts.income} income transactions</p>
+            <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.income)}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatNumber(summaryCounts.income)} income transactions
+            </p>
           </div>
           <div className="space-y-1 rounded-lg border p-4">
             <p className="text-sm text-muted-foreground">Expenses</p>
-            <p className="text-2xl font-semibold">${summaryTotals.expense.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">{summaryCounts.expense} expense transactions</p>
+            <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.expense)}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatNumber(summaryCounts.expense)} expense transactions
+            </p>
           </div>
           <div className="space-y-1 rounded-lg border p-4 lg:col-span-1">
             <p className="text-sm text-muted-foreground">Net balance</p>
-            <p className="text-2xl font-semibold">${summaryTotals.balance.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">{summaryCounts.total} total transactions</p>
+            <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.balance)}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatNumber(summaryCounts.total)} total transactions
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -453,7 +460,7 @@ export default function SummaryPage() {
             <p className="text-sm text-muted-foreground">
               {isInitialLoading
                 ? "Loading transactions..."
-                : `Showing ${transactions.length.toLocaleString()} of ${totalCount.toLocaleString()} transactions`}
+                : `Showing ${formatNumber(transactions.length)} of ${formatNumber(totalCount)} transactions`}
             </p>
           </div>
         </CardHeader>
@@ -493,7 +500,9 @@ export default function SummaryPage() {
                         <TableCell>{item.projectName || item.projectId || "--"}</TableCell>
                         <TableCell>{item.type}</TableCell>
                         <TableCell>{item.subcategory || "--"}</TableCell>
-                        <TableCell className="text-right font-medium">${item.amount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(item.amount)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
