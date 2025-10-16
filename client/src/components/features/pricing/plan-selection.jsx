@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/sonner";
 import { createPlanOrder, submitManualPayment } from "@/lib/plans";
-import { formatCurrency as formatBdtCurrency, formatNumber } from "@/lib/formatters";
+import { formatPlanAmount, resolveNumericValue } from "@/lib/formatters";
 
 const orderSchema = z.object({
   planId: z.string().min(1, "Plan is required"),
@@ -43,59 +43,9 @@ const manualPaymentSchema = z.object({
   gatewayTransactionId: z.string().min(3, "Provide the transaction reference"),
 });
 
-const formatPlanAmount = (value, currency) => {
-  const numericValue = resolveNumeric(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return formatNumber(value);
-  }
-
-  if (numericValue === 0) {
-    return "Free";
-  }
-
-  const normalizedCurrency = typeof currency === "string" ? currency.trim().toUpperCase() : "";
-
-  if (!normalizedCurrency || normalizedCurrency === "BDT") {
-    return formatBdtCurrency(numericValue);
-  }
-
-  try {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: normalizedCurrency,
-      currencyDisplay: "narrowSymbol",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(numericValue);
-  } catch (error) {
-    const formattedNumber = formatNumber(numericValue);
-    return normalizedCurrency ? `${normalizedCurrency} ${formattedNumber}` : formattedNumber;
-  }
-};
-
 function formatBillingCycle(cycle) {
   if (!cycle) return "";
   return cycle.charAt(0).toUpperCase() + cycle.slice(1).toLowerCase();
-}
-
-function resolveNumeric(value) {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  if (value && typeof value === "object" && typeof value.$numberDecimal === "string") {
-    const parsed = Number(value.$numberDecimal);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 const defaultOrderValues = {
@@ -459,7 +409,9 @@ export default function PlanSelection({ plans }) {
 
     if (flowStep === "confirmation") {
       const paymentDetails = manualPaymentResponse?.payment;
-      const amountValue = resolveNumeric(paymentDetails?.amount ?? orderPayload?.amount ?? selectedPlan?.price);
+      const amountValue = resolveNumericValue(
+        paymentDetails?.amount ?? orderPayload?.amount ?? selectedPlan?.price
+      );
       const currencyValue = paymentDetails?.currency ?? orderPayload?.currency ?? selectedPlan?.currency;
       const gatewayValue = paymentDetails?.paymentGateway ?? orderPayload?.paymentGateway;
       return (

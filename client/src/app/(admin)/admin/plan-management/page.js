@@ -19,6 +19,7 @@ import {
   normalizeAdminPlan,
   updateAdminPlan,
 } from "@/lib/queries/admin-plans";
+import { formatPlanAmount } from "@/lib/formatters";
 
 // Plan management interface for administrators.
 export default function PlanManagementPage() {
@@ -31,16 +32,6 @@ export default function PlanManagementPage() {
   } = useQuery(adminPlansOptions());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
-
-  const formatPrice = (value, currency) => {
-    if (typeof value !== "number" || Number.isNaN(value)) return value;
-    const safeCurrency = currency || "USD";
-    try {
-      return new Intl.NumberFormat("en-US", { style: "currency", currency: safeCurrency }).format(value);
-    } catch {
-      return value.toString();
-    }
-  };
 
   const getErrorMessage = (err, fallback) => {
     if (!err) return fallback;
@@ -214,12 +205,12 @@ export default function PlanManagementPage() {
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={5}>Loading plans...</TableCell>
+                    <TableCell colSpan={6}>Loading plans...</TableCell>
                   </TableRow>
                 )}
                 {errorMessage && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-destructive">
+                    <TableCell colSpan={6} className="text-destructive">
                       {errorMessage}
                     </TableCell>
                   </TableRow>
@@ -228,7 +219,7 @@ export default function PlanManagementPage() {
                   <TableRow key={plan.id}>
                     <TableCell className="font-medium">{plan.name}</TableCell>
                     <TableCell className="text-muted-foreground">{plan.slug}</TableCell>
-                    <TableCell>{formatPrice(plan.price, plan.currency)}</TableCell>
+                    <TableCell>{formatPlanAmount(plan.price, plan.currency)}</TableCell>
                     <TableCell>{plan.billingCycle}</TableCell>
                     <TableCell>
                       <Badge variant={plan.isPublic ? "default" : "secondary"}>
