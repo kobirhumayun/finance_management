@@ -9,6 +9,7 @@ import PageHeader from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { qk } from "@/lib/query-keys";
 import { fetchDashboardOverview } from "@/lib/queries/dashboard";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 const percentFormatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 0,
@@ -64,28 +65,28 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Income"
-          value={showSummaryPlaceholder ? "--" : `BDT ${income.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : formatCurrency(income)}
           description="Month to date"
           icon={Banknote}
           trend={formatTrend(comparisons.income, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Total Expenses"
-          value={showSummaryPlaceholder ? "--" : `BDT ${expenses.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : formatCurrency(expenses)}
           description="Month to date"
           icon={CreditCard}
           trend={formatTrend(comparisons.expense, { fallbackDirection: "down" })}
         />
         <SummaryCard
           title="Net Balance"
-          value={showSummaryPlaceholder ? "--" : `BDT ${net.toLocaleString()}`}
+          value={showSummaryPlaceholder ? "--" : formatCurrency(net)}
           description="After expenses"
           icon={Wallet}
           trend={formatTrend(comparisons.balance, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Active Projects"
-          value={showSummaryPlaceholder ? "--" : projects.toLocaleString()}
+          value={showSummaryPlaceholder ? "--" : formatNumber(projects)}
           description="Tracked in FinTrack"
           icon={Briefcase}
         />
