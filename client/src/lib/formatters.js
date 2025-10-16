@@ -45,11 +45,27 @@ export const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 });
 
-export const numberFormatter = new Intl.NumberFormat("en-IN", {
-  style: "decimal",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+const resolveNumberFormatOptions = (minimumFractionDigits) => {
+  if (typeof minimumFractionDigits === "number" && !Number.isNaN(minimumFractionDigits)) {
+    const normalizedMinimum = Math.max(0, minimumFractionDigits);
+    return {
+      style: "decimal",
+      minimumFractionDigits: normalizedMinimum,
+      maximumFractionDigits: Math.max(normalizedMinimum, 2),
+    };
+  }
+
+  return {
+    style: "decimal",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  };
+};
+
+export const numberFormatter = ({ minimumFractionDigits } = {}) =>
+  new Intl.NumberFormat("en-IN", resolveNumberFormatOptions(minimumFractionDigits));
+
+const defaultNumberFormatter = numberFormatter();
 
 export const currencySymbol =
   currencyFormatter
@@ -65,13 +81,21 @@ export const formatCurrency = (value, { fallback = FALLBACK_DISPLAY } = {}) => {
   return currencyFormatter.format(numericValue);
 };
 
-export const formatNumber = (value, { fallback = FALLBACK_DISPLAY } = {}) => {
+export const formatNumber = (
+  value,
+  { fallback = FALLBACK_DISPLAY, minimumFractionDigits } = {}
+) => {
   const numericValue = toNumeric(value);
   if (numericValue === null) {
     return fallback;
   }
 
-  return numberFormatter.format(numericValue);
+  const formatter =
+    typeof minimumFractionDigits === "number"
+      ? numberFormatter({ minimumFractionDigits })
+      : defaultNumberFormatter;
+
+  return formatter.format(numericValue);
 };
 
 export const resolveNumericValue = (value) => toNumeric(value);
@@ -102,7 +126,7 @@ export const formatCurrencyWithCode = (
       maximumFractionDigits: 2,
     }).format(numericValue);
   } catch (error) {
-    const formattedNumber = numberFormatter.format(numericValue);
+    const formattedNumber = defaultNumberFormatter.format(numericValue);
     return normalizedCurrency
       ? `${normalizedCurrency} ${formattedNumber}`
       : formattedNumber;
