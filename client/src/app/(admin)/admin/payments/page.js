@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { qk } from "@/lib/query-keys";
 import { toast } from "@/components/ui/sonner";
 import { adminPaymentsOptions, approveAdminPayment } from "@/lib/queries/admin-payments";
+import { formatNumber } from "@/lib/formatters";
 
 // Payments moderation view for administrators.
 export default function AdminPaymentsPage() {
@@ -197,8 +198,12 @@ export default function AdminPaymentsPage() {
       </Card>
       {showPaginationSummary ? (
         <p className="text-sm text-muted-foreground">
-          Showing {payments.length} {filters.status ? `${formatStatusLabel(filters.status).toLowerCase()} ` : ""}payments
-          {typeof pagination.totalItems === "number" ? ` (of ${pagination.totalItems})` : ""}.
+          Showing {formatNumber(payments.length, { fallback: "0" })}{" "}
+          {filters.status ? `${formatStatusLabel(filters.status).toLowerCase()} ` : ""}payments
+          {typeof pagination.totalItems === "number"
+            ? ` (of ${formatNumber(pagination.totalItems, { fallback: "0" })})`
+            : ""}
+          .
         </p>
       ) : null}
       {errorMessage ? (

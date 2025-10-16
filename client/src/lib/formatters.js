@@ -76,22 +76,14 @@ export const formatNumber = (value, { fallback = FALLBACK_DISPLAY } = {}) => {
 
 export const resolveNumericValue = (value) => toNumeric(value);
 
-export const formatPlanAmount = (
+export const formatCurrencyWithCode = (
   value,
   currency,
-  { fallback = null, zeroLabel = "Free" } = {}
+  { fallback = FALLBACK_DISPLAY } = {}
 ) => {
   const numericValue = toNumeric(value);
-
   if (numericValue === null) {
-    if (fallback !== null && fallback !== undefined) {
-      return fallback;
-    }
-    return formatNumber(value);
-  }
-
-  if (numericValue === 0) {
-    return zeroLabel;
+    return fallback;
   }
 
   const normalizedCurrency =
@@ -115,4 +107,32 @@ export const formatPlanAmount = (
       ? `${normalizedCurrency} ${formattedNumber}`
       : formattedNumber;
   }
+};
+
+export const formatPlanAmount = (
+  value,
+  currency,
+  { fallback = null, zeroLabel = "Free" } = {}
+) => {
+  const numericValue = toNumeric(value);
+
+  if (numericValue === null) {
+    if (fallback !== null && fallback !== undefined) {
+      return fallback;
+    }
+    return formatNumber(value);
+  }
+
+  if (numericValue === 0) {
+    if (zeroLabel !== null && zeroLabel !== undefined) {
+      return zeroLabel;
+    }
+    return formatCurrencyWithCode(0, currency, {
+      fallback: fallback ?? FALLBACK_DISPLAY,
+    });
+  }
+
+  return formatCurrencyWithCode(numericValue, currency, {
+    fallback: fallback ?? FALLBACK_DISPLAY,
+  });
 };
