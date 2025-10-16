@@ -91,6 +91,9 @@ const getBarSizing = (groups) => {
   return { barCategoryGap: "16%", barGap: 12, barSize: 24 };
 };
 
+const getPositiveNumber = (value) =>
+  Number.isFinite(value) && value > 0 ? value : undefined;
+
 function ChartLegend({ payload }) {
   if (!payload || payload.length === 0) {
     return null;
@@ -154,45 +157,35 @@ function IncomeExpenseTooltipCursor({
 }) {
   const color = fill || "var(--ring)";
 
-  const plotHeight = Number.isFinite(height) && height > 0
-    ? height
-    : Number.isFinite(viewBox?.height) && viewBox.height > 0
-      ? viewBox.height
-      : null;
+  const plotHeight = getPositiveNumber(height) ?? getPositiveNumber(viewBox?.height);
 
-  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
+  if (plotHeight === undefined) {
     return null;
   }
 
-  const plotTop = Number.isFinite(y)
-    ? y
-    : Number.isFinite(viewBox?.y)
-      ? viewBox.y
-      : 0;
+  const fallbackTop = Number.isFinite(viewBox?.y) ? viewBox.y : 0;
+  const plotTop = Number.isFinite(y) ? y : getPositiveNumber(viewBox?.y) ?? fallbackTop;
 
-  const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
-  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
+  const fallbackLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
+  const plotLeft = getPositiveNumber(viewBox?.x) ?? fallbackLeft;
+  const viewBoxWidth = getPositiveNumber(viewBox?.width);
   const segments = Math.max(Number(itemCount) || 0, 1);
 
-  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+  let resolvedWidth = getPositiveNumber(width);
 
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    if (Number.isFinite(bandSize) && bandSize > 0) {
-      resolvedWidth = bandSize;
-    }
+  if (resolvedWidth === undefined) {
+    resolvedWidth = getPositiveNumber(bandSize);
   }
 
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
-      resolvedWidth = viewBoxWidth / segments;
-    }
+  if (resolvedWidth === undefined && viewBoxWidth !== undefined) {
+    resolvedWidth = getPositiveNumber(viewBoxWidth / segments);
   }
 
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+  if (resolvedWidth === undefined) {
     return null;
   }
 
-  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+  if (viewBoxWidth !== undefined) {
     const maxWidth = viewBoxWidth / segments;
     if (resolvedWidth > maxWidth * 1.5) {
       resolvedWidth = maxWidth;
@@ -217,7 +210,7 @@ function IncomeExpenseTooltipCursor({
         ? averagePoint - resolvedWidth / 2
         : plotLeft;
 
-  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+  if (viewBoxWidth !== undefined) {
     const maxX = plotLeft + viewBoxWidth - resolvedWidth;
     resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
   } else {
