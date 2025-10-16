@@ -167,7 +167,7 @@ export default function ReportsPage() {
     {
       key: "transactions",
       label: "Transactions",
-      value: formatNumber(summaryCounts.total),
+      value: formatNumber(summaryCounts.total, { minimumFractionDigits: 0 }),
       description: "Total records in the selected range",
     },
   ];
