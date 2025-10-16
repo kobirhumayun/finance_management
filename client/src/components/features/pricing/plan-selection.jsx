@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/sonner";
 import { createPlanOrder, submitManualPayment } from "@/lib/plans";
+import { formatCurrency as formatBdtCurrency, formatNumber } from "@/lib/formatters";
 
 const orderSchema = z.object({
   planId: z.string().min(1, "Plan is required"),
@@ -42,22 +43,36 @@ const manualPaymentSchema = z.object({
   gatewayTransactionId: z.string().min(3, "Provide the transaction reference"),
 });
 
-function formatCurrency(value, currency) {
-  if (Number(value) === 0) {
+const formatPlanAmount = (value, currency) => {
+  const numericValue = resolveNumeric(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return formatNumber(value);
+  }
+
+  if (numericValue === 0) {
     return "Free";
   }
 
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(Number(value));
-  } catch (error) {
-    return `${currency || ""} ${value}`.trim();
+  const normalizedCurrency = typeof currency === "string" ? currency.trim().toUpperCase() : "";
+
+  if (!normalizedCurrency || normalizedCurrency === "BDT") {
+    return formatBdtCurrency(numericValue);
   }
-}
+
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: normalizedCurrency,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numericValue);
+  } catch (error) {
+    const formattedNumber = formatNumber(numericValue);
+    return normalizedCurrency ? `${normalizedCurrency} ${formattedNumber}` : formattedNumber;
+  }
+};
 
 function formatBillingCycle(cycle) {
   if (!cycle) return "";
@@ -65,19 +80,22 @@ function formatBillingCycle(cycle) {
 }
 
 function resolveNumeric(value) {
-  if (typeof value === "number") return value;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
   if (typeof value === "string") {
     const parsed = Number(value);
-    return Number.isNaN(parsed) ? 0 : parsed;
+    return Number.isFinite(parsed) ? parsed : null;
   }
-  if (value && typeof value === "object") {
-    if (typeof value.$numberDecimal === "string") {
-      const parsed = Number(value.$numberDecimal);
-      return Number.isNaN(parsed) ? 0 : parsed;
-    }
+
+  if (value && typeof value === "object" && typeof value.$numberDecimal === "string") {
+    const parsed = Number(value.$numberDecimal);
+    return Number.isFinite(parsed) ? parsed : null;
   }
+
   const parsed = Number(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 const defaultOrderValues = {
@@ -382,7 +400,7 @@ export default function PlanSelection({ plans }) {
             </p>
             {orderResponse?.status && <p className="text-muted-foreground">Status: {orderResponse.status}</p>}
             <p className="text-muted-foreground">
-              {formatCurrency(orderPayload?.amount ?? selectedPlan.price, orderPayload?.currency ?? selectedPlan.currency)} · {formatBillingCycle(selectedPlan.billingCycle)} billing
+              {formatPlanAmount(orderPayload?.amount ?? selectedPlan.price, orderPayload?.currency ?? selectedPlan.currency)} · {formatBillingCycle(selectedPlan.billingCycle)} billing
             </p>
           </div>
           <form id="manual-payment-form" className="mt-4 space-y-4" onSubmit={manualPaymentForm.handleSubmit(handleManualPaymentSubmit)}>
@@ -452,7 +470,7 @@ export default function PlanSelection({ plans }) {
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>Status: {manualPaymentResponse?.payment?.status || "pending"}</p>
-            <p>Amount: {formatCurrency(amountValue, currencyValue)}</p>
+            <p>Amount: {formatPlanAmount(amountValue, currencyValue)}</p>
             {gatewayValue && <p>Gateway: {gatewayValue}</p>}
             {manualPaymentResponse?.payment?.processedAt && (
               <p>Processed at: {new Date(manualPaymentResponse.payment.processedAt).toLocaleString()}</p>
@@ -496,7 +514,7 @@ export default function PlanSelection({ plans }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-3xl font-semibold">{formatCurrency(plan.price, plan.currency)}</p>
+                <p className="text-3xl font-semibold">{formatPlanAmount(plan.price, plan.currency)}</p>
                 <p className="text-sm text-muted-foreground">{formatBillingCycle(plan.billingCycle)}</p>
               </div>
               <ul className="space-y-2 text-sm">
