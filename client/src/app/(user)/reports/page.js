@@ -16,8 +16,14 @@ import { qk } from "@/lib/query-keys";
 import { fetchReportCharts, fetchReportFilters } from "@/lib/queries/reports";
 import { toNumeric } from "@/lib/utils/numbers";
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const integerFormatter = new Intl.NumberFormat("en-US");
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "BDT",
+  currencyDisplay: "narrowSymbol",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+const integerFormatter = new Intl.NumberFormat("en-IN");
 
 const toNumber = (value) => toNumeric(value);
 
@@ -285,11 +291,17 @@ export default function ReportsPage() {
         <p className="text-sm text-muted-foreground">Loading charts…</p>
       )}
 
-      <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
-      <CashFlowChart data={chartsData?.cashFlow || []} />
+      <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} isLoading={chartsLoading} />
+      <CashFlowChart data={chartsData?.cashFlow || []} isLoading={chartsLoading} />
       <div className="grid gap-6 lg:grid-cols-2">
-        <IncomeCategoryChart data={chartsData?.incomeByCategory || []} />
-        <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
+        <IncomeCategoryChart
+          data={chartsData?.incomeByCategory || []}
+          isLoading={chartsLoading}
+        />
+        <ExpenseCategoryChart
+          data={chartsData?.expenseByCategory || []}
+          isLoading={chartsLoading}
+        />
       </div>
     </div>
   );

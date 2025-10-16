@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCSSVariable } from "@/hooks/use-css-variable";
 import { toNumeric } from "@/lib/utils/numbers";
+import { ChartLoadingOverlay } from "./chart-loading-overlay";
 
 const normalizeLabel = (value) => {
   if (typeof value === "string") {
@@ -146,11 +147,11 @@ function ExpenseCategoryLegend({ payload, total }) {
   );
 }
 
-export default function ExpenseCategoryChart({ data = [] }) {
+export default function ExpenseCategoryChart({ data = [], isLoading = false }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const total = useMemo(
     () => chartData.reduce((sum, entry) => sum + (entry.value ?? 0), 0),
-    [chartData]
+    [chartData],
   );
 
   const chart1 = useCSSVariable("--chart-1");
@@ -161,6 +162,7 @@ export default function ExpenseCategoryChart({ data = [] }) {
   const chartPrimary = useCSSVariable("--primary");
   const chartIncome = useCSSVariable("--chart-income");
   const chartExpense = useCSSVariable("--chart-expense");
+  const ringColor = useCSSVariable("--ring");
 
   const palette = useMemo(
     () => {
@@ -233,18 +235,16 @@ export default function ExpenseCategoryChart({ data = [] }) {
   );
 
   const emptyState = chartData.length === 0 || total <= 0;
+  const highlightColor =
+    ringColor || chartExpense || chartPrimary || chart1 || chart2 || chart3 || chart4 || chart5;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Expense by Category</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
-        {emptyState ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No categorized expense data is available for the selected filters.
-          </div>
-        ) : (
+      <CardContent className="relative h-[320px]">
+        {!emptyState ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart margin={{ top: 12, bottom: 12 }}>
               <Pie
@@ -284,6 +284,15 @@ export default function ExpenseCategoryChart({ data = [] }) {
               <Legend verticalAlign="bottom" height={60} content={legendRenderer} />
             </PieChart>
           </ResponsiveContainer>
+        ) : (
+          !isLoading && (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              No categorized expense data is available for the selected filters.
+            </div>
+          )
+        )}
+        {isLoading && (
+          <ChartLoadingOverlay label="Loading expense categories…" color={highlightColor} />
         )}
       </CardContent>
     </Card>

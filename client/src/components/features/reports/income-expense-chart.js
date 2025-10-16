@@ -17,6 +17,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
+import { ChartLoadingOverlay } from "./chart-loading-overlay";
 
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) {
@@ -91,6 +92,9 @@ const getBarSizing = (groups) => {
   return { barCategoryGap: "16%", barGap: 12, barSize: 24 };
 };
 
+const getPositiveNumber = (value) =>
+  Number.isFinite(value) && value > 0 ? value : undefined;
+
 function ChartLegend({ payload }) {
   if (!payload || payload.length === 0) {
     return null;
@@ -154,45 +158,35 @@ function IncomeExpenseTooltipCursor({
 }) {
   const color = fill || "var(--ring)";
 
-  const plotHeight = Number.isFinite(height) && height > 0
-    ? height
-    : Number.isFinite(viewBox?.height) && viewBox.height > 0
-      ? viewBox.height
-      : null;
+  const plotHeight = getPositiveNumber(height) ?? getPositiveNumber(viewBox?.height);
 
-  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
+  if (plotHeight === undefined) {
     return null;
   }
 
-  const plotTop = Number.isFinite(y)
-    ? y
-    : Number.isFinite(viewBox?.y)
-      ? viewBox.y
-      : 0;
+  const fallbackTop = Number.isFinite(viewBox?.y) ? viewBox.y : 0;
+  const plotTop = Number.isFinite(y) ? y : getPositiveNumber(viewBox?.y) ?? fallbackTop;
 
-  const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
-  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
+  const fallbackLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
+  const plotLeft = getPositiveNumber(viewBox?.x) ?? fallbackLeft;
+  const viewBoxWidth = getPositiveNumber(viewBox?.width);
   const segments = Math.max(Number(itemCount) || 0, 1);
 
-  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+  let resolvedWidth = getPositiveNumber(width);
 
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    if (Number.isFinite(bandSize) && bandSize > 0) {
-      resolvedWidth = bandSize;
-    }
+  if (resolvedWidth === undefined) {
+    resolvedWidth = getPositiveNumber(bandSize);
   }
 
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
-    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
-      resolvedWidth = viewBoxWidth / segments;
-    }
+  if (resolvedWidth === undefined && viewBoxWidth !== undefined) {
+    resolvedWidth = getPositiveNumber(viewBoxWidth / segments);
   }
 
-  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+  if (resolvedWidth === undefined) {
     return null;
   }
 
-  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+  if (viewBoxWidth !== undefined) {
     const maxWidth = viewBoxWidth / segments;
     if (resolvedWidth > maxWidth * 1.5) {
       resolvedWidth = maxWidth;
@@ -217,7 +211,7 @@ function IncomeExpenseTooltipCursor({
         ? averagePoint - resolvedWidth / 2
         : plotLeft;
 
-  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+  if (viewBoxWidth !== undefined) {
     const maxX = plotLeft + viewBoxWidth - resolvedWidth;
     resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
   } else {
@@ -237,7 +231,7 @@ function IncomeExpenseTooltipCursor({
   );
 }
 
-export default function IncomeExpenseChart({ data = [] }) {
+export default function IncomeExpenseChart({ data = [], isLoading = false }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const hasSeries = chartData.some((row) => row.income !== 0 || row.expense !== 0);
 
@@ -284,19 +278,15 @@ export default function IncomeExpenseChart({ data = [] }) {
     [resetActiveBar]
   );
 
+  const hasRenderableSeries = chartData.length > 0 && hasSeries;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Income vs. Expense</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
-        {chartData.length === 0 || !hasSeries ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            {chartData.length === 0
-              ? "No income or expense data available for the selected filters."
-              : "No recorded income or expenses for the selected period."}
-          </div>
-        ) : (
+      <CardContent className="relative h-[320px]">
+        {hasRenderableSeries ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
@@ -380,6 +370,17 @@ export default function IncomeExpenseChart({ data = [] }) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        ) : (
+          !isLoading && (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {chartData.length === 0
+                ? "No income or expense data available for the selected filters."
+                : "No recorded income or expenses for the selected period."}
+            </div>
+          )
+        )}
+        {isLoading && (
+          <ChartLoadingOverlay label="Loading income and expense data…" color={highlightColor} />
         )}
       </CardContent>
     </Card>

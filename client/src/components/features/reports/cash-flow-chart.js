@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
+import { ChartLoadingOverlay } from "./chart-loading-overlay";
 
 const CHART_MARGIN = { top: 16, right: 16, bottom: 48, left: 16 };
 
@@ -181,7 +182,7 @@ function CashFlowTooltipCursor({
   );
 }
 
-export default function CashFlowChart({ data = [] }) {
+export default function CashFlowChart({ data = [], isLoading = false }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const yAxisDomain = useMemo(() => getYAxisDomain(chartData), [chartData]);
 
@@ -196,7 +197,7 @@ export default function CashFlowChart({ data = [] }) {
       <CardHeader>
         <CardTitle>Cash Flow Trend</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
+      <CardContent className="relative h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={CHART_MARGIN}>
             <CartesianGrid stroke={borderColor || undefined} vertical={false} strokeDasharray="3 3" />
@@ -260,6 +261,9 @@ export default function CashFlowChart({ data = [] }) {
             />
           </LineChart>
         </ResponsiveContainer>
+        {isLoading && (
+          <ChartLoadingOverlay label="Loading cash flow data…" color={highlightColor} />
+        )}
       </CardContent>
     </Card>
   );
