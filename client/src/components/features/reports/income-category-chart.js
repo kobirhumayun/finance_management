@@ -1,4 +1,4 @@
-// File: src/components/features/reports/expense-category-chart.js
+// File: src/components/features/reports/income-category-chart.js
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
@@ -65,7 +65,7 @@ const calculatePercent = (value, total) => {
   return `${percent.toFixed(percent >= 10 ? 0 : 1)}%`;
 };
 
-function ExpenseCategoryTooltip({ active, payload }) {
+function IncomeCategoryTooltip({ active, payload }) {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
@@ -90,7 +90,7 @@ function ExpenseCategoryTooltip({ active, payload }) {
   );
 }
 
-function ExpenseCategoryTotalLabel({ viewBox, total }) {
+function IncomeCategoryTotalLabel({ viewBox, total }) {
   if (!Number.isFinite(total) || total <= 0) {
     return null;
   }
@@ -114,7 +114,7 @@ function ExpenseCategoryTotalLabel({ viewBox, total }) {
   );
 }
 
-function ExpenseCategoryLegend({ payload, total }) {
+function IncomeCategoryLegend({ payload, total }) {
   if (!payload || payload.length === 0 || !Number.isFinite(total) || total <= 0) {
     return null;
   }
@@ -146,11 +146,11 @@ function ExpenseCategoryLegend({ payload, total }) {
   );
 }
 
-export default function ExpenseCategoryChart({ data = [] }) {
+export default function IncomeCategoryChart({ data = [] }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const total = useMemo(
     () => chartData.reduce((sum, entry) => sum + (entry.value ?? 0), 0),
-    [chartData]
+    [chartData],
   );
 
   const chart1 = useCSSVariable("--chart-1");
@@ -187,16 +187,7 @@ export default function ExpenseCategoryChart({ data = [] }) {
 
       return resolved;
     },
-    [
-      chart1,
-      chart2,
-      chart3,
-      chart4,
-      chart5,
-      chartPrimary,
-      chartIncome,
-      chartExpense,
-    ]
+    [chart1, chart2, chart3, chart4, chart5, chartPrimary, chartIncome, chartExpense],
   );
 
   const [activeIndex, setActiveIndex] = useState(null);
@@ -210,26 +201,29 @@ export default function ExpenseCategoryChart({ data = [] }) {
   }, []);
 
   const legendRenderer = useCallback(
-    (legendProps) => <ExpenseCategoryLegend {...legendProps} total={total} />,
-    [total]
+    (legendProps) => <IncomeCategoryLegend {...legendProps} total={total} />,
+    [total],
   );
 
-  const tooltipRenderer = useCallback((tooltipProps) => {
-    if (!tooltipProps?.payload?.[0]) {
-      return null;
-    }
+  const tooltipRenderer = useCallback(
+    (tooltipProps) => {
+      if (!tooltipProps?.payload?.[0]) {
+        return null;
+      }
 
-    const enrichedPayload = tooltipProps.payload.map((item) => ({
-      ...item,
-      payload: { ...item.payload, total },
-    }));
+      const enrichedPayload = tooltipProps.payload.map((item) => ({
+        ...item,
+        payload: { ...item.payload, total },
+      }));
 
-    return <ExpenseCategoryTooltip {...tooltipProps} payload={enrichedPayload} />;
-  }, [total]);
+      return <IncomeCategoryTooltip {...tooltipProps} payload={enrichedPayload} />;
+    },
+    [total],
+  );
 
   const labelRenderer = useCallback(
-    (labelProps) => <ExpenseCategoryTotalLabel {...labelProps} total={total} />,
-    [total]
+    (labelProps) => <IncomeCategoryTotalLabel {...labelProps} total={total} />,
+    [total],
   );
 
   const emptyState = chartData.length === 0 || total <= 0;
@@ -237,12 +231,12 @@ export default function ExpenseCategoryChart({ data = [] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Expense by Category</CardTitle>
+        <CardTitle>Income by Category</CardTitle>
       </CardHeader>
       <CardContent className="h-[320px]">
         {emptyState ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No categorized expense data is available for the selected filters.
+            No categorized income data is available for the selected filters.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -276,11 +270,7 @@ export default function ExpenseCategoryChart({ data = [] }) {
                 })}
                 <Label position="center" content={labelRenderer} />
               </Pie>
-              <Tooltip
-                cursor={false}
-                wrapperClassName="text-sm"
-                content={tooltipRenderer}
-              />
+              <Tooltip cursor={false} wrapperClassName="text-sm" content={tooltipRenderer} />
               <Legend verticalAlign="bottom" height={60} content={legendRenderer} />
             </PieChart>
           </ResponsiveContainer>
@@ -289,3 +279,4 @@ export default function ExpenseCategoryChart({ data = [] }) {
     </Card>
   );
 }
+

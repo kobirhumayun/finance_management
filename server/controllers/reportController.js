@@ -167,6 +167,11 @@ const getCharts = async (req, res, next) => {
                 {
                     $group: {
                         _id: '$subcategory',
+                        income: {
+                            $sum: {
+                                $cond: [{ $eq: ['$type', 'cash_in'] }, '$amount', 0],
+                            },
+                        },
                         expense: {
                             $sum: {
                                 $cond: [{ $eq: ['$type', 'cash_out'] }, '$amount', 0],
@@ -251,6 +256,25 @@ const getCharts = async (req, res, next) => {
                 return b.value - a.value;
             });
 
+        const incomeByCategory = categoryAggregation
+            .map((item) => {
+                const name = typeof item._id === 'string' ? item._id.trim() : '';
+                const value = toSafeNumber(item.income);
+
+                if (!name || value <= 0) {
+                    return null;
+                }
+
+                return { name, value };
+            })
+            .filter(Boolean)
+            .sort((a, b) => {
+                if (b.value === a.value) {
+                    return a.name.localeCompare(b.name);
+                }
+                return b.value - a.value;
+            });
+
         const stats = statsAggregation[0] || {};
         const totalIncome = toSafeNumber(stats.income);
         const totalExpense = toSafeNumber(stats.expense);
@@ -264,6 +288,7 @@ const getCharts = async (req, res, next) => {
         res.status(200).json({
             incomeVsExpense,
             expenseByCategory,
+            incomeByCategory,
             cashFlow,
             summary: {
                 income: totalIncome,

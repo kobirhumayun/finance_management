@@ -217,7 +217,7 @@ const normalizeCashFlowSeries = (series) => {
     .filter(Boolean);
 };
 
-const normalizeExpenseByCategory = (series) => {
+const normalizeCategoryBreakdown = (series) => {
   if (!Array.isArray(series)) {
     return [];
   }
@@ -266,7 +266,8 @@ export async function fetchReportCharts({ projectId, type, startDate, endDate, s
   return {
     incomeVsExpense: normalizeIncomeExpenseSeries(response?.incomeVsExpense),
     cashFlow: normalizeCashFlowSeries(response?.cashFlow),
-    expenseByCategory: normalizeExpenseByCategory(response?.expenseByCategory),
+    incomeByCategory: normalizeCategoryBreakdown(response?.incomeByCategory),
+    expenseByCategory: normalizeCategoryBreakdown(response?.expenseByCategory),
     summary: normalizeSummary(response?.summary),
     dateRange: normalizeAppliedDateRange(response?.dateRange),
     filters: normalizeChartsFilters(response?.filters ?? {}),

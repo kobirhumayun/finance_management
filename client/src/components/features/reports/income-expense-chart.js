@@ -1,13 +1,13 @@
-// File: src/components/features/reports/income-expense-chart.js
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Legend,
+  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -18,10 +18,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
 
-const toNumber = (value) => toNumeric(value);
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const formatCurrencyTick = (value) => {
+  if (!Number.isFinite(value)) {
+    return "৳0";
+  }
 
-const toMonthLabel = (value) => {
+  const absolute = Math.abs(value);
+  if (absolute >= 1_000_000_000_000) return `৳${(value / 1_000_000_000_000).toFixed(1)}T`;
+  if (absolute >= 1_000_000_000) return `৳${(value / 1_000_000_000).toFixed(1)}B`;
+  if (absolute >= 1_000_000) return `৳${(value / 1_000_000).toFixed(1)}M`;
+  if (absolute >= 1_000) return `৳${(value / 1_000).toFixed(1)}k`;
+
+  return `৳${value.toLocaleString()}`;
+};
+
+const formatCurrency = (value) => `৳${toNumeric(value).toLocaleString()}`;
+
+const normalizeMonth = (value) => {
   if (typeof value === "string") {
     return value.trim();
   }
@@ -31,92 +44,63 @@ const toMonthLabel = (value) => {
   return String(value);
 };
 
-const formatCurrencyTick = (value) => {
-  if (!Number.isFinite(value)) {
-    return "$0";
-  }
+const buildChartData = (data) => {
+  if (!Array.isArray(data)) return [];
 
-  const absolute = Math.abs(value);
-  if (absolute >= 1_000_000_000_000) {
-    return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
-  }
-  if (absolute >= 1_000_000_000) {
-    return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  }
-  if (absolute >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
-  }
-  if (absolute >= 1_000) {
-    return `$${(value / 1_000).toFixed(1)}k`;
-  }
-  return `$${value.toLocaleString()}`;
+  return data
+    .map((entry) => {
+      const month = normalizeMonth(entry?.month);
+      if (!month) return null;
+
+      return {
+        month,
+        income: toNumeric(entry?.income),
+        expense: toNumeric(entry?.expense),
+      };
+    })
+    .filter(Boolean);
 };
 
-const useElementSize = () => {
-  const ref = useRef(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
+const getYAxisDomain = (rows) => {
+  const maxSeriesValue = rows.reduce((max, item) => {
+    return Math.max(max, Math.abs(item.income ?? 0), Math.abs(item.expense ?? 0));
+  }, 0);
 
-  useEffect(() => {
-    if (!ref.current || typeof ResizeObserver === "undefined") {
-      return undefined;
-    }
+  if (!Number.isFinite(maxSeriesValue) || maxSeriesValue <= 0) {
+    return [0, "auto"];
+  }
 
-    const updateSizeFromEntry = (entry) => {
-      if (!entry) return;
-      const rect = entry.contentRect ?? entry;
-      const { width, height } = rect || {};
-      if (typeof width === "number" && typeof height === "number") {
-        setSize({ width, height });
-      }
-    };
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      updateSizeFromEntry(entry);
-    });
-
-    observer.observe(ref.current);
-
-    updateSizeFromEntry(ref.current.getBoundingClientRect?.());
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  return [ref, size];
+  return [0, maxSeriesValue];
 };
 
-const formatCurrency = (value) => `$${toNumber(value).toLocaleString()}`;
+const getBarSizing = (groups) => {
+  if (!groups) {
+    return { barCategoryGap: "30%", barGap: 16, barSize: 32 };
+  }
 
-const CHART_MARGIN = { top: 8, right: 16, bottom: 0, left: 8 };
-const X_AXIS_HEIGHT = 32;
+  if (groups <= 3) {
+    return { barCategoryGap: "45%", barGap: 24, barSize: 40 };
+  }
+  if (groups <= 6) {
+    return { barCategoryGap: "30%", barGap: 18, barSize: 36 };
+  }
+  if (groups <= 10) {
+    return { barCategoryGap: "20%", barGap: 14, barSize: 30 };
+  }
 
-function ChartLegend({ payload, onHeightChange }) {
-  const [legendRef, { height }] = useElementSize();
+  return { barCategoryGap: "16%", barGap: 12, barSize: 24 };
+};
 
-  useEffect(() => {
-    if (typeof onHeightChange === "function") {
-      onHeightChange(height);
-    }
-  }, [height, onHeightChange]);
-
+function ChartLegend({ payload }) {
   if (!payload || payload.length === 0) {
     return null;
   }
 
   return (
-    <div
-      ref={legendRef}
-      className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground"
-    >
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
       {payload.map((entry, index) => (
         <div key={entry.dataKey ?? entry.value ?? index} className="flex items-center gap-2">
-          <span
-            className="h-2.5 w-2.5 rounded-full"
-            style={{ backgroundColor: entry.color }}
-            aria-hidden
-          />
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden />
           <span className="font-medium text-foreground">{entry.value}</span>
         </div>
       ))}
@@ -124,14 +108,15 @@ function ChartLegend({ payload, onHeightChange }) {
   );
 }
 
-function IncomeExpenseTooltip({ active, payload, label }) {
+function IncomeExpenseTooltipContent({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
 
-  const income = payload.find((p) => p.dataKey === "income")?.value ?? 0;
-  const expense = payload.find((p) => p.dataKey === "expense")?.value ?? 0;
-  const balance = toNumber(income) - toNumber(expense);
+  const income = payload.find((item) => item.dataKey === "income")?.value ?? 0;
+  const expense = payload.find((item) => item.dataKey === "expense")?.value ?? 0;
+  const balance = toNumeric(income) - toNumeric(expense);
+
   return (
     <div className="min-w-[200px] rounded-md border bg-popover p-3 text-sm shadow-md">
       <div className="mb-2 font-medium">{label}</div>
@@ -139,11 +124,7 @@ function IncomeExpenseTooltip({ active, payload, label }) {
         {payload.map((entry) => (
           <div key={entry.dataKey} className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-2">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: entry.color }}
-                aria-hidden
-              />
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden />
               {entry.name}
             </span>
             <span className="font-medium">{formatCurrency(entry.value)}</span>
@@ -158,225 +139,137 @@ function IncomeExpenseTooltip({ active, payload, label }) {
   );
 }
 
-// Bar chart comparing income versus expense across time.
+function IncomeExpenseTooltipCursor({
+  fill,
+  fillOpacity = 0.16,
+  itemCount = 1,
+  bandSize,
+  points,
+  x,
+  y,
+  width,
+  height,
+  viewBox,
+  activeCoordinate,
+}) {
+  const color = fill || "var(--ring)";
+
+  const plotHeight = Number.isFinite(height) && height > 0
+    ? height
+    : Number.isFinite(viewBox?.height) && viewBox.height > 0
+      ? viewBox.height
+      : null;
+
+  if (!Number.isFinite(plotHeight) || plotHeight <= 0) {
+    return null;
+  }
+
+  const plotTop = Number.isFinite(y)
+    ? y
+    : Number.isFinite(viewBox?.y)
+      ? viewBox.y
+      : 0;
+
+  const plotLeft = Number.isFinite(viewBox?.x) ? viewBox.x : 0;
+  const viewBoxWidth = Number.isFinite(viewBox?.width) && viewBox.width > 0 ? viewBox.width : null;
+  const segments = Math.max(Number(itemCount) || 0, 1);
+
+  let resolvedWidth = Number.isFinite(width) && width > 0 ? width : null;
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(bandSize) && bandSize > 0) {
+      resolvedWidth = bandSize;
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+      resolvedWidth = viewBoxWidth / segments;
+    }
+  }
+
+  if (!Number.isFinite(resolvedWidth) || resolvedWidth <= 0) {
+    return null;
+  }
+
+  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const maxWidth = viewBoxWidth / segments;
+    if (resolvedWidth > maxWidth * 1.5) {
+      resolvedWidth = maxWidth;
+    }
+  }
+
+  const pointXs = Array.isArray(points)
+    ? points
+        .map((point) => (Number.isFinite(point?.x) ? point.x : null))
+        .filter((value) => Number.isFinite(value))
+    : [];
+
+  const averagePoint = pointXs.length > 0
+    ? pointXs.reduce((sum, value) => sum + value, 0) / pointXs.length
+    : null;
+
+  let resolvedX = Number.isFinite(x)
+    ? x
+    : Number.isFinite(activeCoordinate?.x)
+      ? activeCoordinate.x - resolvedWidth / 2
+      : Number.isFinite(averagePoint)
+        ? averagePoint - resolvedWidth / 2
+        : plotLeft;
+
+  if (Number.isFinite(viewBoxWidth) && viewBoxWidth > 0) {
+    const maxX = plotLeft + viewBoxWidth - resolvedWidth;
+    resolvedX = Math.min(Math.max(resolvedX, plotLeft), maxX);
+  } else {
+    resolvedX = Math.max(resolvedX, plotLeft);
+  }
+
+  return (
+    <Rectangle
+      x={resolvedX}
+      y={plotTop}
+      width={resolvedWidth}
+      height={plotHeight}
+      fill={color}
+      fillOpacity={fillOpacity}
+      pointerEvents="none"
+    />
+  );
+}
+
 export default function IncomeExpenseChart({ data = [] }) {
-  const chartData = useMemo(() => {
-    if (!Array.isArray(data)) {
-      return [];
+  const chartData = useMemo(() => buildChartData(data), [data]);
+  const hasSeries = chartData.some((row) => row.income !== 0 || row.expense !== 0);
+
+  const yAxisDomain = useMemo(() => getYAxisDomain(chartData), [chartData]);
+  const barSizing = useMemo(() => getBarSizing(chartData.length), [chartData.length]);
+  const cursorBandSize = useMemo(() => {
+    const totalBarWidth = (barSizing?.barSize ?? 0) * 2;
+    const gap = typeof barSizing?.barGap === "number" ? barSizing.barGap : 0;
+
+    const estimatedWidth = totalBarWidth + gap;
+
+    if (!Number.isFinite(estimatedWidth) || estimatedWidth <= 0) {
+      return undefined;
     }
 
-    return data
-      .map((item) => {
-        const month = toMonthLabel(item?.month);
-        if (!month) {
-          return null;
-        }
-
-        const income = toNumber(item?.income);
-        const expense = toNumber(item?.expense);
-
-        return { month, income, expense };
-      })
-      .filter(Boolean);
-  }, [data]);
-
-  const hasSeries = chartData.some((item) => item.income !== 0 || item.expense !== 0);
-
-  const { maxValue, scaleMarkers } = useMemo(() => {
-    const maxVal = chartData.reduce((max, item) => {
-      return Math.max(max, Math.abs(item.income || 0), Math.abs(item.expense || 0));
-    }, 0);
-
-    if (maxVal <= 0) {
-      return { maxValue: 0, scaleMarkers: [] };
-    }
-
-    const anchors = [1, 0.75, 0.5, 0.25, 0];
-    const markers = anchors.map((ratio) => ({
-      ratio,
-      label: `${Math.round(ratio * 100)}%`,
-      value: formatCurrencyTick(maxVal * ratio),
-      y: maxVal * ratio,
-    }));
-    return { maxValue: maxVal, scaleMarkers: markers };
-  }, [chartData]);
+    return estimatedWidth;
+  }, [barSizing]);
 
   const incomeColor = useCSSVariable("--chart-income");
   const expenseColor = useCSSVariable("--chart-expense");
-  const ringColor = useCSSVariable("--ring");
-  const cursorFill = useCSSVariable("--muted");
   const borderColor = useCSSVariable("--border");
-  const referenceLineColor = borderColor || cursorFill;
+  const ringColor = useCSSVariable("--ring");
+
   const highlightColor = ringColor || incomeColor || expenseColor;
 
-  const [containerRef, { width: containerWidth, height: containerHeight }] = useElementSize();
-  const scaleTrackRef = useRef(null);
-  const [legendHeight, setLegendHeight] = useState(0);
-  const [activeBar, setActiveBar] = useState({ index: null, dataKey: null });
-  const [baselinePosition, setBaselinePosition] = useState(null);
-
-  const groupCount = chartData.length;
-  const seriesPerGroup = 2;
-
-  const sizing = useMemo(() => {
-    if (!containerWidth || groupCount === 0) {
-      return {
-        barSize: undefined,
-        barGap: 12,
-        barCategoryGap: "20%",
-      };
-    }
-
-    const MIN_GROUP_GAP = 8;
-    const MAX_GROUP_GAP = 32;
-    const MIN_SERIES_GAP = 4;
-    const MAX_SERIES_GAP = 24;
-
-    const groupGapPx = clamp(containerWidth * 0.03, MIN_GROUP_GAP, MAX_GROUP_GAP);
-    const totalGroupGap = groupGapPx * Math.max(groupCount - 1, 0);
-    const availableWidth = Math.max(containerWidth - totalGroupGap, 0);
-    const groupWidth = availableWidth / Math.max(groupCount, 1);
-
-    const innerGapPx = seriesPerGroup > 1 ? clamp(groupWidth * 0.08, MIN_SERIES_GAP, MAX_SERIES_GAP) : 0;
-    const totalInnerGap = innerGapPx * Math.max(seriesPerGroup - 1, 0);
-
-    const computedBarSize = (groupWidth - totalInnerGap) / Math.max(seriesPerGroup, 1);
-    const safeBarSize = Math.max(computedBarSize, 1);
-
-    return {
-      barSize: safeBarSize,
-      barGap: innerGapPx,
-      barCategoryGap: groupGapPx,
-    };
-  }, [containerWidth, groupCount, seriesPerGroup]);
-
-  const handleLegendSizeChange = useCallback((height) => {
-    const nextHeight = height || 0;
-    setLegendHeight((previous) => (previous === nextHeight ? previous : nextHeight));
-  }, []);
+  const [activeBar, setActiveBar] = useState({ index: null, key: null });
 
   const resetActiveBar = useCallback(() => {
-    setActiveBar({ index: null, dataKey: null });
+    setActiveBar({ index: null, key: null });
   }, []);
 
-  const chartBottomPadding = X_AXIS_HEIGHT + (legendHeight || 0);
-
-  const chartMargin = useMemo(
-    () => ({ ...CHART_MARGIN, bottom: chartBottomPadding, left: 0 }),
-    [chartBottomPadding]
-  );
-
-  const chartInnerHeight = useMemo(() => {
-    if (!containerHeight) {
-      return null;
-    }
-
-    return Math.max(containerHeight - chartMargin.top - chartMargin.bottom, 0);
-  }, [containerHeight, chartMargin.bottom, chartMargin.top]);
-
-  const plotHeight = useMemo(() => {
-    if (chartInnerHeight === null) {
-      return null;
-    }
-
-    const adjusted = chartInnerHeight - X_AXIS_HEIGHT;
-    return Math.max(adjusted, 0);
-  }, [chartInnerHeight]);
-
-  useLayoutEffect(() => {
-    if (!containerRef.current || !scaleTrackRef.current) {
-      return;
-    }
-
-    const measure = () => {
-      const svg = containerRef.current.querySelector("svg");
-      const scaleRect = scaleTrackRef.current.getBoundingClientRect?.();
-
-      if (!svg || !scaleRect) {
-        setBaselinePosition(null);
-        return;
-      }
-
-      let baselineY = null;
-      const barGroups = svg.querySelectorAll(".recharts-bar-rectangle");
-      barGroups.forEach((group) => {
-        const shape =
-          group.querySelector(".recharts-rectangle") ?? group.querySelector("path") ?? group.firstElementChild;
-        if (!shape?.getBoundingClientRect) {
-          return;
-        }
-        const rect = shape.getBoundingClientRect();
-        if (!Number.isFinite(rect.bottom)) {
-          return;
-        }
-        baselineY = baselineY === null ? rect.bottom : Math.max(baselineY, rect.bottom);
-      });
-
-      if (baselineY === null) {
-        const baselineNode =
-          svg.querySelector(".baseline-reference-line line") ??
-          svg.querySelector(".baseline-reference-line path");
-
-        if (baselineNode?.getBoundingClientRect) {
-          const baselineRect = baselineNode.getBoundingClientRect();
-          baselineY = baselineRect.top + baselineRect.height / 2;
-        }
-      }
-
-      if (baselineY === null || !Number.isFinite(baselineY)) {
-        setBaselinePosition(null);
-        return;
-      }
-
-      const rawOffset = baselineY - scaleRect.top - CHART_MARGIN.top;
-      const contentHeight =
-        (scaleTrackRef.current?.clientHeight ?? 0) - CHART_MARGIN.top - chartBottomPadding;
-      const normalized = clamp(rawOffset, 0, Math.max(contentHeight, 0));
-
-      if (Number.isFinite(normalized)) {
-        setBaselinePosition(normalized);
-      } else {
-        setBaselinePosition(null);
-      }
-    };
-
-    measure();
-    const frame = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(frame);
-  }, [
-    chartBottomPadding,
-    chartData,
-    containerHeight,
-    containerWidth,
-    legendHeight,
-    scaleMarkers.length,
-  ]);
-  const markerLayout = useMemo(() => {
-    if (!scaleMarkers.length) {
-      return [];
-    }
-
-    return scaleMarkers.map((marker) => {
-      if (marker.ratio === 0 && baselinePosition !== null) {
-        return { ...marker, position: baselinePosition };
-      }
-
-      const position =
-        plotHeight === null ? null : CHART_MARGIN.top + plotHeight * (1 - marker.ratio);
-
-      return { ...marker, position };
-    });
-  }, [baselinePosition, plotHeight, scaleMarkers]);
-
-  const yAxisDomain = useMemo(() => {
-    if (!Number.isFinite(maxValue) || maxValue <= 0) {
-      return [0, "auto"];
-    }
-
-    return [0, maxValue];
-  }, [maxValue]);
-
-  const handleChartMouseMove = useCallback(
+  const handleMouseMove = useCallback(
     (state) => {
       if (!state?.isTooltipActive || typeof state.activeTooltipIndex !== "number") {
         resetActiveBar();
@@ -385,7 +278,7 @@ export default function IncomeExpenseChart({ data = [] }) {
 
       setActiveBar({
         index: state.activeTooltipIndex,
-        dataKey: null,
+        key: state.activePayload?.[0]?.dataKey ?? null,
       });
     },
     [resetActiveBar]
@@ -404,132 +297,89 @@ export default function IncomeExpenseChart({ data = [] }) {
               : "No recorded income or expenses for the selected period."}
           </div>
         ) : (
-          <div className="flex h-full items-stretch">
-            <div className="flex w-24 shrink-0 flex-col text-xs text-muted-foreground">
-              <div
-                className="relative flex-1"
-                ref={scaleTrackRef}
-                style={{ paddingTop: CHART_MARGIN.top, paddingBottom: chartBottomPadding }}
-              >
-                <div className="absolute inset-y-0 right-[calc(0.5rem-1px)] w-px rounded-full bg-border" aria-hidden />
-                {markerLayout.map((marker) => {
-                  const isTop = marker.ratio === 1;
-                  const isBottom = marker.ratio === 0;
-                  const translateClass = isTop ? "" : isBottom ? "-translate-y-full" : "-translate-y-1/2";
-                  const alignClass = isTop ? "items-start" : isBottom ? "items-end" : "items-center";
-                  const lineAlignClass = isTop ? "self-start" : isBottom ? "self-end" : "self-center";
-
-                  const topStyle =
-                    marker.position === null
-                      ? { top: `${(1 - marker.ratio) * 100}%` }
-                      : { top: marker.position };
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 16, right: 16, bottom: 48, left: 16 }}
+              barCategoryGap={barSizing.barCategoryGap}
+              barGap={barSizing.barGap}
+              barSize={barSizing.barSize}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={resetActiveBar}
+            >
+              <CartesianGrid stroke={borderColor || undefined} vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                height={32}
+                stroke="currentColor"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                width={72}
+                domain={yAxisDomain}
+                tickFormatter={formatCurrencyTick}
+                stroke="currentColor"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                cursor={
+                  <IncomeExpenseTooltipCursor
+                    itemCount={chartData.length}
+                    fill={highlightColor || incomeColor || expenseColor || "currentColor"}
+                    bandSize={cursorBandSize}
+                  />
+                }
+                content={<IncomeExpenseTooltipContent />}
+              />
+              <ReferenceLine
+                y={0}
+                stroke={borderColor || highlightColor || undefined}
+                strokeWidth={2}
+                strokeOpacity={0.85}
+                ifOverflow="extendDomain"
+                isFront
+              />
+              <Legend
+                verticalAlign="bottom"
+                height={40}
+                content={(props) => <ChartLegend {...props} />}
+              />
+              <Bar dataKey="income" name="Income" fill={incomeColor} radius={[6, 6, 0, 0]}>
+                {chartData.map((_, index) => {
+                  const isActive =
+                    activeBar.index === index && (activeBar.key === null || activeBar.key === "income");
 
                   return (
-                    <div
-                      key={marker.ratio}
-                      className={`absolute right-2 flex gap-2 ${translateClass} ${alignClass}`}
-                      style={topStyle}
-                    >
-                      <div className="text-right leading-tight">
-                        <div className="font-medium text-foreground">{marker.value}</div>
-                        <div className="text-[10px] uppercase tracking-wide">{marker.label}</div>
-                      </div>
-                      <div className={`h-px w-2 bg-border ${lineAlignClass}`} aria-hidden />
-                    </div>
+                    <Cell
+                      key={`income-${index}`}
+                      fill={incomeColor}
+                      stroke={isActive ? highlightColor : undefined}
+                      strokeWidth={isActive ? 2 : 0}
+                    />
                   );
                 })}
-              </div>
-            </div>
-            <div ref={containerRef} className="h-full flex-1 pl-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={chartMargin}
-                  barSize={sizing.barSize}
-                  barGap={sizing.barGap}
-                  barCategoryGap={sizing.barCategoryGap}
-                  onMouseMove={handleChartMouseMove}
-                  onMouseLeave={resetActiveBar}
-                >
-                  <XAxis
-                    dataKey="month"
-                    height={X_AXIS_HEIGHT}
-                    stroke="currentColor"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis hide domain={yAxisDomain} />
-                  <Tooltip
-                    cursor={{ fill: cursorFill || undefined, fillOpacity: 0.2 }}
-                    content={<IncomeExpenseTooltip />}
-                  />
-                  {scaleMarkers
-                    .filter((marker) => marker.ratio > 0)
-                    .map((marker) => (
-                      <ReferenceLine
-                        key={`marker-${marker.ratio}`}
-                        y={marker.y}
-                        stroke={referenceLineColor || undefined}
-                        strokeWidth={1.5}
-                        strokeOpacity={0.5}
-                        ifOverflow="extendDomain"
-                        isFront={false}
-                      />
-                    ))}
-                  <ReferenceLine
-                    y={0}
-                    className="baseline-reference-line"
-                    stroke={referenceLineColor || highlightColor || undefined}
-                    strokeWidth={2}
-                    strokeOpacity={0.8}
-                    ifOverflow="extendDomain"
-                    isFront
-                  />
-                  <Legend
-                    content={(legendProps) => (
-                      <ChartLegend
-                        {...legendProps}
-                        onHeightChange={handleLegendSizeChange}
-                      />
-                    )}
-                  />
-                  <Bar dataKey="income" name="Income" fill={incomeColor}>
-                    {chartData.map((_, index) => {
-                      const isActive =
-                        activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "income");
+              </Bar>
+              <Bar dataKey="expense" name="Expense" fill={expenseColor} radius={[6, 6, 0, 0]}>
+                {chartData.map((_, index) => {
+                  const isActive =
+                    activeBar.index === index && (activeBar.key === null || activeBar.key === "expense");
 
-                      return (
-                        <Cell
-                          key={`income-${index}`}
-                          radius={[4, 4, 0, 0]}
-                          fill={incomeColor}
-                          stroke={isActive ? highlightColor : undefined}
-                          strokeWidth={isActive ? 2 : 0}
-                        />
-                      );
-                    })}
-                  </Bar>
-                  <Bar dataKey="expense" name="Expense" fill={expenseColor}>
-                    {chartData.map((_, index) => {
-                      const isActive =
-                        activeBar.index === index && (activeBar.dataKey === null || activeBar.dataKey === "expense");
-
-                      return (
-                        <Cell
-                          key={`expense-${index}`}
-                          radius={[4, 4, 0, 0]}
-                          fill={expenseColor}
-                          stroke={isActive ? highlightColor : undefined}
-                          strokeWidth={isActive ? 2 : 0}
-                        />
-                      );
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+                  return (
+                    <Cell
+                      key={`expense-${index}`}
+                      fill={expenseColor}
+                      stroke={isActive ? highlightColor : undefined}
+                      strokeWidth={isActive ? 2 : 0}
+                    />
+                  );
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         )}
       </CardContent>
     </Card>

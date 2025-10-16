@@ -6,6 +6,7 @@ import { useQueries } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
 import IncomeExpenseChart from "@/components/features/reports/income-expense-chart";
 import ExpenseCategoryChart from "@/components/features/reports/expense-category-chart";
+import IncomeCategoryChart from "@/components/features/reports/income-category-chart";
 import CashFlowChart from "@/components/features/reports/cash-flow-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -286,7 +287,10 @@ export default function ReportsPage() {
 
       <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
       <CashFlowChart data={chartsData?.cashFlow || []} />
-      <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <IncomeCategoryChart data={chartsData?.incomeByCategory || []} />
+        <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
+      </div>
     </div>
   );
 }

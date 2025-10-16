@@ -79,6 +79,12 @@ const chartSeries = {
     { month: "Dec", income: 28000, expense: 19000 },
     { month: "Jan", income: 30000, expense: 21300 },
   ],
+  incomeByCategory: [
+    { name: "Consulting", value: 34 },
+    { name: "Retainers", value: 28 },
+    { name: "Subscription", value: 22 },
+    { name: "Milestones", value: 16 },
+  ],
   expenseByCategory: [
     { name: "Software", value: 28 },
     { name: "Marketing", value: 22 },
