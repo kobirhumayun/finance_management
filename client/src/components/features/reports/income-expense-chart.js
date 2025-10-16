@@ -94,6 +94,26 @@ const getBarSizing = (groups) => {
 const getPositiveNumber = (value) =>
   Number.isFinite(value) && value > 0 ? value : undefined;
 
+function ChartLoadingOverlay({ label, color }) {
+  const spinnerColor = color || "var(--ring)";
+
+  return (
+    <div
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/80 text-sm text-muted-foreground backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div
+        className="h-10 w-10 animate-spin rounded-full border-4 border-t-transparent"
+        style={{ borderColor: spinnerColor, borderTopColor: "transparent" }}
+        aria-hidden
+      />
+      <span className="font-medium text-foreground">{label}</span>
+    </div>
+  );
+}
+
 function ChartLegend({ payload }) {
   if (!payload || payload.length === 0) {
     return null;
@@ -230,7 +250,7 @@ function IncomeExpenseTooltipCursor({
   );
 }
 
-export default function IncomeExpenseChart({ data = [] }) {
+export default function IncomeExpenseChart({ data = [], isLoading = false }) {
   const chartData = useMemo(() => buildChartData(data), [data]);
   const hasSeries = chartData.some((row) => row.income !== 0 || row.expense !== 0);
 
@@ -277,19 +297,15 @@ export default function IncomeExpenseChart({ data = [] }) {
     [resetActiveBar]
   );
 
+  const hasRenderableSeries = chartData.length > 0 && hasSeries;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Income vs. Expense</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
-        {chartData.length === 0 || !hasSeries ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            {chartData.length === 0
-              ? "No income or expense data available for the selected filters."
-              : "No recorded income or expenses for the selected period."}
-          </div>
-        ) : (
+      <CardContent className="relative h-[320px]">
+        {hasRenderableSeries ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
@@ -373,6 +389,17 @@ export default function IncomeExpenseChart({ data = [] }) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        ) : (
+          !isLoading && (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {chartData.length === 0
+                ? "No income or expense data available for the selected filters."
+                : "No recorded income or expenses for the selected period."}
+            </div>
+          )
+        )}
+        {isLoading && (
+          <ChartLoadingOverlay label="Loading income and expense data…" color={highlightColor} />
         )}
       </CardContent>
     </Card>

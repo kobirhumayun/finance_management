@@ -285,7 +285,7 @@ export default function ReportsPage() {
         <p className="text-sm text-muted-foreground">Loading charts…</p>
       )}
 
-      <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} />
+      <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} isLoading={chartsLoading} />
       <CashFlowChart data={chartsData?.cashFlow || []} />
       <div className="grid gap-6 lg:grid-cols-2">
         <IncomeCategoryChart data={chartsData?.incomeByCategory || []} />
