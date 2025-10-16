@@ -288,8 +288,14 @@ export default function ReportsPage() {
       <IncomeExpenseChart data={chartsData?.incomeVsExpense || []} isLoading={chartsLoading} />
       <CashFlowChart data={chartsData?.cashFlow || []} isLoading={chartsLoading} />
       <div className="grid gap-6 lg:grid-cols-2">
-        <IncomeCategoryChart data={chartsData?.incomeByCategory || []} />
-        <ExpenseCategoryChart data={chartsData?.expenseByCategory || []} />
+        <IncomeCategoryChart
+          data={chartsData?.incomeByCategory || []}
+          isLoading={chartsLoading}
+        />
+        <ExpenseCategoryChart
+          data={chartsData?.expenseByCategory || []}
+          isLoading={chartsLoading}
+        />
       </div>
     </div>
   );
