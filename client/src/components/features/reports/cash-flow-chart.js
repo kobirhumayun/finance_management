@@ -14,27 +14,39 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { currencySymbol, formatCurrency, formatNumber } from "@/lib/formatters";
 import { toNumeric } from "@/lib/utils/numbers";
 import { useCSSVariable } from "@/hooks/use-css-variable";
 import { ChartLoadingOverlay } from "./chart-loading-overlay";
 
 const CHART_MARGIN = { top: 16, right: 16, bottom: 48, left: 16 };
 
+const CURRENCY_SYMBOL = currencySymbol || "৳";
+
 const formatCurrencyTick = (value) => {
   if (!Number.isFinite(value)) {
-    return "৳0";
+    return `${CURRENCY_SYMBOL}0`;
   }
 
   const absolute = Math.abs(value);
-  if (absolute >= 1_000_000_000_000) return `৳${(value / 1_000_000_000_000).toFixed(1)}T`;
-  if (absolute >= 1_000_000_000) return `৳${(value / 1_000_000_000).toFixed(1)}B`;
-  if (absolute >= 1_000_000) return `৳${(value / 1_000_000).toFixed(1)}M`;
-  if (absolute >= 1_000) return `৳${(value / 1_000).toFixed(1)}k`;
+  const thresholds = [
+    { limit: 1_000_000_000_000, divisor: 1_000_000_000_000, suffix: "T" },
+    { limit: 1_000_000_000, divisor: 1_000_000_000, suffix: "B" },
+    { limit: 1_000_000, divisor: 1_000_000, suffix: "M" },
+    { limit: 1_000, divisor: 1_000, suffix: "k" },
+  ];
 
-  return `৳${value.toLocaleString()}`;
+  for (const { limit, divisor, suffix } of thresholds) {
+    if (absolute >= limit) {
+      const scaled = value / divisor;
+      const sign = scaled < 0 ? "-" : "";
+      const magnitude = formatNumber(Math.abs(scaled), { fallback: "0" });
+      return `${sign}${CURRENCY_SYMBOL}${magnitude}${suffix}`;
+    }
+  }
+
+  return formatCurrency(value, { fallback: `${CURRENCY_SYMBOL}0` });
 };
-
-const formatCurrency = (value) => `৳${toNumeric(value).toLocaleString()}`;
 
 const normalizeMonth = (value) => {
   if (typeof value === "string") {

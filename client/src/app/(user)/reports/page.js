@@ -14,21 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { qk } from "@/lib/query-keys";
 import { fetchReportCharts, fetchReportFilters } from "@/lib/queries/reports";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { toNumeric } from "@/lib/utils/numbers";
-
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "BDT",
-  currencyDisplay: "narrowSymbol",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
-const integerFormatter = new Intl.NumberFormat("en-IN");
-
-const toNumber = (value) => toNumeric(value);
-
-const formatCurrency = (value) => currencyFormatter.format(toNumber(value));
-const formatInteger = (value) => integerFormatter.format(Math.round(toNumber(value)));
 
 // Financial reports page featuring interactive filters and charts backed by real data.
 export default function ReportsPage() {
@@ -156,29 +143,31 @@ export default function ReportsPage() {
     total: Number(summaryData.counts?.total) || 0,
   };
 
+  const balanceValue = toNumeric(summaryData.balance);
+
   const summaryMetrics = [
     {
       key: "income",
       label: "Total Income",
       value: formatCurrency(summaryData.income),
-      description: `${formatInteger(summaryCounts.income)} income transactions`,
+      description: `${formatNumber(summaryCounts.income)} income transactions`,
     },
     {
       key: "expense",
       label: "Total Expense",
       value: formatCurrency(summaryData.expense),
-      description: `${formatInteger(summaryCounts.expense)} expense transactions`,
+      description: `${formatNumber(summaryCounts.expense)} expense transactions`,
     },
     {
       key: "balance",
       label: "Net Balance",
       value: formatCurrency(summaryData.balance),
-      description: summaryData.balance >= 0 ? "Positive cash flow" : "Negative cash flow",
+      description: balanceValue >= 0 ? "Positive cash flow" : "Negative cash flow",
     },
     {
       key: "transactions",
       label: "Transactions",
-      value: formatInteger(summaryCounts.total),
+      value: formatNumber(summaryCounts.total),
       description: "Total records in the selected range",
     },
   ];

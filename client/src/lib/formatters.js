@@ -27,6 +27,11 @@ export const numberFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 });
 
+export const currencySymbol =
+  currencyFormatter
+    .formatToParts(0)
+    .find((part) => part.type === "currency")?.value ?? "৳";
+
 export const formatCurrency = (value, { fallback = FALLBACK_DISPLAY } = {}) => {
   const numericValue = toNumeric(value);
   if (numericValue === null) {
