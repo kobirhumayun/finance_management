@@ -16,8 +16,14 @@ import { qk } from "@/lib/query-keys";
 import { fetchReportCharts, fetchReportFilters } from "@/lib/queries/reports";
 import { toNumeric } from "@/lib/utils/numbers";
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const integerFormatter = new Intl.NumberFormat("en-US");
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "BDT",
+  currencyDisplay: "narrowSymbol",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+const integerFormatter = new Intl.NumberFormat("en-IN");
 
 const toNumber = (value) => toNumeric(value);
 
