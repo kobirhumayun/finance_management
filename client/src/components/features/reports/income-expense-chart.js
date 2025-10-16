@@ -106,7 +106,12 @@ function ChartLoadingOverlay({ label, color }) {
     >
       <div
         className="h-10 w-10 animate-spin rounded-full border-4 border-t-transparent"
-        style={{ borderColor: spinnerColor, borderTopColor: "transparent" }}
+        style={{
+          borderTopColor: "transparent",
+          borderRightColor: spinnerColor,
+          borderBottomColor: spinnerColor,
+          borderLeftColor: spinnerColor,
+        }}
         aria-hidden
       />
       <span className="font-medium text-foreground">{label}</span>
