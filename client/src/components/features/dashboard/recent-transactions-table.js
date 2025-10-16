@@ -1,7 +1,7 @@
-// File: src/components/features/dashboard/recent-transactions-table.js
 "use client";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/formatters";
 
 // Small table summarizing the latest transactions across projects.
 export default function RecentTransactionsTable({ transactions = [], isLoading }) {
@@ -33,8 +33,22 @@ export default function RecentTransactionsTable({ transactions = [], isLoading }
         <TableBody>
           {transactions.map((transaction) => {
             const projectLabel = transaction.projectName || transaction.projectId || "—";
-            const amountValue = Number.isFinite(transaction.amount) ? transaction.amount : 0;
-            const formattedAmount = `${transaction.type === "Expense" ? "-" : "+"}$${amountValue.toLocaleString()}`;
+
+            let parsedAmount = null;
+            if (typeof transaction.amount === "number" && Number.isFinite(transaction.amount)) {
+              parsedAmount = transaction.amount;
+            } else if (typeof transaction.amount === "string" && transaction.amount.trim() !== "") {
+              const numericValue = Number(transaction.amount);
+              if (Number.isFinite(numericValue)) {
+                parsedAmount = numericValue;
+              }
+            }
+
+            const isExpense = transaction.type === "Expense";
+            const formattedAmount =
+              parsedAmount === null
+                ? formatCurrency(null)
+                : `${isExpense ? "-" : "+"}${formatCurrency(Math.abs(parsedAmount))}`;
             return (
               <TableRow key={transaction.id}>
                 <TableCell>{transaction.date}</TableCell>
