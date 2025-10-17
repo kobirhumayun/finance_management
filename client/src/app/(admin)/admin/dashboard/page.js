@@ -55,6 +55,32 @@ export default function AdminDashboardPage() {
   const pendingPaymentsCount = pendingPaymentsData?.pagination?.totalItems ?? pendingPayments.length;
   const recentPayments = recentPaymentsData?.items ?? [];
 
+  const normalizeText = (value) => {
+    if (typeof value !== "string") return "";
+    return value.trim().toLowerCase();
+  };
+
+  const usersByPlan = plans.map((plan) => {
+    const slug = normalizeText(plan?.slug);
+    const name = normalizeText(plan?.name);
+
+    const planUsers = users.filter((user) => {
+      const userSlug = normalizeText(user?.planSlug);
+      const userName = normalizeText(user?.planName);
+
+      if (slug && userSlug) return userSlug === slug;
+      if (slug && userName) return userName === slug;
+      if (name && userSlug) return userSlug === name;
+      if (name && userName) return userName === name;
+      return false;
+    });
+
+    return {
+      plan,
+      users: planUsers,
+    };
+  });
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -89,23 +115,54 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-muted-foreground">Require manual approval</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Enterprise Accounts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {
-                users.filter((user) => {
-                  const slug = user.planSlug?.toLowerCase();
-                  const name = user.planName?.toLowerCase();
-                  return slug === "enterprise" || name?.includes("enterprise");
-                }).length
-              }
-            </p>
-            <p className="text-sm text-muted-foreground">Managed by customer success</p>
-          </CardContent>
-        </Card>
+        {usersByPlan.map(({ plan, users: planUsers }) => {
+          const title = plan?.name || plan?.slug || "Unnamed plan";
+          const subtitle = plan?.slug && plan?.slug !== plan?.name ? plan.slug : null;
+          const moreCount = Math.max(planUsers.length - 5, 0);
+
+          return (
+            <Card key={plan?.id ?? plan?.slug ?? title}>
+              <CardHeader>
+                <CardTitle>{title}</CardTitle>
+                {subtitle ? (
+                  <p className="text-sm text-muted-foreground">{subtitle}</p>
+                ) : null}
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold">{planUsers.length}</p>
+                <p className="text-sm text-muted-foreground">
+                  {planUsers.length === 1 ? "User on this plan" : "Users on this plan"}
+                </p>
+                <div className="mt-4 space-y-3">
+                  {planUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No users currently assigned.</p>
+                  ) : (
+                    <>
+                      {planUsers.slice(0, 5).map((user) => {
+                        const identifier =
+                          user.fullName || user.username || user.email || "Unknown user";
+
+                        return (
+                          <div key={user.id ?? `${user.email ?? identifier}-${plan?.slug ?? title}`}>
+                            <div className="text-sm font-medium leading-tight">{identifier}</div>
+                            {user.email ? (
+                              <div className="text-xs text-muted-foreground">{user.email}</div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                      {moreCount > 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          +{moreCount} more {moreCount === 1 ? "user" : "users"}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
       <Card>
         <CardHeader>
