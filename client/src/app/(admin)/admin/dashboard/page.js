@@ -25,32 +25,65 @@ const normalizeIdentifier = (value) => {
     .replace(/\p{Diacritic}/gu, "");
 };
 
+const STOP_WORDS = new Set([
+  "plan",
+  "plans",
+  "account",
+  "accounts",
+  "user",
+  "users",
+  "tier",
+  "tiers",
+  "package",
+  "packages",
+  "subscription",
+  "subscriptions",
+]);
+
 const expandIdentifierVariants = (...values) => {
   const variants = new Set();
+
+  const addVariant = (value) => {
+    if (!value || STOP_WORDS.has(value)) {
+      return;
+    }
+    variants.add(value);
+  };
 
   values
     .flat()
     .map(normalizeIdentifier)
     .filter(Boolean)
     .forEach((value) => {
-      variants.add(value);
+      addVariant(value);
 
       const condensed = value.replace(/[^a-z0-9]/g, "");
       if (condensed && condensed !== value) {
-        variants.add(condensed);
+        addVariant(condensed);
       }
 
-      const tokens = value.split(/[^a-z0-9]+/).filter(Boolean);
+      const tokens = value
+        .split(/[^a-z0-9]+/)
+        .map((token) => token.trim())
+        .filter(Boolean);
+
       if (tokens.length) {
-        tokens.forEach((token) => variants.add(token));
+        tokens.forEach((token) => {
+          if (token.length > 1) {
+            addVariant(token);
+          }
+        });
       }
-      if (tokens.length > 1) {
-        variants.add(tokens.join(" "));
-        variants.add(tokens.join(""));
+
+      const meaningfulTokens = tokens.filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+
+      if (meaningfulTokens.length > 1) {
+        addVariant(meaningfulTokens.join(" "));
+        addVariant(meaningfulTokens.join(""));
       }
 
       if (value.endsWith("s") && value.length > 1) {
-        variants.add(value.slice(0, -1));
+        addVariant(value.slice(0, -1));
       }
     });
 
