@@ -264,6 +264,9 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-muted-foreground">
                   {planUsers.length === 1 ? "User on this plan" : "Users on this plan"}
                 </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Availability: {plan?.isPublic ? "Publicly available" : "Not publicly available"}
+                </p>
                 {planUsers.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">No users currently assigned.</p>
                 ) : null}
