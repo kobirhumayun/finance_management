@@ -143,6 +143,8 @@ export default function AdminDashboardPage() {
   const pendingPaymentsCount = pendingPaymentsData?.pagination?.totalItems ?? pendingPayments.length;
   const recentPayments = recentPaymentsData?.items ?? [];
 
+  const publicPlansCount = plans.filter((plan) => Boolean(plan?.isPublic)).length;
+
   const normalizedUsers = users.map((user) => ({
     user,
     identifiers: expandIdentifierVariants(
@@ -234,8 +236,8 @@ export default function AdminDashboardPage() {
             <CardTitle>Active Plans</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{plans.length}</p>
-            <p className="text-sm text-muted-foreground">Configured in the catalog</p>
+            <p className="text-3xl font-semibold">{publicPlansCount}</p>
+            <p className="text-sm text-muted-foreground">Publicly accessible plans</p>
           </CardContent>
         </Card>
         <Card>
