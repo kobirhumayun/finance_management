@@ -219,7 +219,6 @@ export default function AdminDashboardPage() {
         {usersByPlan.map(({ plan, users: planUsers }) => {
           const title = plan?.name || plan?.slug || "Unnamed plan";
           const subtitle = plan?.slug && plan?.slug !== plan?.name ? plan.slug : null;
-          const moreCount = Math.max(planUsers.length - 5, 0);
 
           return (
             <Card key={plan?.id ?? plan?.slug ?? title}>
@@ -234,32 +233,9 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-muted-foreground">
                   {planUsers.length === 1 ? "User on this plan" : "Users on this plan"}
                 </p>
-                <div className="mt-4 space-y-3">
-                  {planUsers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No users currently assigned.</p>
-                  ) : (
-                    <>
-                      {planUsers.slice(0, 5).map((user) => {
-                        const identifier =
-                          user.fullName || user.username || user.email || "Unknown user";
-
-                        return (
-                          <div key={user.id ?? `${user.email ?? identifier}-${plan?.slug ?? title}`}>
-                            <div className="text-sm font-medium leading-tight">{identifier}</div>
-                            {user.email ? (
-                              <div className="text-xs text-muted-foreground">{user.email}</div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                      {moreCount > 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          +{moreCount} more {moreCount === 1 ? "user" : "users"}
-                        </p>
-                      ) : null}
-                    </>
-                  )}
-                </div>
+                {planUsers.length === 0 ? (
+                  <p className="mt-4 text-sm text-muted-foreground">No users currently assigned.</p>
+                ) : null}
               </CardContent>
             </Card>
           );
@@ -277,25 +253,6 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-muted-foreground">
                 {unmatchedUsers.length === 1 ? "User" : "Users"} without catalog mapping
               </p>
-              <div className="mt-4 space-y-3">
-                {unmatchedUsers.slice(0, 5).map((user) => {
-                  const identifier = user.fullName || user.username || user.email || "Unknown user";
-
-                  return (
-                    <div key={user.id ?? `${user.email ?? identifier}-unassigned`}>
-                      <div className="text-sm font-medium leading-tight">{identifier}</div>
-                      {user.email ? (
-                        <div className="text-xs text-muted-foreground">{user.email}</div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-                {unmatchedUsers.length > 5 ? (
-                  <p className="text-xs text-muted-foreground">
-                    +{unmatchedUsers.length - 5} more {unmatchedUsers.length - 5 === 1 ? "user" : "users"}
-                  </p>
-                ) : null}
-              </div>
             </CardContent>
           </Card>
         ) : null}
