@@ -159,6 +159,37 @@ export default function AdminDashboardPage() {
     identifiers: expandIdentifierVariants(plan?.slug, plan?.name, plan?.id),
   }));
 
+  const usersByRole = (() => {
+    const roleMap = new Map();
+
+    normalizedUsers.forEach(({ user }) => {
+      const rawRole = toStringSafe(user.role)?.trim() || null;
+      const normalizedKey = normalizeIdentifier(rawRole)
+        ?.replace(/[^a-z0-9]+/g, "-")
+        ?.replace(/^-+|-+$/g, "");
+      const key = normalizedKey || "__unassigned__";
+      const existing = roleMap.get(key);
+
+      if (existing) {
+        if (!existing.role && rawRole) {
+          existing.role = rawRole;
+          existing.label = formatStatus(rawRole, rawRole);
+        }
+        existing.users.push(user);
+        return;
+      }
+
+      roleMap.set(key, {
+        key,
+        role: rawRole,
+        label: formatStatus(rawRole, rawRole || "Unassigned Role"),
+        users: [user],
+      });
+    });
+
+    return Array.from(roleMap.values());
+  })();
+
   const usersByPlan = planIdentifierEntries.map(({ plan, identifiers }) => {
     const planUsers = normalizedUsers
       .filter(({ identifiers: userIdentifiers }) =>
@@ -240,6 +271,22 @@ export default function AdminDashboardPage() {
             </Card>
           );
         })}
+        {usersByRole.map(({ key, label, users: roleUsers }) => (
+          <Card key={`role-${key}`}>
+            <CardHeader>
+              <CardTitle>{label}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{roleUsers.length}</p>
+              <p className="text-sm text-muted-foreground">
+                {roleUsers.length === 1 ? "User with this role" : "Users with this role"}
+              </p>
+              {roleUsers.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">No users currently assigned.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ))}
         {unmatchedUsers.length > 0 ? (
           <Card>
             <CardHeader>
