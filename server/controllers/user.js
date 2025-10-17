@@ -78,8 +78,11 @@ const loginUser = async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials.' }); //
         }
 
-        // Passwords match, generate tokens using the instance method
-        // This model method also handles subscription checks and saving the refresh token.
+        // Passwords match, record the login timestamp before generating new tokens
+        user.lastLoginAt = new Date();
+
+        // Generate tokens using the instance method. This model method also handles
+        // subscription checks and saving the refresh token alongside the last login time.
         const { accessToken, refreshToken } = await user.generateAccessAndRefereshTokens();
 
         res.status(200).json({
