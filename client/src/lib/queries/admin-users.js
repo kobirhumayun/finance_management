@@ -131,7 +131,28 @@ export const normalizeAdminUser = (user) => {
   const statusLabel = formatStatusLabel(statusCode) || formatStatusLabel(merged.status);
 
   const registeredAt = extractDate(merged.registeredAt ?? merged.createdAt);
-  const lastLoginAt = extractDate(merged.lastLoginAt ?? merged.updatedAt);
+  const lastLoginSource =
+    merged.lastLoginAtISO ??
+    merged.lastLoginAtIso ??
+    merged.lastLoginAt ??
+    merged.updatedAt ??
+    merged.createdAt ??
+    merged.raw?.lastLoginAtISO ??
+    merged.raw?.lastLoginAt ??
+    merged.raw?.updatedAt ??
+    merged.raw?.createdAt;
+  const lastLoginAt = extractDate(lastLoginSource);
+  const lastLoginAtSortValueFromPayload =
+    typeof merged.lastLoginAtSortValue === "number" && Number.isFinite(merged.lastLoginAtSortValue)
+      ? merged.lastLoginAtSortValue
+      : null;
+  const derivedLastLoginSortValue = lastLoginAt ? Date.parse(lastLoginAt) : null;
+  const lastLoginAtSortValue =
+    Number.isFinite(lastLoginAtSortValueFromPayload)
+      ? lastLoginAtSortValueFromPayload
+      : Number.isNaN(derivedLastLoginSortValue)
+      ? null
+      : derivedLastLoginSortValue;
 
   const profilePictureUrl = toStringSafe(merged.profilePictureUrl ?? merged.avatarUrl) || null;
 
@@ -164,6 +185,8 @@ export const normalizeAdminUser = (user) => {
     registeredAtLabel: formatDate(registeredAt),
     registeredAtDateTimeLabel: formatDateTime(registeredAt),
     lastLoginAt,
+    lastLoginAtISO: lastLoginAt,
+    lastLoginAtSortValue,
     lastLoginAtLabel: formatDateTime(lastLoginAt),
     profilePictureUrl,
     raw,

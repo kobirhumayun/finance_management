@@ -31,6 +31,28 @@ const formatDate = (value) => {
     return date.toISOString().split('T')[0];
 };
 
+const toDateOrNull = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const resolveLastLoginDate = (user) => {
+    if (!user) {
+        return null;
+    }
+
+    return (
+        toDateOrNull(user.lastLoginAt)
+        || toDateOrNull(user.metadata?.lastLoginAt)
+        || toDateOrNull(user.updatedAt)
+        || toDateOrNull(user.createdAt)
+    );
+};
+
 const normalizeStatusCode = (user) => {
     const metadataStatus = user?.metadata?.accountStatus;
     if (metadataStatus && ACCOUNT_STATUS_CODES.includes(metadataStatus)) {
@@ -64,6 +86,11 @@ const mapUserToResponse = (user, { includeRaw = false } = {}) => {
         ? user.planId
         : null;
 
+    const lastLoginDate = resolveLastLoginDate(user);
+    const lastLoginAtISO = lastLoginDate ? lastLoginDate.toISOString() : null;
+    const lastLoginAtSortValueRaw = typeof lastLoginAtISO === 'string' ? Date.parse(lastLoginAtISO) : null;
+    const lastLoginAtSortValue = Number.isNaN(lastLoginAtSortValueRaw) ? null : lastLoginAtSortValueRaw;
+
     const response = {
         id: user._id.toString(),
         username: user.username,
@@ -82,7 +109,9 @@ const mapUserToResponse = (user, { includeRaw = false } = {}) => {
         statusCode,
         status: humanizeStatus(statusCode),
         registeredAt: formatDate(user.createdAt),
-        lastLoginAt: formatDate(user.lastLoginAt),
+        lastLoginAt: lastLoginDate ? formatDate(lastLoginDate) : null,
+        lastLoginAtISO,
+        lastLoginAtSortValue,
     };
 
     if (includeRaw) {
