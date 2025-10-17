@@ -221,94 +221,128 @@ export default function AdminDashboardPage() {
         title="Admin Overview"
         description="Monitor system metrics, pending approvals, and high-level adoption."
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{users.length}</p>
-            <p className="text-sm text-muted-foreground">Across all plans</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Plans</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{publicPlansCount}</p>
-            <p className="text-sm text-muted-foreground">Publicly accessible plans</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Payments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{pendingPaymentsCount}</p>
-            <p className="text-sm text-muted-foreground">Require manual approval</p>
-          </CardContent>
-        </Card>
-        {usersByPlan.map(({ plan, users: planUsers }) => {
-          const title = plan?.name || plan?.slug || "Unnamed plan";
-          const subtitle = plan?.slug && plan?.slug !== plan?.name ? plan.slug : null;
 
-          return (
-            <Card key={plan?.id ?? plan?.slug ?? title}>
+      <section className="space-y-4" aria-labelledby="admin-dashboard-overview">
+        <div className="flex items-center justify-between">
+          <h2 id="admin-dashboard-overview" className="text-xl font-semibold">
+            Section 1: Overview
+          </h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{users.length}</p>
+              <p className="text-sm text-muted-foreground">Across all plans</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Plans</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{publicPlansCount}</p>
+              <p className="text-sm text-muted-foreground">Publicly accessible plans</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Payments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{pendingPaymentsCount}</p>
+              <p className="text-sm text-muted-foreground">Require manual approval</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-4" aria-labelledby="admin-dashboard-users-by-role">
+        <div className="flex items-center justify-between">
+          <h2 id="admin-dashboard-users-by-role" className="text-xl font-semibold">
+            Section 2: Users by Role
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            This section categorizes users based on their assigned roles.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {usersByRole.map(({ key, label, users: roleUsers }) => (
+            <Card key={`role-${key}`}>
               <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                {subtitle ? (
-                  <p className="text-sm text-muted-foreground">{subtitle}</p>
-                ) : null}
+                <CardTitle>{label}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-semibold">{planUsers.length}</p>
+                <p className="text-3xl font-semibold">{roleUsers.length}</p>
                 <p className="text-sm text-muted-foreground">
-                  {planUsers.length === 1 ? "User on this plan" : "Users on this plan"}
+                  {roleUsers.length === 1 ? "User with this role" : "Users with this role"}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Availability: {plan?.isPublic ? "Publicly available" : "Not publicly available"}
-                </p>
-                {planUsers.length === 0 ? (
+                {roleUsers.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">No users currently assigned.</p>
                 ) : null}
               </CardContent>
             </Card>
-          );
-        })}
-        {usersByRole.map(({ key, label, users: roleUsers }) => (
-          <Card key={`role-${key}`}>
-            <CardHeader>
-              <CardTitle>{label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold">{roleUsers.length}</p>
-              <p className="text-sm text-muted-foreground">
-                {roleUsers.length === 1 ? "User with this role" : "Users with this role"}
-              </p>
-              {roleUsers.length === 0 ? (
-                <p className="mt-4 text-sm text-muted-foreground">No users currently assigned.</p>
-              ) : null}
-            </CardContent>
-          </Card>
-        ))}
-        {unmatchedUsers.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Unassigned Plan</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Users without a matching catalog plan
-              </p>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold">{unmatchedUsers.length}</p>
-              <p className="text-sm text-muted-foreground">
-                {unmatchedUsers.length === 1 ? "User" : "Users"} without catalog mapping
-              </p>
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4" aria-labelledby="admin-dashboard-subscribed-user-count">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <h2 id="admin-dashboard-subscribed-user-count" className="text-xl font-semibold">
+            Section 3: Subscribed User Count
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            This section displays subscribed user totals grouped by plan.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {usersByPlan.map(({ plan, users: planUsers }) => {
+            const title = plan?.name || plan?.slug || "Unnamed plan";
+            const subtitle = plan?.slug && plan?.slug !== plan?.name ? plan.slug : null;
+
+            return (
+              <Card key={plan?.id ?? plan?.slug ?? title}>
+                <CardHeader>
+                  <CardTitle>{title}</CardTitle>
+                  {subtitle ? (
+                    <p className="text-sm text-muted-foreground">{subtitle}</p>
+                  ) : null}
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-semibold">{planUsers.length}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {planUsers.length === 1 ? "User on this plan" : "Users on this plan"}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Availability: {plan?.isPublic ? "Publicly available" : "Not publicly available"}
+                  </p>
+                  {planUsers.length === 0 ? (
+                    <p className="mt-4 text-sm text-muted-foreground">No users currently assigned.</p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            );
+          })}
+          {unmatchedUsers.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Unassigned Plan</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Users without a matching catalog plan
+                </p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold">{unmatchedUsers.length}</p>
+                <p className="text-sm text-muted-foreground">
+                  {unmatchedUsers.length === 1 ? "User" : "Users"} without catalog mapping
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      </section>
       <Card>
         <CardHeader>
           <CardTitle>Recent manual payments</CardTitle>
@@ -325,7 +359,7 @@ export default function AdminDashboardPage() {
                   <TableHead>Submitted</TableHead>
                 </TableRow>
               </TableHeader>
-                <TableBody>
+              <TableBody>
                 {recentPayments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>{payment.reference}</TableCell>
@@ -340,7 +374,7 @@ export default function AdminDashboardPage() {
                     <TableCell>{formatDateTime(payment.submittedAt)}</TableCell>
                   </TableRow>
                 ))}
-                </TableBody>
+              </TableBody>
             </Table>
           </div>
         </CardContent>
