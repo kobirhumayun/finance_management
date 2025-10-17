@@ -222,13 +222,21 @@ export default function AdminDashboardPage() {
         description="Monitor system metrics, pending approvals, and high-level adoption."
       />
 
-      <section className="space-y-4" aria-labelledby="admin-dashboard-overview">
-        <div className="flex items-center justify-between">
-          <h2 id="admin-dashboard-overview" className="text-xl font-semibold">
-            Section 1: Overview
-          </h2>
+      <section
+        className="overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm"
+        aria-labelledby="admin-dashboard-overview"
+      >
+        <div className="border-b border-border px-6 py-4">
+          <div className="space-y-1">
+            <h2 id="admin-dashboard-overview" className="text-xl font-semibold">
+              Overview
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              High-level metrics that highlight platform activity and engagement.
+            </p>
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 px-6 pb-6 pt-4 md:grid-cols-2 xl:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Total Users</CardTitle>
@@ -259,16 +267,21 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="space-y-4" aria-labelledby="admin-dashboard-users-by-role">
-        <div className="flex items-center justify-between">
-          <h2 id="admin-dashboard-users-by-role" className="text-xl font-semibold">
-            Section 2: Users by Role
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            This section categorizes users based on their assigned roles.
-          </p>
+      <section
+        className="overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm"
+        aria-labelledby="admin-dashboard-users-by-role"
+      >
+        <div className="border-b border-border px-6 py-4">
+          <div className="space-y-1">
+            <h2 id="admin-dashboard-users-by-role" className="text-xl font-semibold">
+              Users by Role
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Understand how access is distributed across administrator roles.
+            </p>
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 px-6 pb-6 pt-4 md:grid-cols-2 xl:grid-cols-4">
           {usersByRole.map(({ key, label, users: roleUsers }) => (
             <Card key={`role-${key}`}>
               <CardHeader>
@@ -288,16 +301,21 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="space-y-4" aria-labelledby="admin-dashboard-subscribed-user-count">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h2 id="admin-dashboard-subscribed-user-count" className="text-xl font-semibold">
-            Section 3: Subscribed User Count
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            This section displays subscribed user totals grouped by plan.
-          </p>
+      <section
+        className="overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm"
+        aria-labelledby="admin-dashboard-subscribed-user-count"
+      >
+        <div className="border-b border-border px-6 py-4">
+          <div className="space-y-1">
+            <h2 id="admin-dashboard-subscribed-user-count" className="text-xl font-semibold">
+              Subscribed User Count
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Review plan adoption, availability, and any users without a catalog match.
+            </p>
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 px-6 pb-6 pt-4 md:grid-cols-2 xl:grid-cols-4">
           {usersByPlan.map(({ plan, users: planUsers }) => {
             const title = plan?.name || plan?.slug || "Unnamed plan";
             const subtitle = plan?.slug && plan?.slug !== plan?.name ? plan.slug : null;
