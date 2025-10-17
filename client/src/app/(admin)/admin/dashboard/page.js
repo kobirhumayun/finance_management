@@ -9,6 +9,61 @@ import { adminPlansOptions } from "@/lib/queries/admin-plans";
 import { adminPaymentsOptions } from "@/lib/queries/admin-payments";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
 
+const toStringSafe = (value) => {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return String(value ?? "");
+};
+
+const normalizeIdentifier = (value) => {
+  if (value == null) return "";
+  return toStringSafe(value)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+};
+
+const expandIdentifierVariants = (...values) => {
+  const variants = new Set();
+
+  values
+    .flat()
+    .map(normalizeIdentifier)
+    .filter(Boolean)
+    .forEach((value) => {
+      variants.add(value);
+
+      const condensed = value.replace(/[^a-z0-9]/g, "");
+      if (condensed && condensed !== value) {
+        variants.add(condensed);
+      }
+
+      const tokens = value.split(/[^a-z0-9]+/).filter(Boolean);
+      if (tokens.length) {
+        tokens.forEach((token) => variants.add(token));
+      }
+      if (tokens.length > 1) {
+        variants.add(tokens.join(" "));
+        variants.add(tokens.join(""));
+      }
+
+      if (value.endsWith("s") && value.length > 1) {
+        variants.add(value.slice(0, -1));
+      }
+    });
+
+  return variants;
+};
+
+const identifiersIntersect = (left, right) => {
+  for (const item of left) {
+    if (right.has(item)) return true;
+  }
+  return false;
+};
+
 const formatCurrency = (amount, currency) => {
   if (amount == null) return "—";
   const numericAmount = typeof amount === "number" ? amount : Number(amount);
@@ -55,31 +110,44 @@ export default function AdminDashboardPage() {
   const pendingPaymentsCount = pendingPaymentsData?.pagination?.totalItems ?? pendingPayments.length;
   const recentPayments = recentPaymentsData?.items ?? [];
 
-  const normalizeText = (value) => {
-    if (typeof value !== "string") return "";
-    return value.trim().toLowerCase();
-  };
+  const normalizedUsers = users.map((user) => ({
+    user,
+    identifiers: expandIdentifierVariants(
+      user.planSlug,
+      user.planName,
+      user.plan,
+      user.planId,
+      user.subscriptionStatus
+    ),
+  }));
 
-  const usersByPlan = plans.map((plan) => {
-    const slug = normalizeText(plan?.slug);
-    const name = normalizeText(plan?.name);
+  const planIdentifierEntries = plans.map((plan) => ({
+    plan,
+    identifiers: expandIdentifierVariants(plan?.slug, plan?.name, plan?.id),
+  }));
 
-    const planUsers = users.filter((user) => {
-      const userSlug = normalizeText(user?.planSlug);
-      const userName = normalizeText(user?.planName);
-
-      if (slug && userSlug) return userSlug === slug;
-      if (slug && userName) return userName === slug;
-      if (name && userSlug) return userSlug === name;
-      if (name && userName) return userName === name;
-      return false;
-    });
+  const usersByPlan = planIdentifierEntries.map(({ plan, identifiers }) => {
+    const planUsers = normalizedUsers
+      .filter(({ identifiers: userIdentifiers }) =>
+        identifiers.size && userIdentifiers.size && identifiersIntersect(identifiers, userIdentifiers)
+      )
+      .map(({ user }) => user);
 
     return {
       plan,
       users: planUsers,
     };
   });
+
+  const unmatchedUsers = normalizedUsers
+    .filter(({ identifiers }) => {
+      if (!identifiers.size) return true;
+      return !planIdentifierEntries.some(
+        ({ identifiers: planIdentifiers }) =>
+          planIdentifiers.size && identifiersIntersect(planIdentifiers, identifiers)
+      );
+    })
+    .map(({ user }) => user);
 
   return (
     <div className="space-y-8">
@@ -163,6 +231,41 @@ export default function AdminDashboardPage() {
             </Card>
           );
         })}
+        {unmatchedUsers.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Unassigned Plan</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Users without a matching catalog plan
+              </p>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{unmatchedUsers.length}</p>
+              <p className="text-sm text-muted-foreground">
+                {unmatchedUsers.length === 1 ? "User" : "Users"} without catalog mapping
+              </p>
+              <div className="mt-4 space-y-3">
+                {unmatchedUsers.slice(0, 5).map((user) => {
+                  const identifier = user.fullName || user.username || user.email || "Unknown user";
+
+                  return (
+                    <div key={user.id ?? `${user.email ?? identifier}-unassigned`}>
+                      <div className="text-sm font-medium leading-tight">{identifier}</div>
+                      {user.email ? (
+                        <div className="text-xs text-muted-foreground">{user.email}</div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                {unmatchedUsers.length > 5 ? (
+                  <p className="text-xs text-muted-foreground">
+                    +{unmatchedUsers.length - 5} more {unmatchedUsers.length - 5 === 1 ? "user" : "users"}
+                  </p>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
       <Card>
         <CardHeader>
