@@ -19,6 +19,8 @@ const STATUS_LABELS = {
 };
 
 const PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10);
+const parsedRecentLoginLimit = parseInt(process.env.ADMIN_RECENT_LOGIN_LIMIT || '5', 10);
+const RECENT_LOGIN_LIMIT = Number.isFinite(parsedRecentLoginLimit) ? parsedRecentLoginLimit : 5;
 
 const formatDate = (value) => {
     if (!value) {
@@ -29,6 +31,17 @@ const formatDate = (value) => {
         return null;
     }
     return date.toISOString().split('T')[0];
+};
+
+const formatDateTime = (value) => {
+    if (!value) {
+        return null;
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+    return date.toISOString();
 };
 
 const normalizeStatusCode = (user) => {
@@ -82,7 +95,7 @@ const mapUserToResponse = (user, { includeRaw = false } = {}) => {
         statusCode,
         status: humanizeStatus(statusCode),
         registeredAt: formatDate(user.createdAt),
-        lastLoginAt: formatDate(user.lastLoginAt),
+        lastLoginAt: formatDateTime(user.lastLoginAt),
     };
 
     if (includeRaw) {
@@ -170,6 +183,7 @@ const listUsers = async (req, res) => {
             planId: planIdentifier,
             page: pageParam,
             pageSize: pageSizeParam,
+            recent,
         } = req.query;
 
         const filters = [];
@@ -209,14 +223,39 @@ const listUsers = async (req, res) => {
         const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
         const skip = (page - 1) * pageSize;
 
+        const recentSort = typeof recent === 'string' ? recent.toLowerCase() : null;
+        let sortOptions = { createdAt: -1 };
+
+        if (recentSort && ['asc', 'desc'].includes(recentSort)) {
+            const sortDirection = recentSort === 'asc' ? 1 : -1;
+            sortOptions = {
+                lastLoginAt: sortDirection,
+                createdAt: sortDirection === 1 ? 1 : -1,
+                _id: sortDirection === 1 ? 1 : -1,
+            };
+        }
+
         const users = await User.find(query)
-            .sort({ createdAt: -1 })
+            .sort(sortOptions)
             .skip(skip)
             .limit(pageSize)
             .populate('planId', 'name slug')
             .lean({ virtuals: true });
 
         const items = users.map((user) => mapUserToResponse(user));
+
+        const recentLoginLimit = Math.max(RECENT_LOGIN_LIMIT, 0);
+        let recentlyLoggedInUsers = [];
+
+        if (recentLoginLimit > 0) {
+            const recentLoginUsers = await User.find({ lastLoginAt: { $ne: null } })
+                .sort({ lastLoginAt: -1 })
+                .limit(recentLoginLimit)
+                .populate('planId', 'name slug')
+                .lean({ virtuals: true });
+
+            recentlyLoggedInUsers = recentLoginUsers.map((user) => mapUserToResponse(user));
+        }
 
         const statusAggregation = await User.aggregate([
             {
@@ -263,6 +302,7 @@ const listUsers = async (req, res) => {
                 itemsPerPage: pageSize,
             },
             availableStatuses,
+            recentlyLoggedInUsers,
         });
     } catch (error) {
         console.error('Error listing admin users:', error);
