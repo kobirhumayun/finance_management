@@ -8,6 +8,7 @@ const {
     listOrdersValidationRules,
     getOrderByNumberValidationRules,
     orderSummaryValidationRules,
+    paymentSummaryValidationRules,
     handleValidationErrors,
 } = require('../validators/validatorsIndex');
 
@@ -26,6 +27,13 @@ router.get(
     orderSummaryValidationRules(),
     handleValidationErrors,
     orderController.getOrderSummary,
+);
+
+router.get(
+    '/payments/summary',
+    paymentSummaryValidationRules(),
+    handleValidationErrors,
+    orderController.getPaymentSummary,
 );
 
 router.get(

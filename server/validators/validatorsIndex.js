@@ -5,6 +5,7 @@ const planValidators = require('./planValidators');
 const projectValidators = require('./projectValidators');
 const reportValidators = require('./reportValidators');
 const orderValidators = require('./orderValidators');
+const invoiceValidators = require('./invoiceValidators');
 
 /**
  * Middleware to handle validation results.
@@ -67,5 +68,9 @@ module.exports = {
     listOrdersValidationRules: orderValidators.listOrdersValidationRules,
     getOrderByNumberValidationRules: orderValidators.getOrderByNumberValidationRules,
     orderSummaryValidationRules: orderValidators.orderSummaryValidationRules,
+    paymentSummaryValidationRules: orderValidators.paymentSummaryValidationRules,
+    listInvoicesValidationRules: invoiceValidators.listInvoicesValidationRules,
+    getInvoiceByNumberValidationRules: invoiceValidators.getInvoiceByNumberValidationRules,
+    invoiceSummaryValidationRules: invoiceValidators.invoiceSummaryValidationRules,
     handleValidationErrors,
 };
