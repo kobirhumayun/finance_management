@@ -128,7 +128,8 @@ const paymentSchema = new Schema({
      * Link to an invoice document, if your system generates invoices.
      */
     invoiceId: {
-        type: String, // Or Schema.Types.ObjectId if referencing an Invoice collection
+        type: Schema.Types.ObjectId,
+        ref: 'Invoice',
         index: true
     },
     /**

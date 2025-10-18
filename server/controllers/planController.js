@@ -384,7 +384,7 @@ const activatedPlan = async (req, res) => {
         const savedInvoice = await invoice.save();
 
         order.invoice = savedInvoice._id;
-        payment.invoiceId = savedInvoice._id.toString();
+        payment.invoiceId = savedInvoice._id;
 
         await Promise.all([
             user.save(),
@@ -417,7 +417,7 @@ const activatedPlan = async (req, res) => {
             payment: {
                 id: payment._id,
                 status: payment.status,
-                invoiceId: payment.invoiceId,
+                invoiceId: payment.invoiceId ? payment.invoiceId.toString() : null,
             },
             invoice: {
                 id: savedInvoice._id,
