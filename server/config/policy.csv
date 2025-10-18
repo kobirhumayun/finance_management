@@ -3,6 +3,9 @@
 # Admin Role: Has access to everything, regardless of plan/domain ('*' matches any domain)
 p, admin, *, *, (read|write|update|delete), allow
 
+# Support role: Read access to order resources across all plans
+p, support, *, orders, read, allow
+
 # Consumer Role Policies based on Plan (Domain)
 
 # basic: All plans full access
