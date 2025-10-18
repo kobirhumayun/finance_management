@@ -460,31 +460,49 @@ const manualPaymentSubmit = async (req, res) => {
  * @desc   Get payment records based on status
  * @route  GET /api/payments?status=<status_value>&page=<page_number>&limit=<limit_value>
  * @access Private (Adjust access control as needed, e.g., Admin only)
- * @query  status (required), page (optional, default 1), limit (optional, default 10)
+ * @query  status (optional), userId (optional), planId (optional), order (optional), gatewayTransactionId (optional), page (optional, default 1), limit (optional, default 10)
  */
 const getPaymentsByStatus = async (req, res) => {
-    const { status } = req.query;
+    const { status, userId, planId, order, gatewayTransactionId } = req.query;
     const page = parseInt(req.query.page, 10) || 1; // Default to page 1
     const limit = parseInt(req.query.limit, 10) || 10; // Default to 10 items per page
     const skip = (page - 1) * limit;
 
+    const filters = {};
+
     // --- Validate Status ---
-    if (!status) {
-        return res.status(400).json({ message: 'Status query parameter is required.' });
+    if (status) {
+        // Get allowed enum values from the schema
+        const allowedStatuses = Payment.schema.path('status').enumValues;
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                message: `Invalid status value. Allowed values are: ${allowedStatuses.join(', ')}`
+            });
+        }
+
+        filters.status = status;
     }
 
-    // Get allowed enum values from the schema
-    const allowedStatuses = Payment.schema.path('status').enumValues;
-    if (!allowedStatuses.includes(status)) {
-        return res.status(400).json({
-            message: `Invalid status value. Allowed values are: ${allowedStatuses.join(', ')}`
-        });
+    if (userId) {
+        filters.userId = userId;
+    }
+
+    if (planId) {
+        filters.planId = planId;
+    }
+
+    if (order) {
+        filters.order = order;
+    }
+
+    if (gatewayTransactionId) {
+        filters.gatewayTransactionId = gatewayTransactionId;
     }
 
     // --- Query Database ---
     try {
         // Find payments matching the status with pagination
-        const payments = await Payment.find({ status: status })
+        const payments = await Payment.find(filters)
             .sort({ createdAt: -1 }) // Sort by creation date, newest first (optional)
             .skip(skip)
             .limit(limit)
@@ -493,11 +511,11 @@ const getPaymentsByStatus = async (req, res) => {
             .exec(); // Execute the query
 
         // Get total count for pagination metadata
-        const totalPayments = await Payment.countDocuments({ status: status });
+        const totalPayments = await Payment.countDocuments(filters);
 
         // --- Send Response ---
         res.status(200).json({
-            message: `Successfully retrieved payments with status: ${status}`,
+            message: status ? `Successfully retrieved payments with status: ${status}` : 'Successfully retrieved payments',
             data: payments,
             pagination: {
                 currentPage: page,
