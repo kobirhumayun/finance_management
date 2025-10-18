@@ -108,11 +108,11 @@ const resolveInvoiceFilters = async (query) => {
     }
 
     if (query.userId) {
-        invoiceFilter.user = query.userId;
+        invoiceFilter.user = new mongoose.Types.ObjectId(query.userId);
     }
 
     if (query.planId) {
-        invoiceFilter.plan = query.planId;
+        invoiceFilter.plan = new mongoose.Types.ObjectId(query.planId);
     }
 
     if (query.startDate || query.endDate) {
