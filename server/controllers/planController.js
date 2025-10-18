@@ -2,7 +2,8 @@ const User = require('../models/User');
 const Plan = require('../models/Plan');
 const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
-const Invoice = require('../models/Invoice')
+const Order = require('../models/Order');
+const Invoice = require('../models/Invoice');
 const { createOrderWithPayment } = require('../utils/order');
 
 /**
@@ -275,119 +276,166 @@ const calculateNextBillingDate = (startingDate, billingCycle) => {
 const activatedPlan = async (req, res) => {
     const { appliedUserId, newPlanId, paymentId } = req.body;
 
-    // Validate appliedUserId presence
     if (!appliedUserId) {
-        // This usually indicates an issue with the auth middleware or route protection
         return res.status(401).json({ message: 'Authentication error: User not identified.' });
     }
 
-    // Validate newPlanId format
     if (!mongoose.Types.ObjectId.isValid(newPlanId)) {
         return res.status(400).json({ message: 'Invalid Plan ID format.' });
     }
 
-    // Validate paymentId format
     if (!mongoose.Types.ObjectId.isValid(paymentId)) {
         return res.status(400).json({ message: 'Invalid Payment ID format.' });
     }
 
     try {
-        // Fetch user and the target plan concurrently for efficiency
         const [user, newPlan, payment] = await Promise.all([
             User.findById(appliedUserId),
             Plan.findById(newPlanId),
-            Payment.findById(paymentId)
+            Payment.findById(paymentId),
         ]);
 
-        // --- Validation Checks ---
         if (!user) {
-            // Should be rare if auth middleware is correct, but good practice
             return res.status(404).json({ message: 'User not found.' });
         }
+
         if (!newPlan) {
             return res.status(404).json({ message: `Plan with ID '${newPlanId}' not found.` });
         }
+
         if (!payment) {
             return res.status(404).json({ message: `Payment record with ID '${paymentId}' not found.` });
         }
-        if (payment.status === 'succeeded') {
-            return res.status(403).json({ message: 'This payment has already been used.' }); // 403 Forbidden might be more appropriate
+
+        if (!payment.order) {
+            return res.status(400).json({ message: 'No order is associated with this payment.' });
         }
+
+        const order = await Order.findById(payment.order);
+
+        if (!order) {
+            return res.status(404).json({ message: 'Associated order not found.' });
+        }
+
+        if (payment.invoiceId) {
+            return res.status(409).json({ message: 'This payment has already been finalized.' });
+        }
+
         if (user._id.toString() !== payment.userId.toString()) {
-            return res.status(403).json({ message: 'This payment not eligible for this user.' }); // 403 Forbidden might be more appropriate
-        }
-        if (newPlan.price !== 0 && payment.amount !== newPlan.price) {
-            return res.status(403).json({ message: `This payment ${payment.amount} does not match the plan price ${newPlan.price}.` }); // 403 Forbidden might be more appropriate
+            return res.status(403).json({ message: 'This payment is not eligible for this user.' });
         }
 
+        let paymentAmount = typeof payment.amount === 'number'
+            ? payment.amount
+            : parseFloat(payment.amount?.toString?.() || '0');
 
-        // Check if the user is trying to switch to a non-public plan they aren't already on
+        if (!Number.isFinite(paymentAmount)) {
+            paymentAmount = newPlan.price;
+        }
+
+        if (newPlan.price !== 0 && Math.abs(paymentAmount - newPlan.price) > 0.0001) {
+            return res.status(403).json({
+                message: `This payment amount ${paymentAmount} does not match the plan price ${newPlan.price}.`,
+            });
+        }
+
         const currentPlanIdString = user.planId?.toString();
         if (!newPlan.isPublic && currentPlanIdString !== newPlanId) {
-            return res.status(403).json({ message: 'This plan is not publicly available.' }); // 403 Forbidden might be more appropriate
+            return res.status(403).json({ message: 'This plan is not publicly available.' });
         }
 
-        // Check if the user is already actively subscribed to this plan
-        let subscriptionStartinDate = user.subscriptionStartDate;
-        if (currentPlanIdString === newPlanId && user.subscriptionStatus === 'active') {
-            subscriptionStartinDate = user.subscriptionEndDate;
-        } else {
-            subscriptionStartinDate = new Date(); // Start from now
-        }
-
-        // --- Update User Subscription Details ---
+        const isRenewalOfSamePlan =
+            currentPlanIdString === newPlanId && user.subscriptionStatus === 'active';
+        const subscriptionStartDate = isRenewalOfSamePlan && user.subscriptionEndDate
+            ? user.subscriptionEndDate
+            : new Date();
+        const calculatedEndDate = calculateNextBillingDate(subscriptionStartDate, newPlan.billingCycle);
+        const subscriptionEndDate = calculatedEndDate || subscriptionStartDate;
 
         user.planId = newPlan._id;
-        // Determine status based on price (adjust if trials are implemented)
         user.subscriptionStatus = newPlan.price === 0 ? 'free' : 'active';
-        user.subscriptionStartDate = subscriptionStartinDate;
-        // Calculate next billing date based on the *current time* as the start
-        user.subscriptionEndDate = calculateNextBillingDate(subscriptionStartinDate, newPlan.billingCycle);
-        // Reset trial end date when changing plans (adjust logic if needed)
+        user.subscriptionStartDate = subscriptionStartDate;
+        user.subscriptionEndDate = calculatedEndDate;
         user.trialEndsAt = null;
 
         const invoice = new Invoice({
             user: user._id,
             payment: payment._id,
             plan: newPlan._id,
-            amount: payment.amount,
+            amount: paymentAmount,
             currency: payment.currency,
             status: 'paid',
-            subscriptionStartDate: user.subscriptionStartDate,
-            subscriptionEndDate: user.subscriptionEndDate,
+            subscriptionStartDate,
+            subscriptionEndDate,
         });
 
-        // Save the updated user document
-        await user.save();
-        await payment.updateOne({ status: 'succeeded' }); // Mark
-        await invoice.save();
+        order.status = 'active';
+        order.startDate = subscriptionStartDate;
+        order.endDate = calculatedEndDate;
+        order.renewalDate = calculatedEndDate;
+        order.amount = paymentAmount;
+        order.currency = payment.currency;
+        order.invoice = invoice._id;
 
-        // --- Prepare and Send Response ---
-        // Construct response using the already fetched newPlan details
+        payment.status = 'succeeded';
+        payment.planId = newPlan._id;
+        payment.processedAt = payment.processedAt || new Date();
+
+        const savedInvoice = await invoice.save();
+
+        order.invoice = savedInvoice._id;
+        payment.invoiceId = savedInvoice._id;
+
+        await Promise.all([
+            user.save(),
+            order.save(),
+            payment.save(),
+        ]);
+
         res.status(200).json({
             message: 'Subscription plan activated successfully.',
             subscription: {
-                // Send the full plan object or selected fields
                 plan: {
                     _id: newPlan._id,
                     name: newPlan.name,
                     slug: newPlan.slug,
                     price: newPlan.price,
                     billingCycle: newPlan.billingCycle,
-                    // Add other relevant plan fields if needed by the frontend
                 },
                 status: user.subscriptionStatus,
                 startDate: user.subscriptionStartDate,
                 endDate: user.subscriptionEndDate,
-            }
+            },
+            order: {
+                id: order._id,
+                orderNumber: order.orderID,
+                status: order.status,
+                startDate: order.startDate,
+                endDate: order.endDate,
+                invoice: order.invoice,
+            },
+            payment: {
+                id: payment._id,
+                status: payment.status,
+                invoiceId: payment.invoiceId ? payment.invoiceId.toString() : null,
+            },
+            invoice: {
+                id: savedInvoice._id,
+                invoiceNumber: savedInvoice.invoiceNumber,
+                status: savedInvoice.status,
+                amount: savedInvoice.amount,
+                currency: savedInvoice.currency,
+                issuedDate: savedInvoice.issuedDate,
+                dueDate: savedInvoice.dueDate,
+            },
         });
 
     } catch (error) {
-        // Handle potential database errors during find or save
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(val => val.message);
             return res.status(400).json({ message: 'Validation failed during update', errors: messages });
         }
+        console.error('Error activating plan:', error);
         res.status(500).json({ message: 'Server error while changing subscription plan.' });
     }
 };

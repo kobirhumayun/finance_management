@@ -19,6 +19,10 @@ const orderSchema = new mongoose.Schema(
             ref: 'Payment',
             required: true,
         },
+        invoice: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Invoice',
+        },
         orderID: {
             type: String,
             unique: true,
