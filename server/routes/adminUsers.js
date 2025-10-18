@@ -38,6 +38,7 @@ router.get(
         query('status').optional().isIn(ACCOUNT_STATUS_CODES),
         query('page').optional().isInt({ min: 1 }),
         query('pageSize').optional().isInt({ min: 1, max: 100 }),
+        query('recent').optional().toLowerCase().isIn(['asc', 'desc']),
     ],
     handleValidationErrors,
     adminUserController.listUsers,

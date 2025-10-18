@@ -183,6 +183,7 @@ const listUsers = async (req, res) => {
             planId: planIdentifier,
             page: pageParam,
             pageSize: pageSizeParam,
+            recent,
         } = req.query;
 
         const filters = [];
@@ -222,8 +223,20 @@ const listUsers = async (req, res) => {
         const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
         const skip = (page - 1) * pageSize;
 
+        const recentSort = typeof recent === 'string' ? recent.toLowerCase() : null;
+        let sortOptions = { createdAt: -1 };
+
+        if (recentSort && ['asc', 'desc'].includes(recentSort)) {
+            const sortDirection = recentSort === 'asc' ? 1 : -1;
+            sortOptions = {
+                lastLoginAt: sortDirection,
+                createdAt: sortDirection === 1 ? 1 : -1,
+                _id: sortDirection === 1 ? 1 : -1,
+            };
+        }
+
         const users = await User.find(query)
-            .sort({ createdAt: -1 })
+            .sort(sortOptions)
             .skip(skip)
             .limit(pageSize)
             .populate('planId', 'name slug')
