@@ -6,6 +6,58 @@ const Plan = require('../models/Plan');
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_USER_BUCKET_LIMIT = 25;
+const MAX_USER_BUCKET_LIMIT = 200;
+const NULL_USER_OBJECT_ID = new mongoose.Types.ObjectId('000000000000000000000000');
+
+const decodeUserSummaryCursor = (cursor) => {
+    if (!cursor) {
+        return null;
+    }
+
+    const decoded = Buffer.from(cursor, 'base64').toString('utf8');
+    const parsed = JSON.parse(decoded);
+
+    if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Cursor payload is malformed.');
+    }
+
+    const { totalAmount, userId } = parsed;
+
+    if (totalAmount === undefined || userId === undefined) {
+        throw new Error('Cursor payload is missing required fields.');
+    }
+
+    const numericTotal = Number(totalAmount);
+
+    if (Number.isNaN(numericTotal)) {
+        throw new Error('Cursor totalAmount is not numeric.');
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error('Cursor userId is invalid.');
+    }
+
+    return {
+        totalAmount: numericTotal,
+        userId: new mongoose.Types.ObjectId(userId),
+    };
+};
+
+const encodeUserSummaryCursor = (bucket) => {
+    if (!bucket) {
+        return null;
+    }
+
+    const sortUserId = bucket.sortUserId || bucket.userId || NULL_USER_OBJECT_ID;
+
+    return Buffer.from(
+        JSON.stringify({
+            totalAmount: Number(bucket.totalAmount) || 0,
+            userId: sortUserId.toString(),
+        }),
+    ).toString('base64');
+};
 
 const parseDecimal = (value) => {
     if (value === null || value === undefined) {
@@ -232,6 +284,20 @@ const getInvoiceByNumber = async (req, res) => {
 
 const getInvoiceSummary = async (req, res) => {
     try {
+        const requestedByUserLimit = req.query.byUserLimit || DEFAULT_USER_BUCKET_LIMIT;
+        const byUserLimit = Math.min(
+            Math.max(requestedByUserLimit, 1),
+            MAX_USER_BUCKET_LIMIT,
+        );
+
+        let byUserCursor;
+
+        try {
+            byUserCursor = decodeUserSummaryCursor(req.query.byUserCursor);
+        } catch (cursorError) {
+            return res.status(400).json({ message: 'Invalid byUserCursor parameter.' });
+        }
+
         const { filter, empty } = await resolveInvoiceFilters(req.query);
 
         if (empty) {
@@ -243,12 +309,67 @@ const getInvoiceSummary = async (req, res) => {
                     byPaymentGateway: [],
                     byCurrency: [],
                     byPlan: [],
-                    byUser: [],
+                    byUser: {
+                        nodes: [],
+                        pageInfo: {
+                            nextCursor: null,
+                            hasNextPage: false,
+                        },
+                    },
                     byYear: [],
                     byMonth: [],
                 },
             });
         }
+
+        const byUserFacet = [
+            {
+                $group: {
+                    _id: { $ifNull: ['$user._id', NULL_USER_OBJECT_ID] },
+                    sortUserId: { $first: { $ifNull: ['$user._id', NULL_USER_OBJECT_ID] } },
+                    userId: { $first: '$user._id' },
+                    userEmail: { $first: '$user.email' },
+                    firstName: { $first: '$user.firstName' },
+                    lastName: { $first: '$user.lastName' },
+                    username: { $first: '$user.username' },
+                    count: { $sum: 1 },
+                    totalAmount: { $sum: '$amountNumber' },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    userId: 1,
+                    sortUserId: 1,
+                    userEmail: 1,
+                    firstName: 1,
+                    lastName: 1,
+                    username: 1,
+                    count: 1,
+                    totalAmount: 1,
+                },
+            },
+        ];
+
+        if (byUserCursor) {
+            byUserFacet.push({
+                $match: {
+                    $expr: {
+                        $or: [
+                            { $lt: ['$totalAmount', byUserCursor.totalAmount] },
+                            {
+                                $and: [
+                                    { $eq: ['$totalAmount', byUserCursor.totalAmount] },
+                                    { $gt: ['$sortUserId', byUserCursor.userId] },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            });
+        }
+
+        byUserFacet.push({ $sort: { totalAmount: -1, sortUserId: 1 } }, { $limit: byUserLimit + 1 });
 
         const pipeline = [
             { $match: filter },
@@ -391,33 +512,7 @@ const getInvoiceSummary = async (req, res) => {
                         },
                         { $sort: { totalAmount: -1 } },
                     ],
-                    byUser: [
-                        {
-                            $group: {
-                                _id: '$user._id',
-                                userId: { $first: '$user._id' },
-                                userEmail: { $first: '$user.email' },
-                                firstName: { $first: '$user.firstName' },
-                                lastName: { $first: '$user.lastName' },
-                                username: { $first: '$user.username' },
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                userId: 1,
-                                userEmail: 1,
-                                firstName: 1,
-                                lastName: 1,
-                                username: 1,
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { totalAmount: -1 } },
-                    ],
+                    byUser: byUserFacet,
                     byYear: [
                         {
                             $group: {
@@ -478,6 +573,24 @@ const getInvoiceSummary = async (req, res) => {
         const summaryResults = await Invoice.aggregate(pipeline);
         const summary = summaryResults[0] || {};
 
+        const byUserBuckets = Array.isArray(summary.byUser) ? summary.byUser : [];
+        const hasNextPage = byUserBuckets.length > byUserLimit;
+        const limitedByUserBuckets = hasNextPage
+            ? byUserBuckets.slice(0, byUserLimit)
+            : byUserBuckets;
+        const nextCursor = hasNextPage
+            ? encodeUserSummaryCursor(limitedByUserBuckets[limitedByUserBuckets.length - 1])
+            : null;
+
+        const byUserNodes = limitedByUserBuckets.map((bucket) => {
+            const { sortUserId, ...rest } = bucket;
+
+            return {
+                ...rest,
+                userId: rest.userId ? rest.userId.toString() : null,
+            };
+        });
+
         res.json({
             data: {
                 totals: summary.totals || { totalInvoices: 0, totalAmount: 0 },
@@ -486,7 +599,13 @@ const getInvoiceSummary = async (req, res) => {
                 byPaymentGateway: summary.byPaymentGateway || [],
                 byCurrency: summary.byCurrency || [],
                 byPlan: summary.byPlan || [],
-                byUser: summary.byUser || [],
+                byUser: {
+                    nodes: byUserNodes,
+                    pageInfo: {
+                        nextCursor,
+                        hasNextPage,
+                    },
+                },
                 byYear: summary.byYear || [],
                 byMonth: summary.byMonth || [],
             },

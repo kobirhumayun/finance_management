@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { query, param } = require('express-validator');
 
 const allowedInvoiceStatuses = ['paid', 'unpaid', 'cancelled'];
@@ -10,6 +11,35 @@ const allowedPaymentStatuses = [
     'requires_action',
     'canceled',
 ];
+
+const MAX_USER_BUCKET_LIMIT = 200;
+
+const isValidByUserCursor = (value) => {
+    try {
+        const decoded = Buffer.from(value, 'base64').toString('utf8');
+        const parsed = JSON.parse(decoded);
+
+        if (!parsed || typeof parsed !== 'object') {
+            return false;
+        }
+
+        if (parsed.totalAmount === undefined || parsed.userId === undefined) {
+            return false;
+        }
+
+        if (Number.isNaN(Number(parsed.totalAmount))) {
+            return false;
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(parsed.userId)) {
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
 
 const listInvoicesValidationRules = () => [
     query('limit')
@@ -86,7 +116,25 @@ const getInvoiceByNumberValidationRules = () => [
         .withMessage('invoiceNumber must be between 1 and 64 characters long.'),
 ];
 
-const invoiceSummaryValidationRules = () => listInvoicesValidationRules();
+const invoiceSummaryValidationRules = () => [
+    ...listInvoicesValidationRules(),
+    query('byUserLimit')
+        .optional()
+        .isInt({ min: 1, max: MAX_USER_BUCKET_LIMIT })
+        .withMessage(`byUserLimit must be between 1 and ${MAX_USER_BUCKET_LIMIT} records.`)
+        .toInt(),
+    query('byUserCursor')
+        .optional()
+        .isBase64()
+        .withMessage('byUserCursor must be a valid cursor string.')
+        .custom((value) => {
+            if (!isValidByUserCursor(value)) {
+                throw new Error('byUserCursor is malformed.');
+            }
+
+            return true;
+        }),
+];
 
 module.exports = {
     listInvoicesValidationRules,
