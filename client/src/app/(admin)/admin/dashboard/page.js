@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { adminPlansOptions } from "@/lib/queries/admin-plans";
 import { adminPaymentsOptions } from "@/lib/queries/admin-payments";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
+import InvoiceInsightsDrawer from "@/components/features/admin/invoice-insights-drawer";
 
 const toStringSafe = (value) => {
   if (value == null) return "";
@@ -220,6 +221,7 @@ export default function AdminDashboardPage() {
       <PageHeader
         title="Admin Overview"
         description="Monitor system metrics, pending approvals, and high-level adoption."
+        actions={<InvoiceInsightsDrawer />}
       />
 
       <section
