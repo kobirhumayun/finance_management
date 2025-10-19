@@ -7,6 +7,7 @@ const Invoice = require('../models/Invoice');
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_SUMMARY_USER_LIMIT = 50;
 
 const EMPTY_ORDER_SUMMARY = {
     totals: { totalOrders: 0, totalAmount: 0 },
@@ -28,6 +29,140 @@ const EMPTY_PAYMENT_SUMMARY = {
     byPlan: [],
     byYear: [],
     byMonth: [],
+};
+
+const encodeUserSummaryCursor = (totalAmount, userIdString) => {
+    const safeAmount = Number.isFinite(totalAmount) ? totalAmount : 0;
+    const safeUserId = userIdString || '';
+    return Buffer.from(`${safeAmount}:${safeUserId}`, 'utf8').toString('base64');
+};
+
+const decodeUserSummaryCursor = (cursor) => {
+    if (!cursor) {
+        return { value: null };
+    }
+
+    let decoded;
+
+    try {
+        decoded = Buffer.from(cursor, 'base64').toString('utf8');
+    } catch (error) {
+        return { error: 'Invalid byUserCursor encoding.' };
+    }
+
+    const [amountPart, userIdPart = ''] = decoded.split(':');
+    const totalAmount = parseFloat(amountPart);
+
+    if (!Number.isFinite(totalAmount)) {
+        return { error: 'Invalid byUserCursor payload.' };
+    }
+
+    return {
+        value: {
+            totalAmount,
+            userIdString: userIdPart,
+        },
+    };
+};
+
+const buildUserSummaryFacet = (limit, cursor) => {
+    const stages = [
+        {
+            $group: {
+                _id: '$user._id',
+                userId: { $first: '$user._id' },
+                userEmail: { $first: '$user.email' },
+                firstName: { $first: '$user.firstName' },
+                lastName: { $first: '$user.lastName' },
+                username: { $first: '$user.username' },
+                count: { $sum: 1 },
+                totalAmount: { $sum: '$amountNumber' },
+            },
+        },
+        {
+            $addFields: {
+                totalAmount: { $ifNull: ['$totalAmount', 0] },
+                userIdString: {
+                    $cond: {
+                        if: { $ifNull: ['$userId', false] },
+                        then: { $toString: '$userId' },
+                        else: '',
+                    },
+                },
+            },
+        },
+    ];
+
+    if (cursor) {
+        stages.push({
+            $match: {
+                $expr: {
+                    $or: [
+                        { $lt: ['$totalAmount', cursor.totalAmount] },
+                        {
+                            $and: [
+                                { $eq: ['$totalAmount', cursor.totalAmount] },
+                                { $gt: ['$userIdString', cursor.userIdString || ''] },
+                            ],
+                        },
+                    ],
+                },
+            },
+        });
+    }
+
+    stages.push({ $sort: { totalAmount: -1, userIdString: 1 } });
+
+    if (Number.isFinite(limit) && limit > 0) {
+        stages.push({ $limit: limit + 1 });
+    }
+
+    stages.push({
+        $project: {
+            _id: 0,
+            userId: 1,
+            userEmail: 1,
+            firstName: 1,
+            lastName: 1,
+            username: 1,
+            count: 1,
+            totalAmount: 1,
+        },
+    });
+
+    return stages;
+};
+
+const processUserSummaryResults = (entries, limit) => {
+    const effectiveLimit = Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_SUMMARY_USER_LIMIT;
+    const results = Array.isArray(entries) ? entries : [];
+    const hasNextPage = results.length > effectiveLimit;
+    const trimmedResults = hasNextPage ? results.slice(0, effectiveLimit) : results;
+
+    const normalizedResults = trimmedResults.map((entry) => ({
+        ...entry,
+        totalAmount: parseDecimal(entry.totalAmount),
+    }));
+
+    let nextCursor = null;
+
+    if (hasNextPage && normalizedResults.length) {
+        const lastEntry = normalizedResults[normalizedResults.length - 1];
+        const lastTotalAmount = Number.isFinite(lastEntry.totalAmount)
+            ? lastEntry.totalAmount
+            : parseDecimal(lastEntry.totalAmount) || 0;
+        const lastUserId = lastEntry.userId ? lastEntry.userId.toString() : '';
+        nextCursor = encodeUserSummaryCursor(lastTotalAmount, lastUserId);
+    }
+
+    return {
+        results: normalizedResults,
+        pageInfo: {
+            hasNextPage,
+            nextCursor,
+            limit: effectiveLimit,
+        },
+    };
 };
 
 const parseDecimal = (value) => {
@@ -142,7 +277,7 @@ const resolveOrderFilters = async (query) => {
 
     let paymentQuery = null;
 
-    if (query.paymentStatus || query.paymentGateway || query.invoiceNumber) {
+    if (query.paymentStatus || query.paymentGateway || query.invoiceNumber || query.gatewayTransactionId) {
         paymentQuery = {};
 
         if (query.paymentStatus) {
@@ -151,6 +286,10 @@ const resolveOrderFilters = async (query) => {
 
         if (query.paymentGateway) {
             paymentQuery.paymentGateway = query.paymentGateway;
+        }
+
+        if (query.gatewayTransactionId) {
+            paymentQuery.gatewayTransactionId = query.gatewayTransactionId;
         }
 
         if (query.invoiceNumber) {
@@ -194,6 +333,10 @@ const resolvePaymentFilters = async (query) => {
 
     if (query.paymentGateway) {
         paymentFilter.paymentGateway = query.paymentGateway;
+    }
+
+    if (query.gatewayTransactionId) {
+        paymentFilter.gatewayTransactionId = query.gatewayTransactionId;
     }
 
     if (query.purpose) {
@@ -272,7 +415,7 @@ const listOrders = async (req, res) => {
             })
             .populate({
                 path: 'payment',
-                select: 'status amount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
+                select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
             })
             .lean();
 
@@ -314,7 +457,7 @@ const getOrderByNumber = async (req, res) => {
                 })
                 .populate({
                     path: 'payment',
-                    select: 'status amount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
+                    select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
                 })
                 .lean();
         }
@@ -331,7 +474,7 @@ const getOrderByNumber = async (req, res) => {
                 })
                 .populate({
                     path: 'payment',
-                    select: 'status amount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
+                    select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
                 })
                 .lean();
         }
@@ -351,11 +494,29 @@ const getOrderByNumber = async (req, res) => {
 
 const getOrderSummary = async (req, res) => {
     try {
+        const byUserLimit = typeof req.query.byUserLimit === 'number' ? req.query.byUserLimit : DEFAULT_SUMMARY_USER_LIMIT;
+        const { value: byUserCursor, error: byUserCursorError } = decodeUserSummaryCursor(req.query.byUserCursor);
+
+        if (byUserCursorError) {
+            return res.status(400).json({ message: byUserCursorError });
+        }
+
         const { filter, empty } = await resolveOrderFilters(req.query);
 
         if (empty) {
-            return res.json({ data: EMPTY_ORDER_SUMMARY });
+            return res.json({
+                data: {
+                    ...EMPTY_ORDER_SUMMARY,
+                    byUserPageInfo: {
+                        hasNextPage: false,
+                        nextCursor: null,
+                        limit: byUserLimit,
+                    },
+                },
+            });
         }
+
+        const byUserFacet = buildUserSummaryFacet(byUserLimit, byUserCursor);
 
         const pipeline = [
             { $match: filter },
@@ -479,33 +640,7 @@ const getOrderSummary = async (req, res) => {
                         },
                         { $sort: { totalAmount: -1 } },
                     ],
-                    byUser: [
-                        {
-                            $group: {
-                                _id: '$user._id',
-                                userId: { $first: '$user._id' },
-                                userEmail: { $first: '$user.email' },
-                                firstName: { $first: '$user.firstName' },
-                                lastName: { $first: '$user.lastName' },
-                                username: { $first: '$user.username' },
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                userId: 1,
-                                userEmail: 1,
-                                firstName: 1,
-                                lastName: 1,
-                                username: 1,
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { totalAmount: -1 } },
-                    ],
+                    byUser: byUserFacet,
                     byYear: [
                         {
                             $group: {
@@ -564,6 +699,7 @@ const getOrderSummary = async (req, res) => {
 
         const summaryResults = await Order.aggregate(pipeline);
         const summary = summaryResults[0] || {};
+        const { results: usersByOrder, pageInfo: byUserPageInfo } = processUserSummaryResults(summary.byUser, byUserLimit);
 
         res.json({
             data: {
@@ -572,9 +708,10 @@ const getOrderSummary = async (req, res) => {
                 byPaymentStatus: summary.byPaymentStatus || EMPTY_ORDER_SUMMARY.byPaymentStatus,
                 byPaymentGateway: summary.byPaymentGateway || EMPTY_ORDER_SUMMARY.byPaymentGateway,
                 byPlan: summary.byPlan || EMPTY_ORDER_SUMMARY.byPlan,
-                byUser: summary.byUser || EMPTY_ORDER_SUMMARY.byUser,
+                byUser: usersByOrder,
                 byYear: summary.byYear || EMPTY_ORDER_SUMMARY.byYear,
                 byMonth: summary.byMonth || EMPTY_ORDER_SUMMARY.byMonth,
+                byUserPageInfo,
             },
         });
     } catch (error) {
@@ -585,11 +722,29 @@ const getOrderSummary = async (req, res) => {
 
 const getPaymentSummary = async (req, res) => {
     try {
+        const byUserLimit = typeof req.query.byUserLimit === 'number' ? req.query.byUserLimit : DEFAULT_SUMMARY_USER_LIMIT;
+        const { value: byUserCursor, error: byUserCursorError } = decodeUserSummaryCursor(req.query.byUserCursor);
+
+        if (byUserCursorError) {
+            return res.status(400).json({ message: byUserCursorError });
+        }
+
         const { filter, empty } = await resolvePaymentFilters(req.query);
 
         if (empty) {
-            return res.json({ data: EMPTY_PAYMENT_SUMMARY });
+            return res.json({
+                data: {
+                    ...EMPTY_PAYMENT_SUMMARY,
+                    byUserPageInfo: {
+                        hasNextPage: false,
+                        nextCursor: null,
+                        limit: byUserLimit,
+                    },
+                },
+            });
         }
+
+        const byUserFacet = buildUserSummaryFacet(byUserLimit, byUserCursor);
 
         const pipeline = [
             { $match: filter },
@@ -682,33 +837,7 @@ const getPaymentSummary = async (req, res) => {
                         },
                         { $sort: { purpose: 1 } },
                     ],
-                    byUser: [
-                        {
-                            $group: {
-                                _id: '$user._id',
-                                userId: { $first: '$user._id' },
-                                userEmail: { $first: '$user.email' },
-                                firstName: { $first: '$user.firstName' },
-                                lastName: { $first: '$user.lastName' },
-                                username: { $first: '$user.username' },
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                userId: 1,
-                                userEmail: 1,
-                                firstName: 1,
-                                lastName: 1,
-                                username: 1,
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { totalAmount: -1 } },
-                    ],
+                    byUser: byUserFacet,
                     byPlan: [
                         {
                             $group: {
@@ -790,6 +919,7 @@ const getPaymentSummary = async (req, res) => {
 
         const summaryResults = await Payment.aggregate(pipeline);
         const summary = summaryResults[0] || {};
+        const { results: usersByPayment, pageInfo: byUserPageInfo } = processUserSummaryResults(summary.byUser, byUserLimit);
 
         res.json({
             data: {
@@ -797,10 +927,11 @@ const getPaymentSummary = async (req, res) => {
                 byStatus: summary.byStatus || EMPTY_PAYMENT_SUMMARY.byStatus,
                 byGateway: summary.byGateway || EMPTY_PAYMENT_SUMMARY.byGateway,
                 byPurpose: summary.byPurpose || EMPTY_PAYMENT_SUMMARY.byPurpose,
-                byUser: summary.byUser || EMPTY_PAYMENT_SUMMARY.byUser,
+                byUser: usersByPayment,
                 byPlan: summary.byPlan || EMPTY_PAYMENT_SUMMARY.byPlan,
                 byYear: summary.byYear || EMPTY_PAYMENT_SUMMARY.byYear,
                 byMonth: summary.byMonth || EMPTY_PAYMENT_SUMMARY.byMonth,
+                byUserPageInfo,
             },
         });
     } catch (error) {

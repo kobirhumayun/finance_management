@@ -75,6 +75,13 @@ const listOrdersValidationRules = () => [
         .isLength({ min: 2, max: 64 })
         .withMessage('paymentGateway must be between 2 and 64 characters long.')
         .toLowerCase(),
+    query('gatewayTransactionId')
+        .optional()
+        .isString()
+        .withMessage('gatewayTransactionId must be a string.')
+        .trim()
+        .isLength({ min: 1, max: 128 })
+        .withMessage('gatewayTransactionId must be between 1 and 128 characters long.'),
     query('startDate')
         .optional()
         .isISO8601()
@@ -105,7 +112,23 @@ const getOrderByNumberValidationRules = () => [
         .withMessage('orderNumber must be between 1 and 64 characters long.'),
 ];
 
-const orderSummaryValidationRules = () => listOrdersValidationRules();
+const orderSummaryAdditionalRules = () => [
+    query('byUserLimit')
+        .optional()
+        .isInt({ min: 1, max: 500 })
+        .withMessage('byUserLimit must be between 1 and 500.')
+        .toInt(),
+    query('byUserCursor')
+        .optional()
+        .isString()
+        .withMessage('byUserCursor must be a string.')
+        .trim(),
+];
+
+const orderSummaryValidationRules = () => [
+    ...listOrdersValidationRules(),
+    ...orderSummaryAdditionalRules(),
+];
 
 const paymentSummaryValidationRules = () => [
     query('status')
@@ -139,6 +162,13 @@ const paymentSummaryValidationRules = () => [
         .isLength({ min: 2, max: 64 })
         .withMessage('paymentGateway must be between 2 and 64 characters long.')
         .toLowerCase(),
+    query('gatewayTransactionId')
+        .optional()
+        .isString()
+        .withMessage('gatewayTransactionId must be a string.')
+        .trim()
+        .isLength({ min: 1, max: 128 })
+        .withMessage('gatewayTransactionId must be between 1 and 128 characters long.'),
     query('purpose')
         .optional()
         .isIn(allowedPaymentPurposes)
@@ -153,6 +183,16 @@ const paymentSummaryValidationRules = () => [
         .isISO8601()
         .withMessage('endDate must be a valid ISO 8601 date.')
         .toDate(),
+    query('byUserLimit')
+        .optional()
+        .isInt({ min: 1, max: 500 })
+        .withMessage('byUserLimit must be between 1 and 500.')
+        .toInt(),
+    query('byUserCursor')
+        .optional()
+        .isString()
+        .withMessage('byUserCursor must be a string.')
+        .trim(),
 ];
 
 module.exports = {
