@@ -479,7 +479,13 @@ export const adminInvoiceListOptions = (filters = {}, { limit = 20 } = {}) => {
       };
     },
     initialPageParam: null,
-    getNextPageParam: (lastPage) => lastPage?.pageInfo?.nextCursor ?? null,
+    getNextPageParam: (lastPage) => {
+      const pageInfo = lastPage?.pageInfo;
+      if (!pageInfo || !pageInfo.hasNextPage || !pageInfo.nextCursor) {
+        return undefined;
+      }
+      return pageInfo.nextCursor;
+    },
     staleTime: 15_000,
     gcTime: 5 * 60 * 1000,
   };
@@ -507,7 +513,13 @@ export const adminInvoiceSummaryInfiniteOptions = (filters = {}, { byUserLimit =
       };
     },
     initialPageParam: null,
-    getNextPageParam: (lastPage) => lastPage?.pageInfo?.nextCursor ?? null,
+    getNextPageParam: (lastPage) => {
+      const pageInfo = lastPage?.pageInfo;
+      if (!pageInfo || !pageInfo.hasNextPage || !pageInfo.nextCursor) {
+        return undefined;
+      }
+      return pageInfo.nextCursor;
+    },
     staleTime: 15_000,
     gcTime: 5 * 60 * 1000,
   };
