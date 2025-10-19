@@ -3,7 +3,6 @@ const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const Plan = require('../models/Plan');
-const Invoice = require('../models/Invoice');
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
@@ -186,27 +185,9 @@ const parseDecimal = (value) => {
     return value;
 };
 
-const attachInvoiceData = async (orders) => {
-    const paymentIds = orders
-        .map((order) => order.payment?._id)
-        .filter(Boolean);
-
-    if (paymentIds.length === 0) {
-        return orders;
-    }
-
-    const invoices = await Invoice.find({ payment: { $in: paymentIds } })
-        .select('payment invoiceNumber status issuedDate dueDate amount currency subscriptionStartDate subscriptionEndDate createdAt updatedAt')
-        .lean();
-
-    const invoiceMap = new Map(invoices.map((invoice) => [invoice.payment.toString(), invoice]));
-
-    return orders.map((order) => {
+const normalizeOrderDocuments = (orders) =>
+    orders.map((order) => {
         if (order.payment) {
-            const paymentId = order.payment._id.toString();
-            const invoice = invoiceMap.get(paymentId) || null;
-            order.invoice = invoice;
-
             if (order.payment.amount !== undefined) {
                 order.payment.amount = parseDecimal(order.payment.amount);
             }
@@ -214,13 +195,14 @@ const attachInvoiceData = async (orders) => {
             if (order.payment.refundedAmount !== undefined) {
                 order.payment.refundedAmount = parseDecimal(order.payment.refundedAmount);
             }
-        } else {
+        }
+
+        if (order.invoice === undefined) {
             order.invoice = null;
         }
 
         return order;
     });
-};
 
 const resolveOrderFilters = async (query) => {
     const orderFilter = {};
@@ -275,45 +257,27 @@ const resolveOrderFilters = async (query) => {
         orderFilter.plan = plan._id;
     }
 
-    let paymentQuery = null;
+    const paymentFilter = {};
 
-    if (query.paymentStatus || query.paymentGateway || query.invoiceNumber || query.gatewayTransactionId) {
-        paymentQuery = {};
-
-        if (query.paymentStatus) {
-            paymentQuery.status = query.paymentStatus;
-        }
-
-        if (query.paymentGateway) {
-            paymentQuery.paymentGateway = query.paymentGateway;
-        }
-
-        if (query.gatewayTransactionId) {
-            paymentQuery.gatewayTransactionId = query.gatewayTransactionId;
-        }
-
-        if (query.invoiceNumber) {
-            const invoice = await Invoice.findOne({ invoiceNumber: query.invoiceNumber })
-                .select('payment')
-                .lean();
-
-            if (!invoice || !invoice.payment) {
-                return { empty: true };
-            }
-
-            paymentQuery._id = invoice.payment;
-        }
-
-        const payments = await Payment.find(paymentQuery).select('_id').lean();
-
-        if (!payments.length) {
-            return { empty: true };
-        }
-
-        orderFilter.payment = { $in: payments.map((payment) => payment._id) };
+    if (query.paymentStatus) {
+        paymentFilter.status = query.paymentStatus;
     }
 
-    return { filter: orderFilter };
+    if (query.paymentGateway) {
+        paymentFilter.paymentGateway = query.paymentGateway;
+    }
+
+    if (query.gatewayTransactionId) {
+        paymentFilter.gatewayTransactionId = query.gatewayTransactionId;
+    }
+
+    const hasPaymentFilter = Object.keys(paymentFilter).length > 0;
+
+    return {
+        filter: orderFilter,
+        paymentFilter: hasPaymentFilter ? paymentFilter : null,
+        invoiceNumber: query.invoiceNumber || null,
+    };
 };
 
 const resolvePaymentFilters = async (query) => {
@@ -386,7 +350,7 @@ const listOrders = async (req, res) => {
         const limit = Math.min(requestedLimit, MAX_PAGE_SIZE);
         const cursor = req.query.cursor ? new mongoose.Types.ObjectId(req.query.cursor) : null;
 
-        const { filter, empty } = await resolveOrderFilters(req.query);
+        const { filter, paymentFilter, invoiceNumber, empty } = await resolveOrderFilters(req.query);
 
         if (empty) {
             return res.json({
@@ -398,13 +362,80 @@ const listOrders = async (req, res) => {
             });
         }
 
+        const matchConditions = { ...filter };
+
         if (cursor) {
-            filter._id = { $lt: cursor };
+            matchConditions._id = { ...(matchConditions._id || {}), $lt: cursor };
         }
 
-        const orders = await Order.find(filter)
+        const idPipeline = [
+            { $match: matchConditions },
+            { $sort: { _id: -1 } },
+        ];
+
+        if (paymentFilter) {
+            idPipeline.push({
+                $lookup: {
+                    from: 'payments',
+                    localField: 'payment',
+                    foreignField: '_id',
+                    as: 'paymentDoc',
+                },
+            });
+            idPipeline.push({ $unwind: { path: '$paymentDoc', preserveNullAndEmptyArrays: false } });
+
+            const paymentMatch = {};
+
+            if (paymentFilter.status) {
+                paymentMatch['paymentDoc.status'] = paymentFilter.status;
+            }
+
+            if (paymentFilter.paymentGateway) {
+                paymentMatch['paymentDoc.paymentGateway'] = paymentFilter.paymentGateway;
+            }
+
+            if (paymentFilter.gatewayTransactionId) {
+                paymentMatch['paymentDoc.gatewayTransactionId'] = paymentFilter.gatewayTransactionId;
+            }
+
+            if (Object.keys(paymentMatch).length) {
+                idPipeline.push({ $match: paymentMatch });
+            }
+        }
+
+        if (invoiceNumber) {
+            idPipeline.push({
+                $lookup: {
+                    from: 'invoices',
+                    localField: 'invoice',
+                    foreignField: '_id',
+                    as: 'invoiceDoc',
+                },
+            });
+            idPipeline.push({ $unwind: { path: '$invoiceDoc', preserveNullAndEmptyArrays: false } });
+            idPipeline.push({ $match: { 'invoiceDoc.invoiceNumber': invoiceNumber } });
+        }
+
+        idPipeline.push({ $project: { _id: 1 } });
+        idPipeline.push({ $limit: limit + 1 });
+
+        const idResults = await Order.aggregate(idPipeline);
+        const orderIds = idResults.map((doc) => doc._id);
+        const hasNextPage = orderIds.length > limit;
+        const effectiveIds = hasNextPage ? orderIds.slice(0, limit) : orderIds;
+
+        if (!effectiveIds.length) {
+            return res.json({
+                data: [],
+                pageInfo: {
+                    nextCursor: null,
+                    hasNextPage: false,
+                },
+            });
+        }
+
+        const orders = await Order.find({ _id: { $in: effectiveIds } })
             .sort({ _id: -1 })
-            .limit(limit + 1)
             .populate({
                 path: 'user',
                 select: 'username email firstName lastName role subscriptionStatus subscriptionEndDate subscriptionStartDate',
@@ -417,17 +448,23 @@ const listOrders = async (req, res) => {
                 path: 'payment',
                 select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
             })
+            .populate({
+                path: 'invoice',
+                select: 'invoiceNumber status issuedDate dueDate amount currency subscriptionStartDate subscriptionEndDate createdAt updatedAt',
+            })
             .lean();
 
-        const hasNextPage = orders.length > limit;
-        const trimmedOrders = hasNextPage ? orders.slice(0, limit) : orders;
+        const orderMap = new Map(orders.map((order) => [order._id.toString(), order]));
+        const orderedResults = effectiveIds
+            .map((id) => orderMap.get(id.toString()))
+            .filter(Boolean);
 
-        const enrichedOrders = await attachInvoiceData(trimmedOrders);
+        const normalizedOrders = normalizeOrderDocuments(orderedResults);
 
-        const nextCursor = hasNextPage ? trimmedOrders[trimmedOrders.length - 1]._id.toString() : null;
+        const nextCursor = hasNextPage ? effectiveIds[effectiveIds.length - 1].toString() : null;
 
         res.json({
-            data: enrichedOrders,
+            data: normalizedOrders,
             pageInfo: {
                 nextCursor,
                 hasNextPage,
@@ -459,6 +496,10 @@ const getOrderByNumber = async (req, res) => {
                     path: 'payment',
                     select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
                 })
+                .populate({
+                    path: 'invoice',
+                    select: 'invoiceNumber status issuedDate dueDate amount currency subscriptionStartDate subscriptionEndDate createdAt updatedAt',
+                })
                 .lean();
         }
 
@@ -476,6 +517,10 @@ const getOrderByNumber = async (req, res) => {
                     path: 'payment',
                     select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
                 })
+                .populate({
+                    path: 'invoice',
+                    select: 'invoiceNumber status issuedDate dueDate amount currency subscriptionStartDate subscriptionEndDate createdAt updatedAt',
+                })
                 .lean();
         }
 
@@ -483,7 +528,7 @@ const getOrderByNumber = async (req, res) => {
             return res.status(404).json({ message: 'Order not found.' });
         }
 
-        const [enrichedOrder] = await attachInvoiceData([order]);
+        const [enrichedOrder] = normalizeOrderDocuments([order]);
 
         res.json({ data: enrichedOrder });
     } catch (error) {
@@ -501,7 +546,7 @@ const getOrderSummary = async (req, res) => {
             return res.status(400).json({ message: byUserCursorError });
         }
 
-        const { filter, empty } = await resolveOrderFilters(req.query);
+        const { filter, paymentFilter, invoiceNumber, empty } = await resolveOrderFilters(req.query);
 
         if (empty) {
             return res.json({
@@ -529,173 +574,209 @@ const getOrderSummary = async (req, res) => {
                 },
             },
             { $unwind: { path: '$payment', preserveNullAndEmptyArrays: true } },
-            {
-                $lookup: {
-                    from: 'plans',
-                    localField: 'plan',
-                    foreignField: '_id',
-                    as: 'plan',
-                },
+        {
+            $lookup: {
+                from: 'plans',
+                localField: 'plan',
+                foreignField: '_id',
+                as: 'plan',
             },
-            { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'user',
-                    foreignField: '_id',
-                    as: 'user',
-                },
+        },
+        { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'user',
+                foreignField: '_id',
+                as: 'user',
             },
-            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-            {
-                $addFields: {
-                    amountNumber: { $toDouble: { $ifNull: ['$amount', 0] } },
-                    effectiveDate: { $ifNull: ['$createdAt', '$updatedAt'] },
-                },
-            },
-            {
-                $facet: {
-                    totals: [
-                        {
-                            $group: {
-                                _id: null,
-                                totalOrders: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                    ],
-                    byStatus: [
-                        {
-                            $group: {
-                                _id: '$status',
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                status: '$_id',
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { status: 1 } },
-                    ],
-                    byPaymentStatus: [
-                        {
-                            $group: {
-                                _id: '$payment.status',
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                paymentStatus: '$_id',
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { paymentStatus: 1 } },
-                    ],
-                    byPaymentGateway: [
-                        {
-                            $group: {
-                                _id: '$payment.paymentGateway',
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                paymentGateway: '$_id',
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { paymentGateway: 1 } },
-                    ],
-                    byPlan: [
-                        {
-                            $group: {
-                                _id: '$plan._id',
-                                planSlug: { $first: '$plan.slug' },
-                                planName: { $first: '$plan.name' },
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                planId: '$_id',
-                                planSlug: 1,
-                                planName: 1,
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { totalAmount: -1 } },
-                    ],
-                    byUser: byUserFacet,
-                    byYear: [
-                        {
-                            $group: {
-                                _id: { $year: '$effectiveDate' },
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                year: '$_id',
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { year: -1 } },
-                    ],
-                    byMonth: [
-                        {
-                            $group: {
-                                _id: {
-                                    year: { $year: '$effectiveDate' },
-                                    month: { $month: '$effectiveDate' },
-                                },
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                year: '$_id.year',
-                                month: '$_id.month',
-                                count: 1,
-                                totalAmount: 1,
-                            },
-                        },
-                        { $sort: { year: -1, month: -1 } },
-                    ],
-                },
-            },
-            {
-                $project: {
-                    totals: { $ifNull: [{ $arrayElemAt: ['$totals', 0] }, { totalOrders: 0, totalAmount: 0 }] },
-                    byStatus: 1,
-                    byPaymentStatus: 1,
-                    byPaymentGateway: 1,
-                    byPlan: 1,
-                    byUser: 1,
-                    byYear: 1,
-                    byMonth: 1,
-                },
-            },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
         ];
+
+        if (paymentFilter) {
+            const paymentMatch = {};
+
+            if (paymentFilter.status) {
+                paymentMatch['payment.status'] = paymentFilter.status;
+            }
+
+            if (paymentFilter.paymentGateway) {
+                paymentMatch['payment.paymentGateway'] = paymentFilter.paymentGateway;
+            }
+
+            if (paymentFilter.gatewayTransactionId) {
+                paymentMatch['payment.gatewayTransactionId'] = paymentFilter.gatewayTransactionId;
+            }
+
+            if (Object.keys(paymentMatch).length) {
+                pipeline.push({ $match: paymentMatch });
+            }
+        }
+
+        if (invoiceNumber) {
+            pipeline.push({
+                $lookup: {
+                    from: 'invoices',
+                    localField: 'invoice',
+                    foreignField: '_id',
+                    as: 'invoice',
+                },
+            });
+            pipeline.push({ $unwind: { path: '$invoice', preserveNullAndEmptyArrays: false } });
+            pipeline.push({ $match: { 'invoice.invoiceNumber': invoiceNumber } });
+        }
+
+        pipeline.push({
+            $addFields: {
+                amountNumber: { $toDouble: { $ifNull: ['$amount', 0] } },
+                effectiveDate: { $ifNull: ['$createdAt', '$updatedAt'] },
+            },
+        });
+
+        pipeline.push({
+            $facet: {
+                totals: [
+                    {
+                        $group: {
+                            _id: null,
+                            totalOrders: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                ],
+                byStatus: [
+                    {
+                        $group: {
+                            _id: '$status',
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            status: '$_id',
+                            count: 1,
+                            totalAmount: 1,
+                        },
+                    },
+                    { $sort: { status: 1 } },
+                ],
+                byPaymentStatus: [
+                    {
+                        $group: {
+                            _id: '$payment.status',
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            paymentStatus: '$_id',
+                            count: 1,
+                            totalAmount: 1,
+                        },
+                    },
+                    { $sort: { paymentStatus: 1 } },
+                ],
+                byPaymentGateway: [
+                    {
+                        $group: {
+                            _id: '$payment.paymentGateway',
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            paymentGateway: '$_id',
+                            count: 1,
+                            totalAmount: 1,
+                        },
+                    },
+                    { $sort: { paymentGateway: 1 } },
+                ],
+                byPlan: [
+                    {
+                        $group: {
+                            _id: '$plan._id',
+                            planSlug: { $first: '$plan.slug' },
+                            planName: { $first: '$plan.name' },
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            planId: '$_id',
+                            planSlug: 1,
+                            planName: 1,
+                            count: 1,
+                            totalAmount: 1,
+                        },
+                    },
+                    { $sort: { totalAmount: -1 } },
+                ],
+                byUser: byUserFacet,
+                byYear: [
+                    {
+                        $group: {
+                            _id: { $year: '$effectiveDate' },
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            year: '$_id',
+                            count: 1,
+                            totalAmount: 1,
+                        },
+                    },
+                    { $sort: { year: -1 } },
+                ],
+                byMonth: [
+                    {
+                        $group: {
+                            _id: {
+                                year: { $year: '$effectiveDate' },
+                                month: { $month: '$effectiveDate' },
+                            },
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            year: '$_id.year',
+                            month: '$_id.month',
+                            count: 1,
+                            totalAmount: 1,
+                        },
+                    },
+                    { $sort: { year: -1, month: -1 } },
+                ],
+            },
+        });
+
+        pipeline.push({
+            $project: {
+                totals: { $ifNull: [{ $arrayElemAt: ['$totals', 0] }, { totalOrders: 0, totalAmount: 0 }] },
+                byStatus: 1,
+                byPaymentStatus: 1,
+                byPaymentGateway: 1,
+                byPlan: 1,
+                byUser: 1,
+                byYear: 1,
+                byMonth: 1,
+            },
+        });
 
         const summaryResults = await Order.aggregate(pipeline);
         const summary = summaryResults[0] || {};
