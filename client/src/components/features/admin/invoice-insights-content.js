@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrencyWithCode, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatCurrencyWithCode, formatNumber } from "@/lib/formatters";
 import { sanitizeInvoiceFilters } from "@/lib/queries/admin-invoices";
 
 export const INVOICE_INSIGHTS_PAGE_SIZE = 20;
@@ -84,8 +84,8 @@ const formatAmount = (amount, currency) => {
   if (amount == null) {
     return "—";
   }
-  const fallback = formatNumber(amount, { fallback: "—" });
-  return formatCurrencyWithCode(amount, currency || "USD", { fallback });
+  const fallback = formatCurrency(amount, { fallback: "—" });
+  return formatCurrencyWithCode(amount, currency || "BDT", { fallback });
 };
 
 const formatMonthLabel = ({ year, month }) => {
@@ -294,7 +294,7 @@ function SummarySection({ summary, isLoading, isError }) {
             <CardTitle className="text-base">Total billed amount</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{formatNumber(totals.totalAmount, { fallback: "0" })}</p>
+            <p className="text-3xl font-semibold">{formatAmount(totals.totalAmount, totals.currency)}</p>
             <p className="text-sm text-muted-foreground">Across all invoice currencies</p>
           </CardContent>
         </Card>
@@ -341,7 +341,7 @@ function TopCustomersSection({ customers, hasMore, isFetchingNextPage, onLoadMor
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right">{formatNumber(customer.count, { fallback: "0" })}</TableCell>
-                    <TableCell className="text-right">{formatNumber(customer.totalAmount, { fallback: "0" })}</TableCell>
+                    <TableCell className="text-right">{formatAmount(customer.totalAmount, customer.currency)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -591,7 +591,7 @@ export function InvoiceInsightsContent({
             count: item.count,
             totalAmount: item.totalAmount,
           }))}
-          valueFormatter={(row) => formatNumber(row.totalAmount, { fallback: "0" })}
+          valueFormatter={(row) => formatAmount(row.totalAmount, row.currency)}
         />
         <BreakdownTable
           title="Payment statuses"
@@ -602,7 +602,7 @@ export function InvoiceInsightsContent({
             count: item.count,
             totalAmount: item.totalAmount,
           }))}
-          valueFormatter={(row) => formatNumber(row.totalAmount, { fallback: "0" })}
+          valueFormatter={(row) => formatAmount(row.totalAmount, row.currency)}
         />
         <BreakdownTable
           title="Payment gateways"
@@ -613,7 +613,7 @@ export function InvoiceInsightsContent({
             count: item.count,
             totalAmount: item.totalAmount,
           }))}
-          valueFormatter={(row) => formatNumber(row.totalAmount, { fallback: "0" })}
+          valueFormatter={(row) => formatAmount(row.totalAmount, row.currency)}
         />
         <BreakdownTable
           title="Currencies"
@@ -637,7 +637,7 @@ export function InvoiceInsightsContent({
           count: item.count,
           totalAmount: item.totalAmount,
         }))}
-        valueFormatter={(row) => formatNumber(row.totalAmount, { fallback: "0" })}
+        valueFormatter={(row) => formatAmount(row.totalAmount, row.currency)}
       />
       <div className="grid gap-4 md:grid-cols-2">
         <BreakdownTable
@@ -649,7 +649,7 @@ export function InvoiceInsightsContent({
             count: item.count,
             totalAmount: item.totalAmount,
           }))}
-          valueFormatter={(row) => formatNumber(row.totalAmount, { fallback: "0" })}
+          valueFormatter={(row) => formatAmount(row.totalAmount, row.currency)}
         />
         <BreakdownTable
           title="By month"
@@ -660,7 +660,7 @@ export function InvoiceInsightsContent({
             count: item.count,
             totalAmount: item.totalAmount,
           }))}
-          valueFormatter={(row) => formatNumber(row.totalAmount, { fallback: "0" })}
+          valueFormatter={(row) => formatAmount(row.totalAmount, row.currency)}
         />
       </div>
       <TopCustomersSection
