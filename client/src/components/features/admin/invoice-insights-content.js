@@ -507,37 +507,57 @@ function InvoiceDetailSection({ detail, isLoading, isError, selectedInvoiceNumbe
         <CardHeader>
           <CardTitle className="text-base">Invoice metadata</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Invoice status</span>
-            <span className="font-medium">{detail.statusLabel || formatStatusLabel(detail.status)}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Issued</span>
-            <span className="font-medium">{formatDateTime(detail.issuedDate)}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Due</span>
-            <span className="font-medium">{formatDateTime(detail.dueDate)}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Billing period</span>
-            <span className="font-medium">
-              {detail.subscriptionStartDate ? formatDateOnly(detail.subscriptionStartDate) : "—"} → {detail.subscriptionEndDate ? formatDateOnly(detail.subscriptionEndDate) : "—"}
-            </span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Plan</span>
-            <span className="font-medium">{detail.planName || detail.planSlug || "Unknown plan"}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Amount</span>
-            <span className="font-medium">
-              {formatAmount(
-                detail.amount ?? detail.paymentAmount,
-                detail.currency ?? detail.paymentCurrency,
-              )}
-            </span>
+        <CardContent className="text-sm">
+          <div className="divide-y divide-border/60">
+            {[
+              {
+                key: "invoice-status",
+                label: "Invoice status",
+                value: detail.statusLabel || formatStatusLabel(detail.status),
+              },
+              {
+                key: "issued",
+                label: "Issued",
+                value: formatDateTime(detail.issuedDate),
+              },
+              {
+                key: "due",
+                label: "Due",
+                value: formatDateTime(detail.dueDate),
+              },
+              {
+                key: "billing-period",
+                label: "Billing period",
+                value: `${
+                  detail.subscriptionStartDate
+                    ? formatDateOnly(detail.subscriptionStartDate)
+                    : "—"
+                } → ${
+                  detail.subscriptionEndDate ? formatDateOnly(detail.subscriptionEndDate) : "—"
+                }`,
+              },
+              {
+                key: "plan",
+                label: "Plan",
+                value: detail.planName || detail.planSlug || "Unknown plan",
+              },
+              {
+                key: "amount",
+                label: "Amount",
+                value: formatAmount(
+                  detail.amount ?? detail.paymentAmount,
+                  detail.currency ?? detail.paymentCurrency,
+                ),
+              },
+            ].map((row) => (
+              <div
+                key={row.key}
+                className="flex justify-between gap-4 py-1.5 first:pt-0 last:pb-0"
+              >
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="font-medium">{row.value}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -545,26 +565,43 @@ function InvoiceDetailSection({ detail, isLoading, isError, selectedInvoiceNumbe
         <CardHeader>
           <CardTitle className="text-base">Payment</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Payment status</span>
-            <span className="font-medium">{detail.paymentStatusLabel || formatStatusLabel(detail.paymentStatus)}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Gateway</span>
-            <span className="font-medium">{detail.paymentGateway || "—"}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Reference</span>
-            <span className="font-medium">{detail.paymentReference || "—"}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Processed</span>
-            <span className="font-medium">{formatDateTime(detail.paymentProcessedAt || detail.paymentUpdatedAt)}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Purpose</span>
-            <span className="font-medium">{detail.paymentPurpose || "—"}</span>
+        <CardContent className="text-sm">
+          <div className="divide-y divide-border/60">
+            {[
+              {
+                key: "payment-status",
+                label: "Payment status",
+                value: detail.paymentStatusLabel || formatStatusLabel(detail.paymentStatus),
+              },
+              {
+                key: "gateway",
+                label: "Gateway",
+                value: detail.paymentGateway || "—",
+              },
+              {
+                key: "reference",
+                label: "Reference",
+                value: detail.paymentReference || "—",
+              },
+              {
+                key: "processed",
+                label: "Processed",
+                value: formatDateTime(detail.paymentProcessedAt || detail.paymentUpdatedAt),
+              },
+              {
+                key: "purpose",
+                label: "Purpose",
+                value: detail.paymentPurpose || "—",
+              },
+            ].map((row) => (
+              <div
+                key={row.key}
+                className="flex justify-between gap-4 py-1.5 first:pt-0 last:pb-0"
+              >
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="font-medium">{row.value}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
