@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import {
   formatCurrency,
   formatCurrencyWithCode,
@@ -83,6 +84,13 @@ const formatDateOnly = (value) => {
   } catch {
     return date.toLocaleDateString();
   }
+};
+
+const clamp = (value, min, max) => {
+  if (Number.isNaN(value)) {
+    return value;
+  }
+  return Math.min(Math.max(value, min), max);
 };
 
 const formatAmount = (amount, currency) => {
@@ -421,11 +429,31 @@ function InvoiceListSection({
                   <TableBody>
                     {invoices.map((invoice) => {
                       const isSelected = selectedInvoiceNumber === invoice.invoiceNumber;
+                      const handleRowSelect = (event) => {
+                        if (isSelected) {
+                          onSelect(null, null);
+                          return;
+                        }
+                        onSelect(invoice.invoiceNumber, event.currentTarget);
+                      };
+                      const handleRowKeyDown = (event) => {
+                        if (event.key === "Enter" || event.key === " " || event.key === "Space") {
+                          event.preventDefault();
+                          if (isSelected) {
+                            onSelect(null, null);
+                          } else {
+                            onSelect(invoice.invoiceNumber, event.currentTarget);
+                          }
+                        }
+                      };
                       return (
                         <TableRow
                           key={invoice.id ?? invoice.invoiceNumber}
                           className={isSelected ? "bg-muted/40" : undefined}
-                          onClick={() => onSelect(invoice.invoiceNumber)}
+                          tabIndex={0}
+                          aria-selected={isSelected}
+                          onClick={handleRowSelect}
+                          onKeyDown={handleRowKeyDown}
                         >
                           <TableCell>
                             <div className="font-medium">{invoice.invoiceNumber}</div>
@@ -479,157 +507,277 @@ function InvoiceListSection({
   );
 }
 
-function InvoiceDetailSection({ detail, isLoading, isError, selectedInvoiceNumber }) {
-  if (!selectedInvoiceNumber) {
-    return (
-      <section aria-labelledby="invoice-insights-detail" className="space-y-2">
-        <h2 id="invoice-insights-detail" className="text-lg font-semibold">
-          Invoice detail
-        </h2>
-        <p className="text-sm text-muted-foreground">Select an invoice to preview customer, plan, and payment context.</p>
-      </section>
-    );
-  }
+function InvoiceDetailPopover({
+  anchorElement,
+  detail,
+  isLoading,
+  isError,
+  selectedInvoiceNumber,
+  onClose,
+}) {
+  const bodyRef = useRef(null);
+  const lastMeasuredRectRef = useRef(null);
+  const popoverSideRef = useRef("right");
+  const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
+  const [popoverSide, setPopoverSide] = useState("right");
+  const isOpen = Boolean(selectedInvoiceNumber && anchorElement);
 
-  if (isLoading) {
-    return (
-      <section aria-labelledby="invoice-insights-detail" className="space-y-2">
-        <h2 id="invoice-insights-detail" className="text-lg font-semibold">
-          Invoice detail
-        </h2>
-        <p className="text-sm text-muted-foreground">Loading invoice {selectedInvoiceNumber}…</p>
-      </section>
-    );
-  }
+  useEffect(() => {
+    if (!isOpen && bodyRef.current) {
+      bodyRef.current = null;
+    }
+  }, [isOpen]);
 
-  if (isError) {
-    return (
-      <section aria-labelledby="invoice-insights-detail" className="space-y-2">
-        <h2 id="invoice-insights-detail" className="text-lg font-semibold">
-          Invoice detail
-        </h2>
-        <p className="text-sm text-destructive">Unable to load invoice {selectedInvoiceNumber}.</p>
-      </section>
-    );
-  }
+  useEffect(() => {
+    if (anchorElement && !anchorElement.isConnected) {
+      onClose?.();
+    }
+  }, [anchorElement, onClose]);
 
-  if (!detail) {
+  useEffect(() => {
+    if (!isOpen || !anchorElement) {
+      setVirtualAnchorRef({ current: null });
+      lastMeasuredRectRef.current = null;
+      return;
+    }
+
+    if (typeof window === "undefined" || typeof anchorElement.getBoundingClientRect !== "function") {
+      return;
+    }
+
+    const measure = () => {
+      if (!anchorElement || typeof anchorElement.getBoundingClientRect !== "function") {
+        return;
+      }
+
+      const rect = anchorElement.getBoundingClientRect();
+      const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || rect.right || 0;
+      const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || rect.bottom || 0;
+      const margin = 16;
+
+      const availableRight = Math.max(0, viewportWidth - margin - rect.right);
+      const availableLeft = Math.max(0, rect.left - margin);
+      const nextSide = availableRight >= availableLeft ? "right" : "left";
+      const horizontalEdge = nextSide === "right" ? rect.right : rect.left;
+      const anchorX = clamp(horizontalEdge, margin, Math.max(margin, viewportWidth - margin));
+      const anchorY = clamp(
+        rect.top + rect.height / 2,
+        margin,
+        Math.max(margin, viewportHeight - margin),
+      );
+
+      const sanitizedRect = {
+        width: 0,
+        height: 0,
+        top: anchorY,
+        bottom: anchorY,
+        left: anchorX,
+        right: anchorX,
+        x: anchorX,
+        y: anchorY,
+      };
+
+      const previousRect = lastMeasuredRectRef.current;
+      const rectChanged =
+        !previousRect ||
+        ["top", "bottom", "left", "right", "x", "y"].some(
+          (key) => previousRect[key] !== sanitizedRect[key],
+        );
+      const sideChanged = popoverSideRef.current !== nextSide;
+
+      if (!rectChanged && !sideChanged) {
+        return;
+      }
+
+      lastMeasuredRectRef.current = sanitizedRect;
+
+      if (sideChanged) {
+        popoverSideRef.current = nextSide;
+        setPopoverSide(nextSide);
+      }
+
+      setVirtualAnchorRef({
+        current: {
+          getBoundingClientRect: () => sanitizedRect,
+          contextElement: anchorElement,
+        },
+      });
+    };
+
+    let frameId;
+    const scheduleMeasure = () => {
+      if (frameId != null) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        measure();
+      });
+    };
+
+    measure();
+
+    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("scroll", scheduleMeasure, true);
+
+    return () => {
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure, true);
+    };
+  }, [anchorElement, isOpen]);
+
+  if (!isOpen) {
     return null;
   }
 
-  return (
-    <section aria-labelledby="invoice-insights-detail" className="space-y-4">
-      <div>
-        <h2 id="invoice-insights-detail" className="text-lg font-semibold">
-          Invoice detail
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Reference information for {detail.invoiceNumber}.
-        </p>
+  let content = null;
+
+  if (isLoading) {
+    content = (
+      <p className="text-sm text-muted-foreground">Loading invoice {selectedInvoiceNumber}…</p>
+    );
+  } else if (isError) {
+    content = (
+      <p className="text-sm text-destructive">Unable to load invoice {selectedInvoiceNumber}.</p>
+    );
+  } else if (!detail) {
+    content = (
+      <p className="text-sm text-muted-foreground">
+        No additional details are available for invoice {selectedInvoiceNumber}.
+      </p>
+    );
+  } else {
+    const metadataRows = [
+      {
+        key: "invoice-status",
+        label: "Invoice status",
+        value: detail.statusLabel || formatStatusLabel(detail.status),
+      },
+      {
+        key: "issued",
+        label: "Issued",
+        value: formatDateTime(detail.issuedDate),
+      },
+      {
+        key: "due",
+        label: "Due",
+        value: formatDateTime(detail.dueDate),
+      },
+      {
+        key: "billing-period",
+        label: "Billing period",
+        value: `${
+          detail.subscriptionStartDate ? formatDateOnly(detail.subscriptionStartDate) : "—"
+        } → ${detail.subscriptionEndDate ? formatDateOnly(detail.subscriptionEndDate) : "—"}`,
+      },
+      {
+        key: "plan",
+        label: "Plan",
+        value: detail.planName || detail.planSlug || "Unknown plan",
+      },
+      {
+        key: "amount",
+        label: "Amount",
+        value: formatAmount(
+          detail.amount ?? detail.paymentAmount,
+          detail.currency ?? detail.paymentCurrency,
+        ),
+      },
+    ];
+
+    const paymentRows = [
+      {
+        key: "payment-status",
+        label: "Payment status",
+        value: detail.paymentStatusLabel || formatStatusLabel(detail.paymentStatus),
+      },
+      {
+        key: "gateway",
+        label: "Gateway",
+        value: detail.paymentGateway || "—",
+      },
+      {
+        key: "reference",
+        label: "Reference",
+        value: detail.paymentReference || "—",
+      },
+      {
+        key: "processed",
+        label: "Processed",
+        value: formatDateTime(detail.paymentProcessedAt || detail.paymentUpdatedAt),
+      },
+      {
+        key: "purpose",
+        label: "Purpose",
+        value: detail.paymentPurpose || "—",
+      },
+    ];
+
+    const renderRows = (rows) => (
+      <div className="divide-y divide-border/60">
+        {rows.map((row) => (
+          <div key={row.key} className="flex justify-between gap-4 py-1.5 first:pt-0 last:pb-0">
+            <span className="text-muted-foreground">{row.label}</span>
+            <span className="font-medium">{row.value}</span>
+          </div>
+        ))}
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Invoice metadata</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm">
-          <div className="divide-y divide-border/60">
-            {[
-              {
-                key: "invoice-status",
-                label: "Invoice status",
-                value: detail.statusLabel || formatStatusLabel(detail.status),
-              },
-              {
-                key: "issued",
-                label: "Issued",
-                value: formatDateTime(detail.issuedDate),
-              },
-              {
-                key: "due",
-                label: "Due",
-                value: formatDateTime(detail.dueDate),
-              },
-              {
-                key: "billing-period",
-                label: "Billing period",
-                value: `${
-                  detail.subscriptionStartDate
-                    ? formatDateOnly(detail.subscriptionStartDate)
-                    : "—"
-                } → ${
-                  detail.subscriptionEndDate ? formatDateOnly(detail.subscriptionEndDate) : "—"
-                }`,
-              },
-              {
-                key: "plan",
-                label: "Plan",
-                value: detail.planName || detail.planSlug || "Unknown plan",
-              },
-              {
-                key: "amount",
-                label: "Amount",
-                value: formatAmount(
-                  detail.amount ?? detail.paymentAmount,
-                  detail.currency ?? detail.paymentCurrency,
-                ),
-              },
-            ].map((row) => (
-              <div
-                key={row.key}
-                className="flex justify-between gap-4 py-1.5 first:pt-0 last:pb-0"
-              >
-                <span className="text-muted-foreground">{row.label}</span>
-                <span className="font-medium">{row.value}</span>
-              </div>
-            ))}
+    );
+
+    content = (
+      <div className="space-y-4 text-sm">
+        <section aria-labelledby="invoice-insights-detail-metadata" className="space-y-2">
+          <h3 id="invoice-insights-detail-metadata" className="text-sm font-semibold text-muted-foreground">
+            Invoice metadata
+          </h3>
+          {renderRows(metadataRows)}
+        </section>
+        <section aria-labelledby="invoice-insights-detail-payment" className="space-y-2">
+          <h3 id="invoice-insights-detail-payment" className="text-sm font-semibold text-muted-foreground">
+            Payment
+          </h3>
+          {renderRows(paymentRows)}
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <Popover
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose?.();
+        }
+      }}
+    >
+      <PopoverAnchor virtualRef={virtualAnchorRef} />
+      <PopoverContent
+        align="start"
+        side={popoverSide}
+        sideOffset={12}
+        collisionPadding={16}
+        className="z-50 w-[28rem] max-w-[min(28rem,calc(100vw-2rem))] p-0 shadow-xl"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          bodyRef.current?.focus();
+        }}
+      >
+        <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-4 p-4 focus:outline-none">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Invoice detail</h2>
+            <p className="text-sm text-muted-foreground">
+              Reference information for {selectedInvoiceNumber}.
+            </p>
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Payment</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm">
-          <div className="divide-y divide-border/60">
-            {[
-              {
-                key: "payment-status",
-                label: "Payment status",
-                value: detail.paymentStatusLabel || formatStatusLabel(detail.paymentStatus),
-              },
-              {
-                key: "gateway",
-                label: "Gateway",
-                value: detail.paymentGateway || "—",
-              },
-              {
-                key: "reference",
-                label: "Reference",
-                value: detail.paymentReference || "—",
-              },
-              {
-                key: "processed",
-                label: "Processed",
-                value: formatDateTime(detail.paymentProcessedAt || detail.paymentUpdatedAt),
-              },
-              {
-                key: "purpose",
-                label: "Purpose",
-                value: detail.paymentPurpose || "—",
-              },
-            ].map((row) => (
-              <div
-                key={row.key}
-                className="flex justify-between gap-4 py-1.5 first:pt-0 last:pb-0"
-              >
-                <span className="text-muted-foreground">{row.label}</span>
-                <span className="font-medium">{row.value}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </section>
+          {content}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -643,6 +791,37 @@ export function InvoiceInsightsContent({
   selectedInvoiceNumber,
   onSelectInvoice,
 }) {
+  const [detailAnchorElement, setDetailAnchorElement] = useState(null);
+
+  const handleDetailClose = useCallback(() => {
+    setDetailAnchorElement(null);
+    onSelectInvoice?.(null);
+  }, [onSelectInvoice]);
+
+  const handleInvoiceSelect = useCallback(
+    (invoiceNumber, anchorNode) => {
+      if (!invoiceNumber) {
+        handleDetailClose();
+        return;
+      }
+
+      setDetailAnchorElement(
+        anchorNode &&
+          typeof anchorNode.getBoundingClientRect === "function"
+          ? anchorNode
+          : null,
+      );
+
+      onSelectInvoice?.(invoiceNumber);
+    },
+    [handleDetailClose, onSelectInvoice],
+  );
+
+  useEffect(() => {
+    if (!selectedInvoiceNumber) {
+      setDetailAnchorElement(null);
+    }
+  }, [selectedInvoiceNumber]);
   const summaryPages = summaryQuery?.data?.pages ?? [];
   const summary = summaryPages[0]?.summary;
   const topCustomers = summaryPages.flatMap((page) => page.byUserNodes ?? []);
@@ -752,14 +931,16 @@ export function InvoiceInsightsContent({
         hasMore={Boolean(invoicesQuery?.hasNextPage)}
         isFetchingNextPage={Boolean(invoicesQuery?.isFetchingNextPage)}
         onLoadMore={() => invoicesQuery?.fetchNextPage?.()}
-        onSelect={onSelectInvoice}
+        onSelect={handleInvoiceSelect}
         selectedInvoiceNumber={selectedInvoiceNumber}
       />
-      <InvoiceDetailSection
+      <InvoiceDetailPopover
+        anchorElement={detailAnchorElement}
         detail={detailQuery?.data}
         isLoading={Boolean(detailQuery?.isFetching)}
         isError={Boolean(detailQuery?.isError)}
         selectedInvoiceNumber={selectedInvoiceNumber}
+        onClose={handleDetailClose}
       />
     </div>
   );
