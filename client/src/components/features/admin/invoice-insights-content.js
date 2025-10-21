@@ -17,6 +17,7 @@ import {
   resolveNumericValue,
 } from "@/lib/formatters";
 import { sanitizeInvoiceFilters } from "@/lib/queries/admin-invoices";
+import { cn } from "@/lib/utils";
 
 export const INVOICE_INSIGHTS_PAGE_SIZE = 20;
 export const INVOICE_INSIGHTS_TOP_CUSTOMER_PAGE_SIZE = 10;
@@ -449,7 +450,7 @@ function InvoiceListSection({
                       return (
                         <TableRow
                           key={invoice.id ?? invoice.invoiceNumber}
-                          className={isSelected ? "bg-muted/40" : undefined}
+                          className={cn("cursor-pointer", isSelected && "bg-muted/40")}
                           tabIndex={0}
                           aria-selected={isSelected}
                           onClick={handleRowSelect}
