@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -501,7 +501,6 @@ function InvoiceListSection({
 }
 
 function InvoiceDetailPopover({
-  anchorRef,
   anchorElement,
   detail,
   isLoading,
@@ -511,6 +510,18 @@ function InvoiceDetailPopover({
 }) {
   const bodyRef = useRef(null);
   const isOpen = Boolean(selectedInvoiceNumber && anchorElement);
+  const virtualAnchorRef = useMemo(() => {
+    if (!(anchorElement instanceof HTMLElement)) {
+      return { current: null };
+    }
+
+    return {
+      current: {
+        getBoundingClientRect: () => anchorElement.getBoundingClientRect(),
+        contextElement: anchorElement,
+      },
+    };
+  }, [anchorElement]);
 
   useEffect(() => {
     if (!isOpen && bodyRef.current) {
@@ -649,7 +660,7 @@ function InvoiceDetailPopover({
         }
       }}
     >
-      <PopoverAnchor virtualRef={anchorRef} />
+      <PopoverAnchor virtualRef={virtualAnchorRef} />
       <PopoverContent
         align="start"
         side="right"
@@ -684,12 +695,10 @@ export function InvoiceInsightsContent({
   selectedInvoiceNumber,
   onSelectInvoice,
 }) {
-  const detailAnchorRef = useRef(null);
   const [detailAnchorElement, setDetailAnchorElement] = useState(null);
 
   const handleDetailClose = useCallback(() => {
     setDetailAnchorElement(null);
-    detailAnchorRef.current = null;
     onSelectInvoice?.(null);
   }, [onSelectInvoice]);
 
@@ -701,10 +710,8 @@ export function InvoiceInsightsContent({
       }
 
       if (anchorNode instanceof HTMLElement) {
-        detailAnchorRef.current = anchorNode;
         setDetailAnchorElement(anchorNode);
       } else {
-        detailAnchorRef.current = null;
         setDetailAnchorElement(null);
       }
 
@@ -715,19 +722,9 @@ export function InvoiceInsightsContent({
 
   useEffect(() => {
     if (!selectedInvoiceNumber) {
-      detailAnchorRef.current = null;
       setDetailAnchorElement(null);
     }
   }, [selectedInvoiceNumber]);
-
-  useEffect(() => {
-    if (detailAnchorElement instanceof HTMLElement) {
-      detailAnchorRef.current = detailAnchorElement;
-    } else if (detailAnchorElement === null) {
-      detailAnchorRef.current = null;
-    }
-  }, [detailAnchorElement]);
-
   const summaryPages = summaryQuery?.data?.pages ?? [];
   const summary = summaryPages[0]?.summary;
   const topCustomers = summaryPages.flatMap((page) => page.byUserNodes ?? []);
@@ -841,7 +838,6 @@ export function InvoiceInsightsContent({
         selectedInvoiceNumber={selectedInvoiceNumber}
       />
       <InvoiceDetailPopover
-        anchorRef={detailAnchorRef}
         anchorElement={detailAnchorElement}
         detail={detailQuery?.data}
         isLoading={Boolean(detailQuery?.isFetching)}
