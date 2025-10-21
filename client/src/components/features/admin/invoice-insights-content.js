@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -318,55 +318,63 @@ function SummarySection({ summary, isLoading, isError }) {
 
 function TopCustomersSection({ customers, hasMore, isFetchingNextPage, onLoadMore, isLoading, isError }) {
   return (
-    <section className="space-y-4" aria-labelledby="invoice-insights-top-customers">
-      <div className="space-y-1">
-        <h2 id="invoice-insights-top-customers" className="text-lg font-semibold">
-          Top customers by billed amount
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Identify the accounts contributing the highest revenue within the selected filters.
-        </p>
-      </div>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading top customers…</p>
-      ) : isError ? (
-        <p className="text-sm text-destructive">Unable to load top customers.</p>
-      ) : customers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No customers match the current filters.</p>
-      ) : (
-        <div className="space-y-3">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="text-right">Invoices</TableHead>
-                  <TableHead className="text-right">Total billed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customers.map((customer) => (
-                  <TableRow key={customer.userId ?? customer.displayName}>
-                    <TableCell>
-                      <div className="font-medium">{customer.displayName}</div>
-                      {customer.userEmail ? (
-                        <div className="text-xs text-muted-foreground">{customer.userEmail}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-right">{formatInvoiceCount(customer.count)}</TableCell>
-                    <TableCell className="text-right">{formatAmount(customer.totalAmount, customer.currency)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" size="sm" onClick={onLoadMore} disabled={!hasMore || isFetchingNextPage}>
-              {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All customers loaded"}
-            </Button>
-          </div>
-        </div>
-      )}
+    <section aria-labelledby="invoice-insights-top-customers">
+      <Card>
+        <CardHeader>
+          <CardTitle id="invoice-insights-top-customers">Top customers by billed amount</CardTitle>
+          <CardDescription>
+            Identify the accounts contributing the highest revenue within the selected filters.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading top customers…</p>
+          ) : isError ? (
+            <p className="text-sm text-destructive">Unable to load top customers.</p>
+          ) : customers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No customers match the current filters.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Invoices</TableHead>
+                      <TableHead className="text-right">Total billed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {customers.map((customer) => (
+                      <TableRow key={customer.userId ?? customer.displayName}>
+                        <TableCell>
+                          <div className="font-medium">{customer.displayName}</div>
+                          {customer.userEmail ? (
+                            <div className="text-xs text-muted-foreground">{customer.userEmail}</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right">{formatInvoiceCount(customer.count)}</TableCell>
+                        <TableCell className="text-right">{formatAmount(customer.totalAmount, customer.currency)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onLoadMore}
+                  disabled={!hasMore || isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All customers loaded"}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </section>
   );
 }
@@ -382,75 +390,91 @@ function InvoiceListSection({
   selectedInvoiceNumber,
 }) {
   return (
-    <section className="space-y-4" aria-labelledby="invoice-insights-list">
-      <div className="space-y-1">
-        <h2 id="invoice-insights-list" className="text-lg font-semibold">
-          Matching invoices
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Review individual invoices and open detailed payment context with a single click.
-        </p>
-      </div>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading invoices…</p>
-      ) : isError ? (
-        <p className="text-sm text-destructive">Unable to load invoices.</p>
-      ) : invoices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No invoices match the current filters.</p>
-      ) : (
-        <div className="space-y-3">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Issued</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((invoice) => {
-                  const isSelected = selectedInvoiceNumber === invoice.invoiceNumber;
-                  return (
-                    <TableRow
-                      key={invoice.id ?? invoice.invoiceNumber}
-                      className={isSelected ? "bg-muted/40" : undefined}
-                      onClick={() => onSelect(invoice.invoiceNumber)}
-                    >
-                      <TableCell>
-                        <div className="font-medium">{invoice.invoiceNumber}</div>
-                        {invoice.planName ? (
-                          <div className="text-xs text-muted-foreground">Plan: {invoice.planName}</div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{invoice.userName}</div>
-                        {invoice.userEmail ? (
-                          <div className="text-xs text-muted-foreground">{invoice.userEmail}</div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={invoice.status === "paid" ? "outline" : invoice.status === "cancelled" ? "destructive" : "secondary"}>
-                          {invoice.statusLabel || formatStatusLabel(invoice.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{formatAmount(invoice.amount, invoice.currency)}</TableCell>
-                      <TableCell>{formatDateOnly(invoice.issuedDate)}</TableCell>
+    <section aria-labelledby="invoice-insights-list">
+      <Card>
+        <CardHeader>
+          <CardTitle id="invoice-insights-list">Matching invoices</CardTitle>
+          <CardDescription>
+            Review individual invoices and open detailed payment context with a single click.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading invoices…</p>
+          ) : isError ? (
+            <p className="text-sm text-destructive">Unable to load invoices.</p>
+          ) : invoices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No invoices match the current filters.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Issued</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" size="sm" onClick={onLoadMore} disabled={!hasMore || isFetchingNextPage}>
-              {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All invoices loaded"}
-            </Button>
-          </div>
-        </div>
-      )}
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => {
+                      const isSelected = selectedInvoiceNumber === invoice.invoiceNumber;
+                      return (
+                        <TableRow
+                          key={invoice.id ?? invoice.invoiceNumber}
+                          className={isSelected ? "bg-muted/40" : undefined}
+                          onClick={() => onSelect(invoice.invoiceNumber)}
+                        >
+                          <TableCell>
+                            <div className="font-medium">{invoice.invoiceNumber}</div>
+                            {invoice.planName ? (
+                              <div className="text-xs text-muted-foreground">Plan: {invoice.planName}</div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{invoice.userName}</div>
+                            {invoice.userEmail ? (
+                              <div className="text-xs text-muted-foreground">{invoice.userEmail}</div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                invoice.status === "paid"
+                                  ? "outline"
+                                  : invoice.status === "cancelled"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                            >
+                              {invoice.statusLabel || formatStatusLabel(invoice.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{formatAmount(invoice.amount, invoice.currency)}</TableCell>
+                          <TableCell>{formatDateOnly(invoice.issuedDate)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onLoadMore}
+                  disabled={!hasMore || isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All invoices loaded"}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </section>
   );
 }
