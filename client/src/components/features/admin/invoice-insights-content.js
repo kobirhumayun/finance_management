@@ -511,7 +511,10 @@ function InvoiceDetailPopover({
   const bodyRef = useRef(null);
   const isOpen = Boolean(selectedInvoiceNumber && anchorElement);
   const virtualAnchorRef = useMemo(() => {
-    if (!(anchorElement instanceof HTMLElement)) {
+    if (
+      !anchorElement ||
+      typeof anchorElement.getBoundingClientRect !== "function"
+    ) {
       return { current: null };
     }
 
@@ -709,11 +712,12 @@ export function InvoiceInsightsContent({
         return;
       }
 
-      if (anchorNode instanceof HTMLElement) {
-        setDetailAnchorElement(anchorNode);
-      } else {
-        setDetailAnchorElement(null);
-      }
+      setDetailAnchorElement(
+        anchorNode &&
+          typeof anchorNode.getBoundingClientRect === "function"
+          ? anchorNode
+          : null,
+      );
 
       onSelectInvoice?.(invoiceNumber);
     },
