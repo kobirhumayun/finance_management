@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,6 +84,13 @@ const formatDateOnly = (value) => {
   } catch {
     return date.toLocaleDateString();
   }
+};
+
+const clamp = (value, min, max) => {
+  if (Number.isNaN(value)) {
+    return value;
+  }
+  return Math.min(Math.max(value, min), max);
 };
 
 const formatAmount = (amount, currency) => {
@@ -509,22 +516,11 @@ function InvoiceDetailPopover({
   onClose,
 }) {
   const bodyRef = useRef(null);
+  const lastMeasuredRectRef = useRef(null);
+  const popoverSideRef = useRef("right");
+  const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
+  const [popoverSide, setPopoverSide] = useState("right");
   const isOpen = Boolean(selectedInvoiceNumber && anchorElement);
-  const virtualAnchorRef = useMemo(() => {
-    if (
-      !anchorElement ||
-      typeof anchorElement.getBoundingClientRect !== "function"
-    ) {
-      return { current: null };
-    }
-
-    return {
-      current: {
-        getBoundingClientRect: () => anchorElement.getBoundingClientRect(),
-        contextElement: anchorElement,
-      },
-    };
-  }, [anchorElement]);
 
   useEffect(() => {
     if (!isOpen && bodyRef.current) {
@@ -537,6 +533,102 @@ function InvoiceDetailPopover({
       onClose?.();
     }
   }, [anchorElement, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !anchorElement) {
+      setVirtualAnchorRef({ current: null });
+      lastMeasuredRectRef.current = null;
+      return;
+    }
+
+    if (typeof window === "undefined" || typeof anchorElement.getBoundingClientRect !== "function") {
+      return;
+    }
+
+    const measure = () => {
+      if (!anchorElement || typeof anchorElement.getBoundingClientRect !== "function") {
+        return;
+      }
+
+      const rect = anchorElement.getBoundingClientRect();
+      const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || rect.right || 0;
+      const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || rect.bottom || 0;
+      const margin = 16;
+
+      const availableRight = Math.max(0, viewportWidth - margin - rect.right);
+      const availableLeft = Math.max(0, rect.left - margin);
+      const nextSide = availableRight >= availableLeft ? "right" : "left";
+      const horizontalEdge = nextSide === "right" ? rect.right : rect.left;
+      const anchorX = clamp(horizontalEdge, margin, Math.max(margin, viewportWidth - margin));
+      const anchorY = clamp(
+        rect.top + rect.height / 2,
+        margin,
+        Math.max(margin, viewportHeight - margin),
+      );
+
+      const sanitizedRect = {
+        width: 0,
+        height: 0,
+        top: anchorY,
+        bottom: anchorY,
+        left: anchorX,
+        right: anchorX,
+        x: anchorX,
+        y: anchorY,
+      };
+
+      const previousRect = lastMeasuredRectRef.current;
+      const rectChanged =
+        !previousRect ||
+        ["top", "bottom", "left", "right", "x", "y"].some(
+          (key) => previousRect[key] !== sanitizedRect[key],
+        );
+      const sideChanged = popoverSideRef.current !== nextSide;
+
+      if (!rectChanged && !sideChanged) {
+        return;
+      }
+
+      lastMeasuredRectRef.current = sanitizedRect;
+
+      if (sideChanged) {
+        popoverSideRef.current = nextSide;
+        setPopoverSide(nextSide);
+      }
+
+      setVirtualAnchorRef({
+        current: {
+          getBoundingClientRect: () => sanitizedRect,
+          contextElement: anchorElement,
+        },
+      });
+    };
+
+    let frameId;
+    const scheduleMeasure = () => {
+      if (frameId != null) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        measure();
+      });
+    };
+
+    measure();
+
+    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("scroll", scheduleMeasure, true);
+
+    return () => {
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure, true);
+    };
+  }, [anchorElement, isOpen]);
 
   if (!isOpen) {
     return null;
@@ -666,8 +758,9 @@ function InvoiceDetailPopover({
       <PopoverAnchor virtualRef={virtualAnchorRef} />
       <PopoverContent
         align="start"
-        side="right"
+        side={popoverSide}
         sideOffset={12}
+        collisionPadding={16}
         className="z-50 w-[28rem] max-w-[min(28rem,calc(100vw-2rem))] p-0 shadow-xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
