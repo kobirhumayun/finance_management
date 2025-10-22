@@ -283,6 +283,12 @@ function OrderDetailPopover({
   }, [isOpen]);
 
   useEffect(() => {
+    if (anchorElement && !anchorElement.isConnected) {
+      onClose?.();
+    }
+  }, [anchorElement, onClose]);
+
+  useEffect(() => {
     if (!isOpen || !anchorElement) {
       setVirtualAnchorRef({ current: null });
       lastMeasuredRectRef.current = null;
