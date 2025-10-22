@@ -43,6 +43,43 @@ export const qk = {
   },
   admin: {
     plans: () => ["admin", "plans"],
+    orders: {
+      root: () => ["admin", "orders"],
+      list: (filters) => {
+        const normalized = normalizeParams(filters);
+        if (Object.keys(normalized).length === 0) {
+          return ["admin", "orders", "list"];
+        }
+        return ["admin", "orders", "list", normalized];
+      },
+      summary: (filters) => {
+        const normalized = normalizeParams(filters);
+        if (Object.keys(normalized).length === 0) {
+          return ["admin", "orders", "summary"];
+        }
+        return ["admin", "orders", "summary", normalized];
+      },
+      summaryByUser: (filters) => {
+        const normalized = normalizeParams(filters);
+        if (Object.keys(normalized).length === 0) {
+          return ["admin", "orders", "summary", "by-user"];
+        }
+        return ["admin", "orders", "summary", "by-user", normalized];
+      },
+      paymentSummary: (filters) => {
+        const normalized = normalizeParams(filters);
+        if (Object.keys(normalized).length === 0) {
+          return ["admin", "orders", "payments", "summary"];
+        }
+        return ["admin", "orders", "payments", "summary", normalized];
+      },
+      detail: (orderNumber) => [
+        "admin",
+        "orders",
+        "detail",
+        orderNumber ? String(orderNumber) : "unknown",
+      ],
+    },
     invoices: {
       root: () => ["admin", "invoices"],
       list: (filters) => {
