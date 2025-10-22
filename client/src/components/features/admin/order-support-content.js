@@ -272,8 +272,6 @@ function OrderDetailPopover({
   const bodyRef = useRef(null);
   const lastMeasuredRectRef = useRef(null);
   const popoverSideRef = useRef("right");
-  const closeGuardFrameRef = useRef(null);
-  const closeGuardActiveRef = useRef(false);
   const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
   const [popoverSide, setPopoverSide] = useState("right");
   const isOpen = Boolean(selectedOrderNumber && anchorElement);
@@ -283,44 +281,6 @@ function OrderDetailPopover({
       bodyRef.current = null;
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      closeGuardActiveRef.current = false;
-      closeGuardFrameRef.current = null;
-      return undefined;
-    }
-
-    if (!isOpen) {
-      closeGuardActiveRef.current = false;
-      if (closeGuardFrameRef.current != null) {
-        window.cancelAnimationFrame(closeGuardFrameRef.current);
-        closeGuardFrameRef.current = null;
-      }
-      return undefined;
-    }
-
-    closeGuardActiveRef.current = true;
-
-    const frame = window.requestAnimationFrame(() => {
-      closeGuardActiveRef.current = false;
-      closeGuardFrameRef.current = null;
-    });
-
-    closeGuardFrameRef.current = frame;
-
-    return () => {
-      closeGuardActiveRef.current = false;
-      window.cancelAnimationFrame(frame);
-      closeGuardFrameRef.current = null;
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (anchorElement && !anchorElement.isConnected) {
-      onClose?.();
-    }
-  }, [anchorElement, onClose]);
 
   useEffect(() => {
     if (!isOpen || !anchorElement) {
@@ -672,9 +632,6 @@ function OrderDetailPopover({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          if (closeGuardActiveRef.current) {
-            return;
-          }
           onClose?.();
         }
       }}
@@ -689,15 +646,6 @@ function OrderDetailPopover({
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           bodyRef.current?.focus();
-        }}
-        onInteractOutside={(event) => {
-          if (
-            anchorElement &&
-            typeof anchorElement.contains === "function" &&
-            (event.target === anchorElement || anchorElement.contains(event.target))
-          ) {
-            event.preventDefault();
-          }
         }}
       >
         <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-4 p-4 focus:outline-none">
@@ -903,8 +851,8 @@ export default function OrderSupportContent({
   const orderDetailQuery = useQuery(orderDetailOptions);
 
   const handleDetailClose = useCallback(() => {
-    setSelectedOrderNumber(null);
     setDetailAnchorElement(null);
+    setSelectedOrderNumber(null);
   }, []);
 
   const handleOrderSelect = useCallback(
@@ -914,27 +862,21 @@ export default function OrderSupportContent({
         return;
       }
 
-      setSelectedOrderNumber(orderNumber);
       setDetailAnchorElement(
         anchorNode && typeof anchorNode.getBoundingClientRect === "function"
           ? anchorNode
           : null,
       );
+      setSelectedOrderNumber(orderNumber);
     },
     [handleDetailClose],
   );
 
   useEffect(() => {
     if (!selectedOrderNumber) {
-      return;
+      setDetailAnchorElement(null);
     }
-    const stillExists = orders.some(
-      (order) => order?.orderNumber === selectedOrderNumber,
-    );
-    if (!stillExists) {
-      handleDetailClose();
-    }
-  }, [orders, selectedOrderNumber, handleDetailClose]);
+  }, [selectedOrderNumber]);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
