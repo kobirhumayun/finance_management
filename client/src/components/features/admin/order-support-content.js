@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import {
   formatCurrency,
   formatCurrencyWithCode,
@@ -140,6 +141,13 @@ const formatCount = (value) => {
     return formatNumber(value, { fallback: "0", minimumFractionDigits: 0 });
   }
   return formatNumber(Math.round(numeric), { fallback: "0", minimumFractionDigits: 0 });
+};
+
+const clamp = (value, min, max) => {
+  if (Number.isNaN(value)) {
+    return value;
+  }
+  return Math.min(Math.max(value, min), max);
 };
 
 const BreakdownTable = ({
@@ -423,13 +431,19 @@ export default function OrderSupportContent({
   }, [orders]);
 
   const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [cardPosition, setCardPosition] = useState(null);
+  const [selectedOrderAnchor, setSelectedOrderAnchor] = useState(null);
+  const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
+  const [popoverSide, setPopoverSide] = useState("bottom");
   const tableContainerRef = useRef(null);
-  const cardRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const lastInteractedRowIdRef = useRef(null);
+  const lastMeasuredRectRef = useRef(null);
+  const popoverSideRef = useRef("bottom");
+  const lastAnchorRef = useRef(null);
 
   const selectedOrderEntry = selectedOrderId ? orderIndexById.get(selectedOrderId) : null;
   const selectedOrder = selectedOrderEntry?.order ?? null;
+  const isDetailOpen = Boolean(selectedOrderId && selectedOrderAnchor && selectedOrder);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
@@ -460,69 +474,135 @@ export default function OrderSupportContent({
   const summaryReady = summaryQuery.isSuccess && orderSummary;
   const paymentSummaryReady = paymentSummaryQuery.isSuccess && paymentSummary;
 
+  const handleCloseDetails = useCallback(() => {
+    setSelectedOrderId((current) => {
+      if (!current) {
+        return current;
+      }
+      lastInteractedRowIdRef.current = current;
+      return null;
+    });
+    setSelectedOrderAnchor(null);
+  }, []);
+
   useEffect(() => {
     if (selectedOrderId && !orderIndexById.has(selectedOrderId)) {
-      setSelectedOrderId(null);
+      handleCloseDetails();
     }
-  }, [orderIndexById, selectedOrderId]);
+  }, [orderIndexById, selectedOrderId, handleCloseDetails]);
 
   useEffect(() => {
-    if (!selectedOrderId) {
-      setCardPosition(null);
+    if (!selectedOrderId || !selectedOrderAnchor) {
+      setVirtualAnchorRef({ current: null });
+      lastMeasuredRectRef.current = null;
+      lastAnchorRef.current = null;
+      popoverSideRef.current = "bottom";
+      setPopoverSide("bottom");
       return;
     }
 
-    const container = tableContainerRef.current;
-    if (!container) {
+    if (
+      typeof window === "undefined" ||
+      typeof selectedOrderAnchor.getBoundingClientRect !== "function"
+    ) {
       return;
     }
 
-    const scrollContainer =
-      container.querySelector('[data-slot="table-container"]') ?? container;
-
-    const updateCardPosition = () => {
-      const rowElement = container.querySelector(
-        `[data-order-row="${selectedOrderId}"]`,
-      );
-
-      if (!rowElement) {
+    const measure = () => {
+      if (
+        !selectedOrderAnchor ||
+        typeof selectedOrderAnchor.getBoundingClientRect !== "function"
+      ) {
         return;
       }
 
-      const wrapperRect = container.getBoundingClientRect();
-      const scrollRect = scrollContainer.getBoundingClientRect();
-      const rowRect = rowElement.getBoundingClientRect();
-      const scrollLeft = scrollContainer.scrollLeft ?? 0;
-      const scrollTop = scrollContainer.scrollTop ?? 0;
-      const visibleWidth = scrollContainer.clientWidth ?? scrollRect.width;
-      const relativeLeft = rowRect.left - wrapperRect.left + scrollLeft;
-      const baseWidth = rowRect.width;
-      const width = Math.min(visibleWidth, Math.max(baseWidth, 320));
-      const minLeft = scrollLeft;
-      const maxLeft = scrollLeft + visibleWidth - width;
-      const clampedLeft = Math.min(
-        Math.max(relativeLeft, minLeft),
-        Math.max(minLeft, maxLeft),
-      );
-      const top = rowRect.bottom - wrapperRect.top + scrollTop + 8;
+      const rect = selectedOrderAnchor.getBoundingClientRect();
+      const viewportWidth =
+        window.innerWidth || document.documentElement?.clientWidth || rect.right || 0;
+      const viewportHeight =
+        window.innerHeight || document.documentElement?.clientHeight || rect.bottom || 0;
+      const margin = 16;
 
-      setCardPosition({
-        top,
-        left: Number.isFinite(clampedLeft) ? clampedLeft : relativeLeft,
-        width,
+      const availableBottom = Math.max(0, viewportHeight - margin - rect.bottom);
+      const availableTop = Math.max(0, rect.top - margin);
+      const nextSide = availableBottom >= availableTop ? "bottom" : "top";
+      const verticalEdge = nextSide === "bottom" ? rect.bottom : rect.top;
+      const anchorY = clamp(
+        verticalEdge,
+        margin,
+        Math.max(margin, viewportHeight - margin),
+      );
+      const anchorX = clamp(
+        rect.left + rect.width / 2,
+        margin,
+        Math.max(margin, viewportWidth - margin),
+      );
+
+      const sanitizedRect = {
+        width: 0,
+        height: 0,
+        top: anchorY,
+        bottom: anchorY,
+        left: anchorX,
+        right: anchorX,
+        x: anchorX,
+        y: anchorY,
+      };
+
+      const previousRect = lastMeasuredRectRef.current;
+      const anchorChanged = lastAnchorRef.current !== selectedOrderAnchor;
+      const rectChanged =
+        !previousRect ||
+        ["top", "bottom", "left", "right", "x", "y"].some(
+          (key) => previousRect[key] !== sanitizedRect[key],
+        );
+      const sideChanged = popoverSideRef.current !== nextSide;
+
+      if (!rectChanged && !sideChanged && !anchorChanged) {
+        return;
+      }
+
+      lastMeasuredRectRef.current = sanitizedRect;
+      lastAnchorRef.current = selectedOrderAnchor;
+
+      if (sideChanged) {
+        popoverSideRef.current = nextSide;
+        setPopoverSide(nextSide);
+      }
+
+      setVirtualAnchorRef({
+        current: {
+          getBoundingClientRect: () => sanitizedRect,
+          contextElement: selectedOrderAnchor,
+        },
       });
     };
 
-    updateCardPosition();
+    let frameId;
+    const scheduleMeasure = () => {
+      if (frameId != null) {
+        return;
+      }
 
-    window.addEventListener("resize", updateCardPosition);
-    scrollContainer.addEventListener("scroll", updateCardPosition);
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        measure();
+      });
+    };
+
+    measure();
+
+    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("scroll", scheduleMeasure, true);
 
     return () => {
-      window.removeEventListener("resize", updateCardPosition);
-      scrollContainer.removeEventListener("scroll", updateCardPosition);
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure, true);
     };
-  }, [selectedOrderId, orderIndexById]);
+  }, [selectedOrderId, selectedOrderAnchor]);
 
   useEffect(() => {
     if (!selectedOrderId) {
@@ -536,90 +616,48 @@ export default function OrderSupportContent({
       }
       return;
     }
-
-    const focusFrame = requestAnimationFrame(() => {
-      const closeButton = cardRef.current?.querySelector(
-        '[data-role="order-details-close"]',
-      );
-      if (closeButton instanceof HTMLElement) {
-        closeButton.focus();
-      }
-    });
-
-    return () => cancelAnimationFrame(focusFrame);
   }, [selectedOrderId]);
 
   useEffect(() => {
-    if (!selectedOrderId) {
+    if (!selectedOrderId || !selectedOrderAnchor) {
       return;
     }
 
-    const handlePointerDown = (event) => {
-      const cardElement = cardRef.current;
-      if (cardElement?.contains(event.target)) {
-        return;
-      }
+    if (!selectedOrderAnchor.isConnected) {
+      handleCloseDetails();
+    }
+  }, [selectedOrderId, selectedOrderAnchor, handleCloseDetails]);
 
-      const rowElement = tableContainerRef.current?.querySelector(
-        `[data-order-row="${selectedOrderId}"]`,
-      );
-
-      if (rowElement?.contains(event.target)) {
-        return;
-      }
-
-      lastInteractedRowIdRef.current = selectedOrderId;
-      setSelectedOrderId(null);
-    };
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        lastInteractedRowIdRef.current = selectedOrderId;
+  const handleToggleRowSelection = useCallback(
+    (rowId, rowElement) => {
+      lastInteractedRowIdRef.current = rowId;
+      if (selectedOrderId === rowId) {
         setSelectedOrderId(null);
+        setSelectedOrderAnchor(null);
+        return;
       }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [selectedOrderId]);
-
-  const handleToggleRowSelection = useCallback((rowId) => {
-    lastInteractedRowIdRef.current = rowId;
-    setSelectedOrderId((current) => (current === rowId ? null : rowId));
-  }, []);
+      setSelectedOrderId(rowId);
+      setSelectedOrderAnchor(
+        rowElement instanceof HTMLElement ? rowElement : null,
+      );
+    },
+    [selectedOrderId],
+  );
 
   const handleRowKeyDown = useCallback(
     (event, rowId) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        handleToggleRowSelection(rowId);
+        handleToggleRowSelection(rowId, event.currentTarget);
       }
 
       if (event.key === "Escape" && selectedOrderId === rowId) {
         event.preventDefault();
-        lastInteractedRowIdRef.current = rowId;
-        setSelectedOrderId(null);
+        handleCloseDetails();
       }
     },
-    [handleToggleRowSelection, selectedOrderId],
+    [handleToggleRowSelection, selectedOrderId, handleCloseDetails],
   );
-
-  const handleCloseDetails = useCallback(() => {
-    if (!selectedOrderId) {
-      return;
-    }
-
-    lastInteractedRowIdRef.current = selectedOrderId;
-    setSelectedOrderId(null);
-  }, [selectedOrderId]);
 
   const detailsCardId = "order-support-selected-order";
   const detailsTitleId = `${detailsCardId}-title`;
@@ -939,7 +977,9 @@ export default function OrderSupportContent({
                           role="button"
                           aria-expanded={isSelected}
                           aria-controls={detailsCardId}
-                          onClick={() => handleToggleRowSelection(rowId)}
+                          onClick={(event) =>
+                            handleToggleRowSelection(rowId, event.currentTarget)
+                          }
                           onKeyDown={(event) => handleRowKeyDown(event, rowId)}
                           data-state={isSelected ? "selected" : undefined}
                           className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -982,165 +1022,177 @@ export default function OrderSupportContent({
                     })}
                   </TableBody>
                 </Table>
-                {selectedOrder && cardPosition ? (
-                  <div
-                    ref={cardRef}
-                    className="pointer-events-none absolute z-20 max-w-full"
-                    style={{
-                      top: cardPosition.top,
-                      left: cardPosition.left,
-                      width: cardPosition.width,
+                {selectedOrder ? (
+                  <Popover
+                    open={isDetailOpen}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        handleCloseDetails();
+                      }
                     }}
                   >
-                    <Card
-                      role="dialog"
-                      aria-modal="false"
-                      aria-labelledby={detailsTitleId}
-                      aria-describedby={detailsBodyId}
-                      id={detailsCardId}
-                      className="pointer-events-auto shadow-lg"
+                    <PopoverAnchor virtualRef={virtualAnchorRef} />
+                    <PopoverContent
+                      align="center"
+                      side={popoverSide}
+                      sideOffset={12}
+                      collisionPadding={16}
+                      className="z-50 w-[min(40rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] p-0 shadow-lg"
+                      onOpenAutoFocus={(event) => {
+                        event.preventDefault();
+                        closeButtonRef.current?.focus();
+                      }}
                     >
-                      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-1">
-                          <CardTitle id={detailsTitleId} className="text-base">
-                            Order #{selectedOrder.orderNumber ?? selectedOrderId}
-                          </CardTitle>
-                          <CardDescription>
-                            {formatStatusLabel(selectedOrder.statusLabel)} · Created
-                            {" "}
-                            {formatDateTime(selectedOrder.createdAt)}
-                          </CardDescription>
-                        </div>
-                        <div className="flex shrink-0 items-start">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleCloseDetails}
-                            data-role="order-details-close"
-                            aria-label="Close order details"
-                          >
-                            <span aria-hidden="true">×</span>
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent
-                        id={detailsBodyId}
-                        className="grid gap-4 text-sm sm:grid-cols-2"
+                      <Card
+                        role="dialog"
+                        aria-modal="false"
+                        aria-labelledby={detailsTitleId}
+                        aria-describedby={detailsBodyId}
+                        id={detailsCardId}
                       >
-                        <div className="space-y-1">
-                          <p className="font-medium">Customer</p>
-                          <p>{selectedOrder.user?.displayName ?? "Unknown"}</p>
-                          {selectedOrder.user?.email ? (
-                            <p className="text-muted-foreground">{selectedOrder.user.email}</p>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-medium">Plan</p>
-                          <p>
-                            {selectedOrder.plan?.planName ??
-                              selectedOrder.plan?.planSlug ??
-                              "Unassigned"}
-                          </p>
-                          {selectedOrder.plan?.billingCycle ? (
-                            <p className="text-muted-foreground">
-                              Billing cycle: {selectedOrder.plan.billingCycle}
+                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
+                            <CardTitle id={detailsTitleId} className="text-base">
+                              Order #{selectedOrder.orderNumber ?? selectedOrderId}
+                            </CardTitle>
+                            <CardDescription>
+                              {formatStatusLabel(selectedOrder.statusLabel)} · Created
+                              {" "}
+                              {formatDateTime(selectedOrder.createdAt)}
+                            </CardDescription>
+                          </div>
+                          <div className="flex shrink-0 items-start">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={handleCloseDetails}
+                              data-role="order-details-close"
+                              aria-label="Close order details"
+                              ref={closeButtonRef}
+                            >
+                              <span aria-hidden="true">×</span>
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent
+                          id={detailsBodyId}
+                          className="grid gap-4 text-sm sm:grid-cols-2"
+                        >
+                          <div className="space-y-1">
+                            <p className="font-medium">Customer</p>
+                            <p>{selectedOrder.user?.displayName ?? "Unknown"}</p>
+                            {selectedOrder.user?.email ? (
+                              <p className="text-muted-foreground">{selectedOrder.user.email}</p>
+                            ) : null}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-medium">Plan</p>
+                            <p>
+                              {selectedOrder.plan?.planName ??
+                                selectedOrder.plan?.planSlug ??
+                                "Unassigned"}
                             </p>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-medium">Order details</p>
-                          <p>Status: {formatStatusLabel(selectedOrder.statusLabel)}</p>
-                          <p className="text-muted-foreground">
-                            Total amount:
-                            {" "}
-                            {formatAmount(
-                              selectedOrder.amount ?? selectedOrder.payment?.amount,
-                              selectedOrder.currency ?? selectedOrder.payment?.currency,
-                            )}
-                          </p>
-                          {selectedOrder.startDate ? (
+                            {selectedOrder.plan?.billingCycle ? (
+                              <p className="text-muted-foreground">
+                                Billing cycle: {selectedOrder.plan.billingCycle}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-medium">Order details</p>
+                            <p>Status: {formatStatusLabel(selectedOrder.statusLabel)}</p>
                             <p className="text-muted-foreground">
-                              Starts {formatDateOnly(selectedOrder.startDate)}
-                            </p>
-                          ) : null}
-                          {selectedOrder.endDate ? (
-                            <p className="text-muted-foreground">
-                              Ends {formatDateOnly(selectedOrder.endDate)}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-medium">Payment</p>
-                          <p>
-                            {formatAmount(
-                              selectedOrder.payment?.amount,
-                              selectedOrder.payment?.currency,
-                            )}
-                            {" "}· {formatStatusLabel(selectedOrder.payment?.statusLabel)}
-                          </p>
-                          {selectedOrder.payment?.paymentGateway ? (
-                            <p className="text-muted-foreground">
-                              Gateway: {selectedOrder.payment.paymentGateway}
-                            </p>
-                          ) : null}
-                          {selectedOrder.payment?.gatewayTransactionId ? (
-                            <p className="text-muted-foreground">
-                              Transaction ID: {selectedOrder.payment.gatewayTransactionId}
-                            </p>
-                          ) : null}
-                          {selectedOrder.payment?.purposeLabel ||
-                          selectedOrder.payment?.purpose ? (
-                            <p className="text-muted-foreground">
-                              Purpose:{" "}
-                              {formatStatusLabel(
-                                selectedOrder.payment?.purposeLabel ??
-                                  selectedOrder.payment?.purpose,
+                              Total amount:
+                              {" "}
+                              {formatAmount(
+                                selectedOrder.amount ?? selectedOrder.payment?.amount,
+                                selectedOrder.currency ?? selectedOrder.payment?.currency,
                               )}
                             </p>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-medium">Timeline</p>
-                          <p>Created {formatDateTime(selectedOrder.createdAt)}</p>
-                          {selectedOrder.updatedAt ? (
-                            <p className="text-muted-foreground">
-                              Updated {formatDateTime(selectedOrder.updatedAt)}
+                            {selectedOrder.startDate ? (
+                              <p className="text-muted-foreground">
+                                Starts {formatDateOnly(selectedOrder.startDate)}
+                              </p>
+                            ) : null}
+                            {selectedOrder.endDate ? (
+                              <p className="text-muted-foreground">
+                                Ends {formatDateOnly(selectedOrder.endDate)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-medium">Payment</p>
+                            <p>
+                              {formatAmount(
+                                selectedOrder.payment?.amount,
+                                selectedOrder.payment?.currency,
+                              )}
+                              {" "}· {formatStatusLabel(selectedOrder.payment?.statusLabel)}
                             </p>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1 sm:col-span-2">
-                          <p className="font-medium">Invoice</p>
-                          {selectedOrder.invoice?.invoiceNumber ? (
-                            <div className="space-y-1">
-                              <p>
-                                #{selectedOrder.invoice.invoiceNumber} ·
-                                {" "}
-                                {formatStatusLabel(selectedOrder.invoice.statusLabel)} ·
-                                {" "}
-                                {formatAmount(
-                                  selectedOrder.invoice.amount,
-                                  selectedOrder.invoice.currency,
+                            {selectedOrder.payment?.paymentGateway ? (
+                              <p className="text-muted-foreground">
+                                Gateway: {selectedOrder.payment.paymentGateway}
+                              </p>
+                            ) : null}
+                            {selectedOrder.payment?.gatewayTransactionId ? (
+                              <p className="text-muted-foreground">
+                                Transaction ID: {selectedOrder.payment.gatewayTransactionId}
+                              </p>
+                            ) : null}
+                            {selectedOrder.payment?.purposeLabel ||
+                            selectedOrder.payment?.purpose ? (
+                              <p className="text-muted-foreground">
+                                Purpose:{" "}
+                                {formatStatusLabel(
+                                  selectedOrder.payment?.purposeLabel ??
+                                    selectedOrder.payment?.purpose,
                                 )}
                               </p>
-                              {selectedOrder.invoice?.dueDate ? (
-                                <p className="text-muted-foreground">
-                                  Due {formatDateOnly(selectedOrder.invoice.dueDate)}
+                            ) : null}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-medium">Timeline</p>
+                            <p>Created {formatDateTime(selectedOrder.createdAt)}</p>
+                            {selectedOrder.updatedAt ? (
+                              <p className="text-muted-foreground">
+                                Updated {formatDateTime(selectedOrder.updatedAt)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <p className="font-medium">Invoice</p>
+                            {selectedOrder.invoice?.invoiceNumber ? (
+                              <div className="space-y-1">
+                                <p>
+                                  #{selectedOrder.invoice.invoiceNumber} ·
+                                  {" "}
+                                  {formatStatusLabel(selectedOrder.invoice.statusLabel)} ·
+                                  {" "}
+                                  {formatAmount(
+                                    selectedOrder.invoice.amount,
+                                    selectedOrder.invoice.currency,
+                                  )}
                                 </p>
-                              ) : null}
-                              {selectedOrder.invoice?.issuedAt ? (
-                                <p className="text-muted-foreground">
-                                  Issued {formatDateTime(selectedOrder.invoice.issuedAt)}
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <p className="text-muted-foreground">No invoice linked.</p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                                {selectedOrder.invoice?.dueDate ? (
+                                  <p className="text-muted-foreground">
+                                    Due {formatDateOnly(selectedOrder.invoice.dueDate)}
+                                  </p>
+                                ) : null}
+                                {selectedOrder.invoice?.issuedAt ? (
+                                  <p className="text-muted-foreground">
+                                    Issued {formatDateTime(selectedOrder.invoice.issuedAt)}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <p className="text-muted-foreground">No invoice linked.</p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </PopoverContent>
+                  </Popover>
                 ) : null}
               </div>
             ) : null}
