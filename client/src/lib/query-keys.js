@@ -43,6 +43,18 @@ export const qk = {
   },
   admin: {
     plans: () => ["admin", "plans"],
+    orders: {
+      root: () => ["admin", "orders"],
+      list: (filters) => ["admin", "orders", "list", normalizeParams(filters)],
+      summary: (filters) => ["admin", "orders", "summary", normalizeParams(filters)],
+      paymentsSummary: (filters) => ["admin", "orders", "payments-summary", normalizeParams(filters)],
+      detail: (orderNumber) => [
+        "admin",
+        "orders",
+        "detail",
+        orderNumber ? String(orderNumber) : "unknown",
+      ],
+    },
     invoices: {
       root: () => ["admin", "invoices"],
       list: (filters) => {

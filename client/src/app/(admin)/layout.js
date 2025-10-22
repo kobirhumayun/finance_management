@@ -5,10 +5,19 @@ import { useState } from "react";
 import Header from "@/components/shared/header";
 import Sidebar from "@/components/shared/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Home, ClipboardList, Users, DollarSign, SlidersHorizontal, BarChart3 } from "lucide-react";
+import {
+  Home,
+  ClipboardList,
+  Users,
+  DollarSign,
+  SlidersHorizontal,
+  BarChart3,
+  LifeBuoy,
+} from "lucide-react";
 
 const adminLinks = [
   { label: "Dashboard", href: "/admin/dashboard", icon: Home },
+  { label: "Order Support & Inquiries", href: "/admin/order-support", icon: LifeBuoy },
   { label: "Plan Management", href: "/admin/plan-management", icon: ClipboardList },
   { label: "User Management", href: "/admin/user-management", icon: Users },
   { label: "Invoice Insights", href: "/admin/invoice-insights", icon: BarChart3 },
