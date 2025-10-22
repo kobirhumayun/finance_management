@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,6 +127,11 @@ const formatAmount = (amount, currency) => {
   }
   const fallback = formatCurrency(amount, { fallback: "—" });
   return formatCurrencyWithCode(amount, currency || "BDT", { fallback });
+};
+
+const createOrderRowId = (order, index) => {
+  const baseIdentifier = order?.id ?? order?.orderNumber ?? index;
+  return `order-row-${String(baseIdentifier)}`;
 };
 
 const formatCount = (value) => {
@@ -409,6 +414,23 @@ export default function OrderSupportContent({
     return pages.flatMap((page) => page.orders ?? []);
   }, [ordersQuery.data]);
 
+  const orderIndexById = useMemo(() => {
+    const map = new Map();
+    orders.forEach((order, index) => {
+      map.set(createOrderRowId(order, index), { order, index });
+    });
+    return map;
+  }, [orders]);
+
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [cardPosition, setCardPosition] = useState(null);
+  const tableContainerRef = useRef(null);
+  const cardRef = useRef(null);
+  const lastInteractedRowIdRef = useRef(null);
+
+  const selectedOrderEntry = selectedOrderId ? orderIndexById.get(selectedOrderId) : null;
+  const selectedOrder = selectedOrderEntry?.order ?? null;
+
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
     ? ordersQuery.error?.message || "Failed to load orders."
@@ -437,6 +459,171 @@ export default function OrderSupportContent({
 
   const summaryReady = summaryQuery.isSuccess && orderSummary;
   const paymentSummaryReady = paymentSummaryQuery.isSuccess && paymentSummary;
+
+  useEffect(() => {
+    if (selectedOrderId && !orderIndexById.has(selectedOrderId)) {
+      setSelectedOrderId(null);
+    }
+  }, [orderIndexById, selectedOrderId]);
+
+  useEffect(() => {
+    if (!selectedOrderId) {
+      setCardPosition(null);
+      return;
+    }
+
+    const container = tableContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const scrollContainer =
+      container.querySelector('[data-slot="table-container"]') ?? container;
+
+    const updateCardPosition = () => {
+      const rowElement = container.querySelector(
+        `[data-order-row="${selectedOrderId}"]`,
+      );
+
+      if (!rowElement) {
+        return;
+      }
+
+      const wrapperRect = container.getBoundingClientRect();
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      const rowRect = rowElement.getBoundingClientRect();
+      const scrollLeft = scrollContainer.scrollLeft ?? 0;
+      const scrollTop = scrollContainer.scrollTop ?? 0;
+      const visibleWidth = scrollContainer.clientWidth ?? scrollRect.width;
+      const relativeLeft = rowRect.left - wrapperRect.left + scrollLeft;
+      const baseWidth = rowRect.width;
+      const width = Math.min(visibleWidth, Math.max(baseWidth, 320));
+      const minLeft = scrollLeft;
+      const maxLeft = scrollLeft + visibleWidth - width;
+      const clampedLeft = Math.min(
+        Math.max(relativeLeft, minLeft),
+        Math.max(minLeft, maxLeft),
+      );
+      const top = rowRect.bottom - wrapperRect.top + scrollTop + 8;
+
+      setCardPosition({
+        top,
+        left: Number.isFinite(clampedLeft) ? clampedLeft : relativeLeft,
+        width,
+      });
+    };
+
+    updateCardPosition();
+
+    window.addEventListener("resize", updateCardPosition);
+    scrollContainer.addEventListener("scroll", updateCardPosition);
+
+    return () => {
+      window.removeEventListener("resize", updateCardPosition);
+      scrollContainer.removeEventListener("scroll", updateCardPosition);
+    };
+  }, [selectedOrderId, orderIndexById]);
+
+  useEffect(() => {
+    if (!selectedOrderId) {
+      if (lastInteractedRowIdRef.current && tableContainerRef.current) {
+        const targetRow = tableContainerRef.current.querySelector(
+          `[data-order-row="${lastInteractedRowIdRef.current}"]`,
+        );
+        if (targetRow instanceof HTMLElement) {
+          requestAnimationFrame(() => targetRow.focus());
+        }
+      }
+      return;
+    }
+
+    const focusFrame = requestAnimationFrame(() => {
+      const closeButton = cardRef.current?.querySelector(
+        '[data-role="order-details-close"]',
+      );
+      if (closeButton instanceof HTMLElement) {
+        closeButton.focus();
+      }
+    });
+
+    return () => cancelAnimationFrame(focusFrame);
+  }, [selectedOrderId]);
+
+  useEffect(() => {
+    if (!selectedOrderId) {
+      return;
+    }
+
+    const handlePointerDown = (event) => {
+      const cardElement = cardRef.current;
+      if (cardElement?.contains(event.target)) {
+        return;
+      }
+
+      const rowElement = tableContainerRef.current?.querySelector(
+        `[data-order-row="${selectedOrderId}"]`,
+      );
+
+      if (rowElement?.contains(event.target)) {
+        return;
+      }
+
+      lastInteractedRowIdRef.current = selectedOrderId;
+      setSelectedOrderId(null);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        lastInteractedRowIdRef.current = selectedOrderId;
+        setSelectedOrderId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedOrderId]);
+
+  const handleToggleRowSelection = useCallback((rowId) => {
+    lastInteractedRowIdRef.current = rowId;
+    setSelectedOrderId((current) => (current === rowId ? null : rowId));
+  }, []);
+
+  const handleRowKeyDown = useCallback(
+    (event, rowId) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleToggleRowSelection(rowId);
+      }
+
+      if (event.key === "Escape" && selectedOrderId === rowId) {
+        event.preventDefault();
+        lastInteractedRowIdRef.current = rowId;
+        setSelectedOrderId(null);
+      }
+    },
+    [handleToggleRowSelection, selectedOrderId],
+  );
+
+  const handleCloseDetails = useCallback(() => {
+    if (!selectedOrderId) {
+      return;
+    }
+
+    lastInteractedRowIdRef.current = selectedOrderId;
+    setSelectedOrderId(null);
+  }, [selectedOrderId]);
+
+  const detailsCardId = "order-support-selected-order";
+  const detailsTitleId = `${detailsCardId}-title`;
+  const detailsBodyId = `${detailsCardId}-body`;
 
   return (
     <div className="space-y-8">
@@ -727,7 +914,7 @@ export default function OrderSupportContent({
               <p className="text-sm text-muted-foreground">No orders found for the selected filters.</p>
             ) : null}
             {orders.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div ref={tableContainerRef} className="relative">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -740,13 +927,28 @@ export default function OrderSupportContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.map((order) => (
-                      <TableRow key={order.id ?? order.orderNumber}>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium">#{order.orderNumber}</p>
-                            {order.invoice?.invoiceNumber ? (
-                              <p className="text-xs text-muted-foreground">
+                    {orders.map((order, index) => {
+                      const rowId = createOrderRowId(order, index);
+                      const isSelected = selectedOrderId === rowId;
+
+                      return (
+                        <TableRow
+                          key={rowId}
+                          data-order-row={rowId}
+                          tabIndex={0}
+                          role="button"
+                          aria-expanded={isSelected}
+                          aria-controls={detailsCardId}
+                          onClick={() => handleToggleRowSelection(rowId)}
+                          onKeyDown={(event) => handleRowKeyDown(event, rowId)}
+                          data-state={isSelected ? "selected" : undefined}
+                          className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        >
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p className="font-medium">#{order.orderNumber}</p>
+                              {order.invoice?.invoiceNumber ? (
+                                <p className="text-xs text-muted-foreground">
                                 Invoice {order.invoice.invoiceNumber}
                               </p>
                             ) : null}
@@ -775,10 +977,171 @@ export default function OrderSupportContent({
                           {formatAmount(order.amount ?? order.payment?.amount, order.currency ?? order.payment?.currency)}
                         </TableCell>
                         <TableCell className="text-right">{formatDateTime(order.createdAt)}</TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
+                {selectedOrder && cardPosition ? (
+                  <div
+                    ref={cardRef}
+                    className="pointer-events-none absolute z-20 max-w-full"
+                    style={{
+                      top: cardPosition.top,
+                      left: cardPosition.left,
+                      width: cardPosition.width,
+                    }}
+                  >
+                    <Card
+                      role="dialog"
+                      aria-modal="false"
+                      aria-labelledby={detailsTitleId}
+                      aria-describedby={detailsBodyId}
+                      id={detailsCardId}
+                      className="pointer-events-auto shadow-lg"
+                    >
+                      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1">
+                          <CardTitle id={detailsTitleId} className="text-base">
+                            Order #{selectedOrder.orderNumber ?? selectedOrderId}
+                          </CardTitle>
+                          <CardDescription>
+                            {formatStatusLabel(selectedOrder.statusLabel)} · Created
+                            {" "}
+                            {formatDateTime(selectedOrder.createdAt)}
+                          </CardDescription>
+                        </div>
+                        <div className="flex shrink-0 items-start">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleCloseDetails}
+                            data-role="order-details-close"
+                            aria-label="Close order details"
+                          >
+                            <span aria-hidden="true">×</span>
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent
+                        id={detailsBodyId}
+                        className="grid gap-4 text-sm sm:grid-cols-2"
+                      >
+                        <div className="space-y-1">
+                          <p className="font-medium">Customer</p>
+                          <p>{selectedOrder.user?.displayName ?? "Unknown"}</p>
+                          {selectedOrder.user?.email ? (
+                            <p className="text-muted-foreground">{selectedOrder.user.email}</p>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium">Plan</p>
+                          <p>
+                            {selectedOrder.plan?.planName ??
+                              selectedOrder.plan?.planSlug ??
+                              "Unassigned"}
+                          </p>
+                          {selectedOrder.plan?.billingCycle ? (
+                            <p className="text-muted-foreground">
+                              Billing cycle: {selectedOrder.plan.billingCycle}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium">Order details</p>
+                          <p>Status: {formatStatusLabel(selectedOrder.statusLabel)}</p>
+                          <p className="text-muted-foreground">
+                            Total amount:
+                            {" "}
+                            {formatAmount(
+                              selectedOrder.amount ?? selectedOrder.payment?.amount,
+                              selectedOrder.currency ?? selectedOrder.payment?.currency,
+                            )}
+                          </p>
+                          {selectedOrder.startDate ? (
+                            <p className="text-muted-foreground">
+                              Starts {formatDateOnly(selectedOrder.startDate)}
+                            </p>
+                          ) : null}
+                          {selectedOrder.endDate ? (
+                            <p className="text-muted-foreground">
+                              Ends {formatDateOnly(selectedOrder.endDate)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium">Payment</p>
+                          <p>
+                            {formatAmount(
+                              selectedOrder.payment?.amount,
+                              selectedOrder.payment?.currency,
+                            )}
+                            {" "}· {formatStatusLabel(selectedOrder.payment?.statusLabel)}
+                          </p>
+                          {selectedOrder.payment?.paymentGateway ? (
+                            <p className="text-muted-foreground">
+                              Gateway: {selectedOrder.payment.paymentGateway}
+                            </p>
+                          ) : null}
+                          {selectedOrder.payment?.gatewayTransactionId ? (
+                            <p className="text-muted-foreground">
+                              Transaction ID: {selectedOrder.payment.gatewayTransactionId}
+                            </p>
+                          ) : null}
+                          {selectedOrder.payment?.purposeLabel ||
+                          selectedOrder.payment?.purpose ? (
+                            <p className="text-muted-foreground">
+                              Purpose:{" "}
+                              {formatStatusLabel(
+                                selectedOrder.payment?.purposeLabel ??
+                                  selectedOrder.payment?.purpose,
+                              )}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium">Timeline</p>
+                          <p>Created {formatDateTime(selectedOrder.createdAt)}</p>
+                          {selectedOrder.updatedAt ? (
+                            <p className="text-muted-foreground">
+                              Updated {formatDateTime(selectedOrder.updatedAt)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <p className="font-medium">Invoice</p>
+                          {selectedOrder.invoice?.invoiceNumber ? (
+                            <div className="space-y-1">
+                              <p>
+                                #{selectedOrder.invoice.invoiceNumber} ·
+                                {" "}
+                                {formatStatusLabel(selectedOrder.invoice.statusLabel)} ·
+                                {" "}
+                                {formatAmount(
+                                  selectedOrder.invoice.amount,
+                                  selectedOrder.invoice.currency,
+                                )}
+                              </p>
+                              {selectedOrder.invoice?.dueDate ? (
+                                <p className="text-muted-foreground">
+                                  Due {formatDateOnly(selectedOrder.invoice.dueDate)}
+                                </p>
+                              ) : null}
+                              {selectedOrder.invoice?.issuedAt ? (
+                                <p className="text-muted-foreground">
+                                  Issued {formatDateTime(selectedOrder.invoice.issuedAt)}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground">No invoice linked.</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {ordersQuery.hasNextPage ? (
