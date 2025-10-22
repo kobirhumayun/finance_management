@@ -43,6 +43,29 @@ export const qk = {
   },
   admin: {
     plans: () => ["admin", "plans"],
+    invoices: {
+      root: () => ["admin", "invoices"],
+      list: (filters) => {
+        const normalized = normalizeParams(filters);
+        if (Object.keys(normalized).length === 0) {
+          return ["admin", "invoices", "list"];
+        }
+        return ["admin", "invoices", "list", normalized];
+      },
+      summary: (filters) => {
+        const normalized = normalizeParams(filters);
+        if (Object.keys(normalized).length === 0) {
+          return ["admin", "invoices", "summary"];
+        }
+        return ["admin", "invoices", "summary", normalized];
+      },
+      detail: (invoiceNumber) => [
+        "admin",
+        "invoices",
+        "detail",
+        invoiceNumber ? String(invoiceNumber) : "unknown",
+      ],
+    },
     payments: (filters) => {
       if (!filters || (typeof filters === "object" && Object.keys(filters).length === 0)) {
         return ["admin", "payments"];
