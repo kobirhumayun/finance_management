@@ -272,6 +272,8 @@ function OrderDetailPopover({
   const bodyRef = useRef(null);
   const lastMeasuredRectRef = useRef(null);
   const popoverSideRef = useRef("right");
+  const closeGuardFrameRef = useRef(null);
+  const closeGuardActiveRef = useRef(false);
   const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
   const [popoverSide, setPopoverSide] = useState("right");
   const isOpen = Boolean(selectedOrderNumber && anchorElement);
@@ -280,6 +282,38 @@ function OrderDetailPopover({
     if (!isOpen && bodyRef.current) {
       bodyRef.current = null;
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      closeGuardActiveRef.current = false;
+      closeGuardFrameRef.current = null;
+      return undefined;
+    }
+
+    if (!isOpen) {
+      closeGuardActiveRef.current = false;
+      if (closeGuardFrameRef.current != null) {
+        window.cancelAnimationFrame(closeGuardFrameRef.current);
+        closeGuardFrameRef.current = null;
+      }
+      return undefined;
+    }
+
+    closeGuardActiveRef.current = true;
+
+    const frame = window.requestAnimationFrame(() => {
+      closeGuardActiveRef.current = false;
+      closeGuardFrameRef.current = null;
+    });
+
+    closeGuardFrameRef.current = frame;
+
+    return () => {
+      closeGuardActiveRef.current = false;
+      window.cancelAnimationFrame(frame);
+      closeGuardFrameRef.current = null;
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -638,6 +672,9 @@ function OrderDetailPopover({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
+          if (closeGuardActiveRef.current) {
+            return;
+          }
           onClose?.();
         }
       }}
@@ -652,6 +689,15 @@ function OrderDetailPopover({
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           bodyRef.current?.focus();
+        }}
+        onInteractOutside={(event) => {
+          if (
+            anchorElement &&
+            typeof anchorElement.contains === "function" &&
+            (event.target === anchorElement || anchorElement.contains(event.target))
+          ) {
+            event.preventDefault();
+          }
         }}
       >
         <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-4 p-4 focus:outline-none">
