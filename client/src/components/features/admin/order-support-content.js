@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import {
   formatCurrency,
   formatCurrencyWithCode,
@@ -18,7 +20,9 @@ import {
 import {
   sanitizeOrderFilters,
   sanitizeOrderPaymentSummaryFilters,
+  adminOrderDetailOptions,
 } from "@/lib/queries/admin-orders";
+import { cn } from "@/lib/utils";
 
 export const ORDER_SUPPORT_PAGE_SIZE = 20;
 export const ORDER_SUPPORT_TOP_CUSTOMER_PAGE_SIZE = 10;
@@ -137,6 +141,20 @@ const formatCount = (value) => {
   return formatNumber(Math.round(numeric), { fallback: "0", minimumFractionDigits: 0 });
 };
 
+const clamp = (value, min, max) => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (Number.isNaN(numericValue)) {
+    return min;
+  }
+  if (numericValue < min) {
+    return min;
+  }
+  if (numericValue > max) {
+    return max;
+  }
+  return numericValue;
+};
+
 const BreakdownTable = ({
   title,
   description,
@@ -241,6 +259,419 @@ const TopCustomersTable = ({
     </CardContent>
   </Card>
 );
+
+function OrderDetailPopover({
+  anchorElement,
+  order,
+  detail,
+  isLoading,
+  isError,
+  selectedOrderNumber,
+  onClose,
+}) {
+  const bodyRef = useRef(null);
+  const lastMeasuredRectRef = useRef(null);
+  const popoverSideRef = useRef("right");
+  const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
+  const [popoverSide, setPopoverSide] = useState("right");
+  const isOpen = Boolean(selectedOrderNumber && anchorElement);
+
+  useEffect(() => {
+    if (!isOpen && bodyRef.current) {
+      bodyRef.current = null;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (anchorElement && !anchorElement.isConnected) {
+      onClose?.();
+    }
+  }, [anchorElement, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !anchorElement) {
+      setVirtualAnchorRef({ current: null });
+      lastMeasuredRectRef.current = null;
+      return;
+    }
+
+    if (typeof window === "undefined" || typeof anchorElement.getBoundingClientRect !== "function") {
+      return;
+    }
+
+    const measure = () => {
+      if (!anchorElement || typeof anchorElement.getBoundingClientRect !== "function") {
+        return;
+      }
+
+      const rect = anchorElement.getBoundingClientRect();
+      const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || rect.right || 0;
+      const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || rect.bottom || 0;
+      const margin = 16;
+
+      const availableRight = Math.max(0, viewportWidth - margin - rect.right);
+      const availableLeft = Math.max(0, rect.left - margin);
+      const nextSide = availableRight >= availableLeft ? "right" : "left";
+      const horizontalEdge = nextSide === "right" ? rect.right : rect.left;
+      const anchorX = clamp(horizontalEdge, margin, Math.max(margin, viewportWidth - margin));
+      const anchorY = clamp(
+        rect.top + rect.height / 2,
+        margin,
+        Math.max(margin, viewportHeight - margin),
+      );
+
+      const sanitizedRect = {
+        width: 0,
+        height: 0,
+        top: anchorY,
+        bottom: anchorY,
+        left: anchorX,
+        right: anchorX,
+        x: anchorX,
+        y: anchorY,
+      };
+
+      const previousRect = lastMeasuredRectRef.current;
+      const rectChanged =
+        !previousRect ||
+        ["top", "bottom", "left", "right", "x", "y"].some(
+          (key) => previousRect[key] !== sanitizedRect[key],
+        );
+      const sideChanged = popoverSideRef.current !== nextSide;
+
+      if (!rectChanged && !sideChanged) {
+        return;
+      }
+
+      lastMeasuredRectRef.current = sanitizedRect;
+
+      if (sideChanged) {
+        popoverSideRef.current = nextSide;
+        setPopoverSide(nextSide);
+      }
+
+      setVirtualAnchorRef({
+        current: {
+          getBoundingClientRect: () => sanitizedRect,
+          contextElement: anchorElement,
+        },
+      });
+    };
+
+    let frameId;
+    const scheduleMeasure = () => {
+      if (frameId != null) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        measure();
+      });
+    };
+
+    measure();
+
+    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("scroll", scheduleMeasure, true);
+
+    return () => {
+      if (frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure, true);
+    };
+  }, [anchorElement, isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const mergedOrder =
+    order || detail
+      ? {
+          ...(order ?? {}),
+          ...(detail ?? {}),
+          payment: { ...(order?.payment ?? {}), ...(detail?.payment ?? {}) },
+          invoice: { ...(order?.invoice ?? {}), ...(detail?.invoice ?? {}) },
+          user: { ...(order?.user ?? {}), ...(detail?.user ?? {}) },
+          plan: { ...(order?.plan ?? {}), ...(detail?.plan ?? {}) },
+        }
+      : null;
+
+  const payment = mergedOrder?.payment ?? {};
+  const invoice = mergedOrder?.invoice ?? {};
+  const user = mergedOrder?.user ?? {};
+  const plan = mergedOrder?.plan ?? {};
+
+  let content = null;
+
+  if (!mergedOrder) {
+    content = (
+      <p className="text-sm text-muted-foreground">
+        No additional details are available for order #{selectedOrderNumber}.
+      </p>
+    );
+  } else {
+    const metadataRows = [
+      {
+        key: "order-status",
+        label: "Order status",
+        value: formatStatusLabel(mergedOrder.statusLabel || mergedOrder.status),
+      },
+      {
+        key: "order-created",
+        label: "Created",
+        value: formatDateTime(mergedOrder.createdAt),
+      },
+      {
+        key: "order-updated",
+        label: "Updated",
+        value: formatDateTime(mergedOrder.updatedAt),
+      },
+      {
+        key: "order-period",
+        label: "Service period",
+        value: `${formatDateOnly(mergedOrder.startDate)} → ${formatDateOnly(mergedOrder.endDate)}`,
+      },
+      {
+        key: "order-renewal",
+        label: "Renews",
+        value: formatDateOnly(mergedOrder.renewalDate),
+      },
+      {
+        key: "order-plan",
+        label: "Plan",
+        value: plan.planName || plan.planSlug || "Unassigned plan",
+      },
+      {
+        key: "order-amount",
+        label: "Order amount",
+        value: formatAmount(
+          mergedOrder.amount ?? payment.amount,
+          mergedOrder.currency ?? payment.currency,
+        ),
+      },
+    ];
+
+    const customerRows = [
+      {
+        key: "customer-name",
+        label: "Customer",
+        value: user.displayName || "Unknown customer",
+      },
+      {
+        key: "customer-email",
+        label: "Email",
+        value: user.email || "—",
+      },
+      {
+        key: "customer-username",
+        label: "Username",
+        value: user.username || "—",
+      },
+      {
+        key: "customer-role",
+        label: "Role",
+        value: user.role || "—",
+      },
+      {
+        key: "customer-subscription-status",
+        label: "Subscription status",
+        value: user.subscriptionStatus
+          ? formatStatusLabel(user.subscriptionStatus)
+          : "—",
+      },
+      {
+        key: "customer-subscription-period",
+        label: "Subscription period",
+        value: `${formatDateOnly(user.subscriptionStartDate)} → ${formatDateOnly(
+          user.subscriptionEndDate,
+        )}`,
+      },
+    ];
+
+    const paymentRows = [
+      {
+        key: "payment-status",
+        label: "Payment status",
+        value: formatStatusLabel(payment.statusLabel || payment.status),
+      },
+      {
+        key: "payment-gateway",
+        label: "Gateway",
+        value: payment.paymentGateway || "—",
+      },
+      {
+        key: "payment-transaction",
+        label: "Transaction ID",
+        value: payment.gatewayTransactionId || "—",
+      },
+      {
+        key: "payment-amount",
+        label: "Amount",
+        value: formatAmount(payment.amount, payment.currency || mergedOrder.currency),
+      },
+      {
+        key: "payment-refunded",
+        label: "Refunded",
+        value: formatAmount(payment.refundedAmount, payment.currency || mergedOrder.currency),
+      },
+      {
+        key: "payment-purpose",
+        label: "Purpose",
+        value: payment.purpose || "—",
+      },
+      {
+        key: "payment-processed",
+        label: "Processed",
+        value: formatDateTime(payment.processedAt || payment.updatedAt),
+      },
+      {
+        key: "payment-created",
+        label: "Created",
+        value: formatDateTime(payment.createdAt),
+      },
+    ];
+
+    const invoiceRows = [
+      {
+        key: "invoice-number",
+        label: "Invoice number",
+        value: invoice.invoiceNumber || "—",
+      },
+      {
+        key: "invoice-status",
+        label: "Invoice status",
+        value: formatStatusLabel(invoice.statusLabel || invoice.status),
+      },
+      {
+        key: "invoice-amount",
+        label: "Invoice amount",
+        value: formatAmount(
+          invoice.amount,
+          invoice.currency || payment.currency || mergedOrder.currency,
+        ),
+      },
+      {
+        key: "invoice-issued",
+        label: "Issued",
+        value: formatDateTime(invoice.issuedDate),
+      },
+      {
+        key: "invoice-due",
+        label: "Due",
+        value: formatDateTime(invoice.dueDate),
+      },
+      {
+        key: "invoice-period",
+        label: "Billing period",
+        value: `${formatDateOnly(invoice.subscriptionStartDate)} → ${formatDateOnly(
+          invoice.subscriptionEndDate,
+        )}`,
+      },
+    ];
+
+    const renderRows = (rows) => (
+      <div className="divide-y divide-border/60">
+        {rows.map((row) => (
+          <div key={row.key} className="flex justify-between gap-4 py-1.5 first:pt-0 last:pb-0">
+            <span className="text-muted-foreground">{row.label}</span>
+            <span className="font-medium text-right">{row.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+
+    const statusMessages = [];
+    if (isLoading) {
+      statusMessages.push(
+        <p key="loading" className="text-sm text-muted-foreground">
+          {detail
+            ? "Refreshing order data…"
+            : `Loading order #${selectedOrderNumber}…`}
+        </p>,
+      );
+    }
+    if (isError) {
+      statusMessages.push(
+        <p key="error" className="text-sm text-destructive">
+          Unable to load additional details for order #{selectedOrderNumber}.
+        </p>,
+      );
+    }
+
+    content = (
+      <div className="space-y-4 text-sm">
+        {statusMessages}
+        <section aria-labelledby="order-support-detail-metadata" className="space-y-2">
+          <h3 id="order-support-detail-metadata" className="text-sm font-semibold text-muted-foreground">
+            Order metadata
+          </h3>
+          {renderRows(metadataRows)}
+        </section>
+        <section aria-labelledby="order-support-detail-customer" className="space-y-2">
+          <h3 id="order-support-detail-customer" className="text-sm font-semibold text-muted-foreground">
+            Customer
+          </h3>
+          {renderRows(customerRows)}
+        </section>
+        <section aria-labelledby="order-support-detail-payment" className="space-y-2">
+          <h3 id="order-support-detail-payment" className="text-sm font-semibold text-muted-foreground">
+            Payment
+          </h3>
+          {renderRows(paymentRows)}
+        </section>
+        <section aria-labelledby="order-support-detail-invoice" className="space-y-2">
+          <h3 id="order-support-detail-invoice" className="text-sm font-semibold text-muted-foreground">
+            Invoice
+          </h3>
+          {renderRows(invoiceRows)}
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <Popover
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose?.();
+        }
+      }}
+    >
+      <PopoverAnchor virtualRef={virtualAnchorRef} />
+      <PopoverContent
+        align="start"
+        side={popoverSide}
+        sideOffset={12}
+        collisionPadding={16}
+        className="z-50 w-[32rem] max-w-[min(32rem,calc(100vw-2rem))] p-0 shadow-xl"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          bodyRef.current?.focus();
+        }}
+      >
+        <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-4 p-4 focus:outline-none">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Order detail</h2>
+              <p className="text-sm text-muted-foreground">
+                Reference information for order #{selectedOrderNumber}.
+              </p>
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onClose?.()}>
+              Close
+            </Button>
+          </div>
+          {content}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const OrderLookupSection = ({
   lookupValue,
@@ -372,6 +803,9 @@ export default function OrderSupportContent({
   onClearInvestigatedOrder,
   summaryNextCursor,
 }) {
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
+  const [detailAnchorElement, setDetailAnchorElement] = useState(null);
+
   const orderSummary = summaryQuery.data;
   const paymentSummary = paymentSummaryQuery.data;
 
@@ -408,6 +842,53 @@ export default function OrderSupportContent({
     const pages = ordersQuery.data?.pages ?? [];
     return pages.flatMap((page) => page.orders ?? []);
   }, [ordersQuery.data]);
+
+  const selectedOrder = useMemo(() => {
+    if (!selectedOrderNumber) {
+      return null;
+    }
+    return orders.find((order) => order?.orderNumber === selectedOrderNumber) ?? null;
+  }, [orders, selectedOrderNumber]);
+
+  const orderDetailOptions = useMemo(
+    () => adminOrderDetailOptions(selectedOrderNumber),
+    [selectedOrderNumber],
+  );
+  const orderDetailQuery = useQuery(orderDetailOptions);
+
+  const handleDetailClose = useCallback(() => {
+    setSelectedOrderNumber(null);
+    setDetailAnchorElement(null);
+  }, []);
+
+  const handleOrderSelect = useCallback(
+    (orderNumber, anchorNode) => {
+      if (!orderNumber) {
+        handleDetailClose();
+        return;
+      }
+
+      setSelectedOrderNumber(orderNumber);
+      setDetailAnchorElement(
+        anchorNode && typeof anchorNode.getBoundingClientRect === "function"
+          ? anchorNode
+          : null,
+      );
+    },
+    [handleDetailClose],
+  );
+
+  useEffect(() => {
+    if (!selectedOrderNumber) {
+      return;
+    }
+    const stillExists = orders.some(
+      (order) => order?.orderNumber === selectedOrderNumber,
+    );
+    if (!stillExists) {
+      handleDetailClose();
+    }
+  }, [orders, selectedOrderNumber, handleDetailClose]);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
@@ -740,43 +1221,73 @@ export default function OrderSupportContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.map((order) => (
-                      <TableRow key={order.id ?? order.orderNumber}>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium">#{order.orderNumber}</p>
-                            {order.invoice?.invoiceNumber ? (
-                              <p className="text-xs text-muted-foreground">
-                                Invoice {order.invoice.invoiceNumber}
-                              </p>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>{renderOrderStatusBadge(order.statusLabel)}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium">{order.user?.displayName ?? "Unknown"}</p>
-                            {order.user?.email ? (
-                              <p className="text-xs text-muted-foreground">{order.user.email}</p>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p>{order.plan?.planName ?? order.plan?.planSlug ?? "Unassigned"}</p>
-                            {order.payment?.paymentGateway ? (
-                              <p className="text-xs text-muted-foreground">
-                                {order.payment.paymentGateway} · {order.payment.statusLabel ?? "Unknown"}
-                              </p>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatAmount(order.amount ?? order.payment?.amount, order.currency ?? order.payment?.currency)}
-                        </TableCell>
-                        <TableCell className="text-right">{formatDateTime(order.createdAt)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {orders.map((order) => {
+                      const isSelected = selectedOrderNumber === order.orderNumber;
+                      const handleRowSelect = (event) => {
+                        if (isSelected) {
+                          handleDetailClose();
+                          return;
+                        }
+                        handleOrderSelect(order.orderNumber, event.currentTarget);
+                      };
+                      const handleRowKeyDown = (event) => {
+                        if (event.key === "Enter" || event.key === " " || event.key === "Space") {
+                          event.preventDefault();
+                          if (isSelected) {
+                            handleDetailClose();
+                          } else {
+                            handleOrderSelect(order.orderNumber, event.currentTarget);
+                          }
+                        }
+                      };
+                      return (
+                        <TableRow
+                          key={order.id ?? order.orderNumber}
+                          className={cn("relative cursor-pointer", isSelected && "bg-muted/40")}
+                          tabIndex={0}
+                          aria-selected={isSelected}
+                          onClick={handleRowSelect}
+                          onKeyDown={handleRowKeyDown}
+                        >
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p className="font-medium">#{order.orderNumber}</p>
+                              {order.invoice?.invoiceNumber ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Invoice {order.invoice.invoiceNumber}
+                                </p>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>{renderOrderStatusBadge(order.statusLabel)}</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p className="font-medium">{order.user?.displayName ?? "Unknown"}</p>
+                              {order.user?.email ? (
+                                <p className="text-xs text-muted-foreground">{order.user.email}</p>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p>{order.plan?.planName ?? order.plan?.planSlug ?? "Unassigned"}</p>
+                              {order.payment?.paymentGateway ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {order.payment.paymentGateway} · {order.payment.statusLabel ?? "Unknown"}
+                                </p>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatAmount(
+                              order.amount ?? order.payment?.amount,
+                              order.currency ?? order.payment?.currency,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{formatDateTime(order.createdAt)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -794,6 +1305,16 @@ export default function OrderSupportContent({
           </CardContent>
         </Card>
       </section>
+
+      <OrderDetailPopover
+        anchorElement={detailAnchorElement}
+        order={selectedOrder}
+        detail={orderDetailQuery.data}
+        isLoading={Boolean(orderDetailQuery.isFetching)}
+        isError={Boolean(orderDetailQuery.isError)}
+        selectedOrderNumber={selectedOrderNumber}
+        onClose={handleDetailClose}
+      />
 
       <Separator />
 
