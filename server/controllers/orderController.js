@@ -9,7 +9,7 @@ const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_SUMMARY_USER_LIMIT = 50;
 
 const EMPTY_ORDER_SUMMARY = {
-    totals: { totalOrders: 0, totalAmount: 0 },
+    totals: { totalOrders: 0, totalAmount: 0, currencyBreakdown: [] },
     byStatus: [],
     byPaymentStatus: [],
     byPaymentGateway: [],
@@ -20,7 +20,7 @@ const EMPTY_ORDER_SUMMARY = {
 };
 
 const EMPTY_PAYMENT_SUMMARY = {
-    totals: { totalPayments: 0, totalAmount: 0 },
+    totals: { totalPayments: 0, totalAmount: 0, currencyBreakdown: [] },
     byStatus: [],
     byGateway: [],
     byPurpose: [],
@@ -68,14 +68,41 @@ const buildUserSummaryFacet = (limit, cursor) => {
     const stages = [
         {
             $group: {
-                _id: '$user._id',
+                _id: {
+                    userId: '$user._id',
+                    currency: {
+                        $ifNull: ['$summaryCurrency', { $ifNull: ['$currency', 'UNKNOWN'] }],
+                    },
+                },
                 userId: { $first: '$user._id' },
                 userEmail: { $first: '$user.email' },
                 firstName: { $first: '$user.firstName' },
                 lastName: { $first: '$user.lastName' },
                 username: { $first: '$user.username' },
+                currency: {
+                    $first: { $ifNull: ['$summaryCurrency', { $ifNull: ['$currency', 'UNKNOWN'] }] },
+                },
                 count: { $sum: 1 },
                 totalAmount: { $sum: '$amountNumber' },
+            },
+        },
+        {
+            $group: {
+                _id: '$_id.userId',
+                userId: { $first: '$userId' },
+                userEmail: { $first: '$userEmail' },
+                firstName: { $first: '$firstName' },
+                lastName: { $first: '$lastName' },
+                username: { $first: '$username' },
+                count: { $sum: '$count' },
+                totalAmount: { $sum: '$totalAmount' },
+                currencyBreakdown: {
+                    $push: {
+                        currency: '$currency',
+                        count: '$count',
+                        totalAmount: '$totalAmount',
+                    },
+                },
             },
         },
         {
@@ -86,6 +113,17 @@ const buildUserSummaryFacet = (limit, cursor) => {
                         if: { $ifNull: ['$userId', false] },
                         then: { $toString: '$userId' },
                         else: '',
+                    },
+                },
+                currencyBreakdown: {
+                    $map: {
+                        input: { $ifNull: ['$currencyBreakdown', []] },
+                        as: 'entry',
+                        in: {
+                            currency: '$$entry.currency',
+                            count: '$$entry.count',
+                            totalAmount: { $ifNull: ['$$entry.totalAmount', 0] },
+                        },
                     },
                 },
             },
@@ -126,6 +164,7 @@ const buildUserSummaryFacet = (limit, cursor) => {
             username: 1,
             count: 1,
             totalAmount: 1,
+            currencyBreakdown: 1,
         },
     });
 
@@ -141,6 +180,12 @@ const processUserSummaryResults = (entries, limit) => {
     const normalizedResults = trimmedResults.map((entry) => ({
         ...entry,
         totalAmount: parseDecimal(entry.totalAmount),
+        currencyBreakdown: Array.isArray(entry.currencyBreakdown)
+            ? entry.currencyBreakdown.map((currencyEntry) => ({
+                  ...currencyEntry,
+                  totalAmount: parseDecimal(currencyEntry.totalAmount),
+              }))
+            : [],
     }));
 
     let nextCursor = null;
@@ -346,7 +391,8 @@ const resolvePaymentFilters = async (query) => {
 
 const listOrders = async (req, res) => {
     try {
-        const requestedLimit = typeof req.query.limit === 'number' ? req.query.limit : DEFAULT_PAGE_SIZE;
+        const parsedLimit = Number(req.query.limit);
+        const requestedLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : DEFAULT_PAGE_SIZE;
         const limit = Math.min(requestedLimit, MAX_PAGE_SIZE);
         const cursor = req.query.cursor ? new mongoose.Types.ObjectId(req.query.cursor) : null;
 
@@ -358,6 +404,7 @@ const listOrders = async (req, res) => {
                 pageInfo: {
                     nextCursor: null,
                     hasNextPage: false,
+                    limit,
                 },
             });
         }
@@ -430,6 +477,7 @@ const listOrders = async (req, res) => {
                 pageInfo: {
                     nextCursor: null,
                     hasNextPage: false,
+                    limit,
                 },
             });
         }
@@ -446,7 +494,7 @@ const listOrders = async (req, res) => {
             })
             .populate({
                 path: 'payment',
-                select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
+                select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt userId planId',
             })
             .populate({
                 path: 'invoice',
@@ -468,6 +516,7 @@ const listOrders = async (req, res) => {
             pageInfo: {
                 nextCursor,
                 hasNextPage,
+                limit,
             },
         });
     } catch (error) {
@@ -494,7 +543,7 @@ const getOrderByNumber = async (req, res) => {
                 })
                 .populate({
                     path: 'payment',
-                    select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
+                    select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt userId planId',
                 })
                 .populate({
                     path: 'invoice',
@@ -515,7 +564,7 @@ const getOrderByNumber = async (req, res) => {
                 })
                 .populate({
                     path: 'payment',
-                    select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt',
+                    select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose invoiceId processedAt createdAt updatedAt userId planId',
                 })
                 .populate({
                     path: 'invoice',
@@ -631,6 +680,10 @@ const getOrderSummary = async (req, res) => {
             $addFields: {
                 amountNumber: { $toDouble: { $ifNull: ['$amount', 0] } },
                 effectiveDate: { $ifNull: ['$createdAt', '$updatedAt'] },
+                summaryCurrency: { $ifNull: ['$currency', 'UNKNOWN'] },
+                paymentSummaryCurrency: {
+                    $ifNull: ['$payment.currency', { $ifNull: ['$currency', 'UNKNOWN'] }],
+                },
             },
         });
 
@@ -639,18 +692,46 @@ const getOrderSummary = async (req, res) => {
                 totals: [
                     {
                         $group: {
-                            _id: null,
+                            _id: '$summaryCurrency',
                             totalOrders: { $sum: 1 },
                             totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOrders: { $sum: '$totalOrders' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id',
+                                    totalOrders: '$totalOrders',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
                         },
                     },
                 ],
                 byStatus: [
                     {
                         $group: {
-                            _id: '$status',
+                            _id: { status: '$status', currency: '$summaryCurrency' },
                             count: { $sum: 1 },
                             totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: '$_id.status',
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
                         },
                     },
                     {
@@ -659,6 +740,7 @@ const getOrderSummary = async (req, res) => {
                             status: '$_id',
                             count: 1,
                             totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
                     },
                     { $sort: { status: 1 } },
@@ -666,9 +748,26 @@ const getOrderSummary = async (req, res) => {
                 byPaymentStatus: [
                     {
                         $group: {
-                            _id: '$payment.status',
+                            _id: {
+                                status: '$payment.status',
+                                currency: '$paymentSummaryCurrency',
+                            },
                             count: { $sum: 1 },
                             totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: '$_id.status',
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
                         },
                     },
                     {
@@ -677,6 +776,7 @@ const getOrderSummary = async (req, res) => {
                             paymentStatus: '$_id',
                             count: 1,
                             totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
                     },
                     { $sort: { paymentStatus: 1 } },
@@ -684,9 +784,26 @@ const getOrderSummary = async (req, res) => {
                 byPaymentGateway: [
                     {
                         $group: {
-                            _id: '$payment.paymentGateway',
+                            _id: {
+                                gateway: '$payment.paymentGateway',
+                                currency: '$paymentSummaryCurrency',
+                            },
                             count: { $sum: 1 },
                             totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: '$_id.gateway',
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
                         },
                     },
                     {
@@ -695,6 +812,7 @@ const getOrderSummary = async (req, res) => {
                             paymentGateway: '$_id',
                             count: 1,
                             totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
                     },
                     { $sort: { paymentGateway: 1 } },
@@ -702,7 +820,10 @@ const getOrderSummary = async (req, res) => {
                 byPlan: [
                     {
                         $group: {
-                            _id: '$plan._id',
+                            _id: {
+                                planId: '$plan._id',
+                                currency: '$summaryCurrency',
+                            },
                             planSlug: { $first: '$plan.slug' },
                             planName: { $first: '$plan.name' },
                             count: { $sum: 1 },
@@ -710,13 +831,31 @@ const getOrderSummary = async (req, res) => {
                         },
                     },
                     {
+                        $group: {
+                            _id: '$_id.planId',
+                            planId: { $first: '$_id.planId' },
+                            planSlug: { $first: '$planSlug' },
+                            planName: { $first: '$planName' },
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
+                        },
+                    },
+                    {
                         $project: {
                             _id: 0,
-                            planId: '$_id',
+                            planId: 1,
                             planSlug: 1,
                             planName: 1,
                             count: 1,
                             totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
                     },
                     { $sort: { totalAmount: -1 } },
@@ -725,9 +864,23 @@ const getOrderSummary = async (req, res) => {
                 byYear: [
                     {
                         $group: {
-                            _id: { $year: '$effectiveDate' },
+                            _id: { year: { $year: '$effectiveDate' }, currency: '$summaryCurrency' },
                             count: { $sum: 1 },
                             totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: '$_id.year',
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
                         },
                     },
                     {
@@ -736,6 +889,7 @@ const getOrderSummary = async (req, res) => {
                             year: '$_id',
                             count: 1,
                             totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
                     },
                     { $sort: { year: -1 } },
@@ -746,9 +900,24 @@ const getOrderSummary = async (req, res) => {
                             _id: {
                                 year: { $year: '$effectiveDate' },
                                 month: { $month: '$effectiveDate' },
+                                currency: '$summaryCurrency',
                             },
                             count: { $sum: 1 },
                             totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: { year: '$_id.year', month: '$_id.month' },
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
+                            },
                         },
                     },
                     {
@@ -758,6 +927,7 @@ const getOrderSummary = async (req, res) => {
                             month: '$_id.month',
                             count: 1,
                             totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
                     },
                     { $sort: { year: -1, month: -1 } },
@@ -767,7 +937,20 @@ const getOrderSummary = async (req, res) => {
 
         pipeline.push({
             $project: {
-                totals: { $ifNull: [{ $arrayElemAt: ['$totals', 0] }, { totalOrders: 0, totalAmount: 0 }] },
+                totals: {
+                    $let: {
+                        vars: {
+                            totalsDoc: { $ifNull: [{ $arrayElemAt: ['$totals', 0] }, {}] },
+                        },
+                        in: {
+                            totalOrders: { $ifNull: ['$$totalsDoc.totalOrders', 0] },
+                            totalAmount: { $ifNull: ['$$totalsDoc.totalAmount', 0] },
+                            currencyBreakdown: {
+                                $ifNull: ['$$totalsDoc.currencyBreakdown', []],
+                            },
+                        },
+                    },
+                },
                 byStatus: 1,
                 byPaymentStatus: 1,
                 byPaymentGateway: 1,
@@ -833,6 +1016,7 @@ const getPaymentSummary = async (req, res) => {
                 $addFields: {
                     amountNumber: { $toDouble: { $ifNull: ['$amount', 0] } },
                     effectiveDate: { $ifNull: ['$processedAt', '$createdAt'] },
+                    summaryCurrency: { $ifNull: ['$currency', 'UNKNOWN'] },
                 },
             },
             {
@@ -855,39 +1039,85 @@ const getPaymentSummary = async (req, res) => {
             { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
             {
                 $facet: {
-                    totals: [
-                        {
-                            $group: {
-                                _id: null,
-                                totalPayments: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
+                totals: [
+                    {
+                        $group: {
+                            _id: '$summaryCurrency',
+                            totalPayments: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            totalPayments: { $sum: '$totalPayments' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id',
+                                    totalPayments: '$totalPayments',
+                                    totalAmount: '$totalAmount',
+                                },
                             },
                         },
-                    ],
-                    byStatus: [
-                        {
-                            $group: {
-                                _id: '$status',
-                                count: { $sum: 1 },
-                                totalAmount: { $sum: '$amountNumber' },
+                    },
+                ],
+                byStatus: [
+                    {
+                        $group: {
+                            _id: { status: '$status', currency: '$summaryCurrency' },
+                            count: { $sum: 1 },
+                            totalAmount: { $sum: '$amountNumber' },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: '$_id.status',
+                            count: { $sum: '$count' },
+                            totalAmount: { $sum: '$totalAmount' },
+                            currencyBreakdown: {
+                                $push: {
+                                    currency: '$_id.currency',
+                                    count: '$count',
+                                    totalAmount: '$totalAmount',
+                                },
                             },
                         },
-                        {
-                            $project: {
-                                _id: 0,
-                                status: '$_id',
-                                count: 1,
-                                totalAmount: 1,
-                            },
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            status: '$_id',
+                            count: 1,
+                            totalAmount: 1,
+                            currencyBreakdown: 1,
                         },
-                        { $sort: { status: 1 } },
-                    ],
+                    },
+                    { $sort: { status: 1 } },
+                ],
                     byGateway: [
                         {
                             $group: {
-                                _id: '$paymentGateway',
+                                _id: {
+                                    gateway: '$paymentGateway',
+                                    currency: '$summaryCurrency',
+                                },
                                 count: { $sum: 1 },
                                 totalAmount: { $sum: '$amountNumber' },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: '$_id.gateway',
+                                count: { $sum: '$count' },
+                                totalAmount: { $sum: '$totalAmount' },
+                                currencyBreakdown: {
+                                    $push: {
+                                        currency: '$_id.currency',
+                                        count: '$count',
+                                        totalAmount: '$totalAmount',
+                                    },
+                                },
                             },
                         },
                         {
@@ -896,6 +1126,7 @@ const getPaymentSummary = async (req, res) => {
                                 paymentGateway: '$_id',
                                 count: 1,
                                 totalAmount: 1,
+                                currencyBreakdown: 1,
                             },
                         },
                         { $sort: { paymentGateway: 1 } },
@@ -903,9 +1134,23 @@ const getPaymentSummary = async (req, res) => {
                     byPurpose: [
                         {
                             $group: {
-                                _id: '$purpose',
+                                _id: { purpose: '$purpose', currency: '$summaryCurrency' },
                                 count: { $sum: 1 },
                                 totalAmount: { $sum: '$amountNumber' },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: '$_id.purpose',
+                                count: { $sum: '$count' },
+                                totalAmount: { $sum: '$totalAmount' },
+                                currencyBreakdown: {
+                                    $push: {
+                                        currency: '$_id.currency',
+                                        count: '$count',
+                                        totalAmount: '$totalAmount',
+                                    },
+                                },
                             },
                         },
                         {
@@ -914,6 +1159,7 @@ const getPaymentSummary = async (req, res) => {
                                 purpose: '$_id',
                                 count: 1,
                                 totalAmount: 1,
+                                currencyBreakdown: 1,
                             },
                         },
                         { $sort: { purpose: 1 } },
@@ -922,12 +1168,32 @@ const getPaymentSummary = async (req, res) => {
                     byPlan: [
                         {
                             $group: {
-                                _id: '$plan._id',
+                                _id: {
+                                    planId: '$plan._id',
+                                    currency: '$summaryCurrency',
+                                },
                                 planId: { $first: '$plan._id' },
                                 planSlug: { $first: '$plan.slug' },
                                 planName: { $first: '$plan.name' },
                                 count: { $sum: 1 },
                                 totalAmount: { $sum: '$amountNumber' },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: '$_id.planId',
+                                planId: { $first: '$_id.planId' },
+                                planSlug: { $first: '$planSlug' },
+                                planName: { $first: '$planName' },
+                                count: { $sum: '$count' },
+                                totalAmount: { $sum: '$totalAmount' },
+                                currencyBreakdown: {
+                                    $push: {
+                                        currency: '$_id.currency',
+                                        count: '$count',
+                                        totalAmount: '$totalAmount',
+                                    },
+                                },
                             },
                         },
                         {
@@ -938,6 +1204,7 @@ const getPaymentSummary = async (req, res) => {
                                 planName: 1,
                                 count: 1,
                                 totalAmount: 1,
+                                currencyBreakdown: 1,
                             },
                         },
                         { $sort: { totalAmount: -1 } },
@@ -945,9 +1212,23 @@ const getPaymentSummary = async (req, res) => {
                     byYear: [
                         {
                             $group: {
-                                _id: { $year: '$effectiveDate' },
+                                _id: { year: { $year: '$effectiveDate' }, currency: '$summaryCurrency' },
                                 count: { $sum: 1 },
                                 totalAmount: { $sum: '$amountNumber' },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: '$_id.year',
+                                count: { $sum: '$count' },
+                                totalAmount: { $sum: '$totalAmount' },
+                                currencyBreakdown: {
+                                    $push: {
+                                        currency: '$_id.currency',
+                                        count: '$count',
+                                        totalAmount: '$totalAmount',
+                                    },
+                                },
                             },
                         },
                         {
@@ -956,6 +1237,7 @@ const getPaymentSummary = async (req, res) => {
                                 year: '$_id',
                                 count: 1,
                                 totalAmount: 1,
+                                currencyBreakdown: 1,
                             },
                         },
                         { $sort: { year: -1 } },
@@ -966,9 +1248,24 @@ const getPaymentSummary = async (req, res) => {
                                 _id: {
                                     year: { $year: '$effectiveDate' },
                                     month: { $month: '$effectiveDate' },
+                                    currency: '$summaryCurrency',
                                 },
                                 count: { $sum: 1 },
                                 totalAmount: { $sum: '$amountNumber' },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: { year: '$_id.year', month: '$_id.month' },
+                                count: { $sum: '$count' },
+                                totalAmount: { $sum: '$totalAmount' },
+                                currencyBreakdown: {
+                                    $push: {
+                                        currency: '$_id.currency',
+                                        count: '$count',
+                                        totalAmount: '$totalAmount',
+                                    },
+                                },
                             },
                         },
                         {
@@ -978,6 +1275,7 @@ const getPaymentSummary = async (req, res) => {
                                 month: '$_id.month',
                                 count: 1,
                                 totalAmount: 1,
+                                currencyBreakdown: 1,
                             },
                         },
                         { $sort: { year: -1, month: -1 } },
@@ -987,6 +1285,31 @@ const getPaymentSummary = async (req, res) => {
             {
                 $project: {
                     totals: { $ifNull: [{ $arrayElemAt: ['$totals', 0] }, { totalPayments: 0, totalAmount: 0 }] },
+                    byStatus: 1,
+                    byGateway: 1,
+                    byPurpose: 1,
+                    byUser: 1,
+                    byPlan: 1,
+                    byYear: 1,
+                    byMonth: 1,
+                },
+            },
+            {
+                $project: {
+                    totals: {
+                        $let: {
+                            vars: {
+                                totalsDoc: { $ifNull: [{ $arrayElemAt: ['$totals', 0] }, {}] },
+                            },
+                            in: {
+                                totalPayments: { $ifNull: ['$$totalsDoc.totalPayments', 0] },
+                                totalAmount: { $ifNull: ['$$totalsDoc.totalAmount', 0] },
+                                currencyBreakdown: {
+                                    $ifNull: ['$$totalsDoc.currencyBreakdown', []],
+                                },
+                            },
+                        },
+                    },
                     byStatus: 1,
                     byGateway: 1,
                     byPurpose: 1,
