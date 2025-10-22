@@ -256,7 +256,7 @@ function FiltersSection({ filters, onChange, onReset }) {
             id="invoice-filter-start"
             name="startDate"
             type="date"
-            className="cursor-pointer"
+            className="[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-moz-calendar-picker-indicator]:cursor-pointer"
             value={filters.startDate}
             onChange={handleInputChange}
           />
@@ -267,7 +267,7 @@ function FiltersSection({ filters, onChange, onReset }) {
             id="invoice-filter-end"
             name="endDate"
             type="date"
-            className="cursor-pointer"
+            className="[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-moz-calendar-picker-indicator]:cursor-pointer"
             value={filters.endDate}
             onChange={handleInputChange}
           />
