@@ -295,16 +295,6 @@ function OrderDetailPopover({
   }, [isOpen]);
 
   useEffect(() => {
-    if (isReattaching) {
-      return;
-    }
-
-    if (anchorElement && !anchorElement.isConnected) {
-      onClose?.();
-    }
-  }, [anchorElement, isReattaching, onClose]);
-
-  useEffect(() => {
     if (!isOpen || !anchorElement) {
       setVirtualAnchorRef({ current: null });
       lastMeasuredRectRef.current = null;
@@ -658,7 +648,7 @@ function OrderDetailPopover({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          if (isReattaching) {
+          if (isReattaching || (anchorElement && !anchorElement.isConnected)) {
             return;
           }
           onClose?.();
