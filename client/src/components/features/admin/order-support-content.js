@@ -155,16 +155,6 @@ const clamp = (value, min, max) => {
   return numericValue;
 };
 
-const escapeForSelector = (value) => {
-  if (typeof value !== "string") {
-    value = value == null ? "" : String(value);
-  }
-  if (typeof window !== "undefined" && window.CSS?.escape) {
-    return window.CSS.escape(value);
-  }
-  return value.replace(/[\0-\x1f\x7f-\x9f!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, (char) => `\\${char}`);
-};
-
 const BreakdownTable = ({
   title,
   description,
@@ -291,6 +281,12 @@ function OrderDetailPopover({
       bodyRef.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (anchorElement && !anchorElement.isConnected) {
+      onClose?.();
+    }
+  }, [anchorElement, onClose]);
 
   useEffect(() => {
     if (!isOpen || !anchorElement) {
@@ -892,32 +888,6 @@ export default function OrderSupportContent({
     }
   }, [selectedOrderNumber]);
 
-  useEffect(() => {
-    if (!selectedOrderNumber) {
-      return;
-    }
-
-    if (detailAnchorElement && detailAnchorElement.isConnected) {
-      return;
-    }
-
-    if (typeof document === "undefined") {
-      return;
-    }
-
-    const selector = `[data-order-support-row="${escapeForSelector(selectedOrderNumber)}"]`;
-    const candidate = document.querySelector(selector);
-
-    if (candidate && typeof candidate.getBoundingClientRect === "function") {
-      if (candidate !== detailAnchorElement) {
-        setDetailAnchorElement(candidate);
-      }
-      return;
-    }
-
-    handleDetailClose();
-  }, [selectedOrderNumber, detailAnchorElement, orders, handleDetailClose]);
-
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
     ? ordersQuery.error?.message || "Failed to load orders."
@@ -1274,7 +1244,6 @@ export default function OrderSupportContent({
                           className={cn("relative cursor-pointer", isSelected && "bg-muted/40")}
                           tabIndex={0}
                           aria-selected={isSelected}
-                          data-order-support-row={order.orderNumber ?? order.id ?? ""}
                           onClick={handleRowSelect}
                           onKeyDown={handleRowKeyDown}
                         >
