@@ -810,6 +810,12 @@ export default function OrderSupportContent({
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const [detailAnchorElement, setDetailAnchorElement] = useState(null);
 
+  const filtersSignature = useMemo(
+    () => JSON.stringify(sanitizeOrderFilters(filters)),
+    [filters],
+  );
+  const lastFiltersSignatureRef = useRef(filtersSignature);
+
   const orderSummary = summaryQuery.data;
   const paymentSummary = paymentSummaryQuery.data;
 
@@ -887,6 +893,15 @@ export default function OrderSupportContent({
       setDetailAnchorElement(null);
     }
   }, [selectedOrderNumber]);
+
+  useEffect(() => {
+    if (lastFiltersSignatureRef.current === filtersSignature) {
+      return;
+    }
+
+    lastFiltersSignatureRef.current = filtersSignature;
+    handleDetailClose();
+  }, [filtersSignature, handleDetailClose]);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError

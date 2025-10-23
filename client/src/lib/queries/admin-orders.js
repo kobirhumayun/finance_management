@@ -729,6 +729,8 @@ export const adminOrderListInfiniteOptions = (filters = {}, { limit = 20 } = {})
       const response = await apiJSON(`${ORDER_LIST_ENDPOINT}${query}`, { signal });
       return normalizeOrderListResponse(response);
     },
+    staleTime: 15_000,
+    gcTime: 5 * 60 * 1000,
   };
 };
 
