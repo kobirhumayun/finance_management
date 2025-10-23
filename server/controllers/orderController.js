@@ -271,6 +271,12 @@ const resolveOrderFilters = async (query) => {
         paymentFilter.gatewayTransactionId = query.gatewayTransactionId;
     }
 
+    const paymentPurpose = query.purpose || query.paymentPurpose;
+
+    if (paymentPurpose) {
+        paymentFilter.purpose = paymentPurpose;
+    }
+
     const hasPaymentFilter = Object.keys(paymentFilter).length > 0;
 
     return {
@@ -396,6 +402,10 @@ const listOrders = async (req, res) => {
 
             if (paymentFilter.gatewayTransactionId) {
                 paymentMatch['paymentDoc.gatewayTransactionId'] = paymentFilter.gatewayTransactionId;
+            }
+
+            if (paymentFilter.purpose) {
+                paymentMatch['paymentDoc.purpose'] = paymentFilter.purpose;
             }
 
             if (Object.keys(paymentMatch).length) {
@@ -607,6 +617,10 @@ const getOrderSummary = async (req, res) => {
 
             if (paymentFilter.gatewayTransactionId) {
                 paymentMatch['payment.gatewayTransactionId'] = paymentFilter.gatewayTransactionId;
+            }
+
+            if (paymentFilter.purpose) {
+                paymentMatch['payment.purpose'] = paymentFilter.purpose;
             }
 
             if (Object.keys(paymentMatch).length) {

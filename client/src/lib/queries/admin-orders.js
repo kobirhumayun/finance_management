@@ -215,6 +215,21 @@ export const sanitizeOrderFilters = (filters = {}) => {
   return result;
 };
 
+const applyPaymentPurposeFilter = (filters = {}) => {
+  if (!filters || typeof filters !== "object") {
+    return {};
+  }
+
+  const result = { ...filters };
+
+  if (result.paymentPurpose != null) {
+    result.purpose = result.paymentPurpose;
+    delete result.paymentPurpose;
+  }
+
+  return result;
+};
+
 const normalizePageInfo = (pageInfo) => {
   if (!pageInfo || typeof pageInfo !== "object") {
     return { nextCursor: null, hasNextPage: false };
@@ -535,8 +550,9 @@ const normalizePaymentSummaryData = (data) => {
 };
 
 export const adminOrderListOptions = (filters = {}, { limit = 20 } = {}) => {
-  const { paymentPurpose: _ignoredPaymentPurpose, ...sanitizedFilters } = sanitizeOrderFilters(filters);
-  const appliedFilters = { ...sanitizedFilters, limit };
+  const sanitizedFilters = sanitizeOrderFilters(filters);
+  const mappedFilters = applyPaymentPurposeFilter(sanitizedFilters);
+  const appliedFilters = { ...mappedFilters, limit };
 
   return {
     queryKey: qk.admin.orders.list(appliedFilters),
@@ -565,8 +581,9 @@ export const adminOrderListOptions = (filters = {}, { limit = 20 } = {}) => {
 };
 
 export const adminOrderSummaryInfiniteOptions = (filters = {}, { byUserLimit = 10 } = {}) => {
-  const { paymentPurpose: _ignoredPaymentPurpose, ...sanitizedFilters } = sanitizeOrderFilters(filters);
-  const appliedFilters = { ...sanitizedFilters, byUserLimit };
+  const sanitizedFilters = sanitizeOrderFilters(filters);
+  const mappedFilters = applyPaymentPurposeFilter(sanitizedFilters);
+  const appliedFilters = { ...mappedFilters, byUserLimit };
 
   return {
     queryKey: qk.admin.orders.summary(appliedFilters),
@@ -600,6 +617,7 @@ export const adminOrderSummaryInfiniteOptions = (filters = {}, { byUserLimit = 1
 
 const buildPaymentSummaryFilters = (filters = {}) => {
   const sanitized = sanitizeOrderFilters(filters);
+  const mappedFilters = applyPaymentPurposeFilter(sanitized);
   const result = {};
 
   [
@@ -611,18 +629,15 @@ const buildPaymentSummaryFilters = (filters = {}) => {
     "gatewayTransactionId",
     "startDate",
     "endDate",
+    "purpose",
   ].forEach((key) => {
-    if (sanitized[key] != null) {
-      result[key] = sanitized[key];
+    if (mappedFilters[key] != null) {
+      result[key] = mappedFilters[key];
     }
   });
 
-  if (sanitized.paymentStatus) {
-    result.status = sanitized.paymentStatus;
-  }
-
-  if (sanitized.paymentPurpose) {
-    result.purpose = sanitized.paymentPurpose;
+  if (mappedFilters.paymentStatus) {
+    result.status = mappedFilters.paymentStatus;
   }
 
   return result;
