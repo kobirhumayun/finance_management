@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useInfiniteQuery, useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import OrderSupportContent, {
   ORDER_SUPPORT_PAGE_SIZE,
   ORDER_SUPPORT_TOP_CUSTOMER_PAGE_SIZE,
@@ -13,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   adminOrderListInfiniteOptions,
+  adminOrderDetailOptions,
   adminOrderSummaryOptions,
   adminOrderTopCustomersInfiniteOptions,
   adminPaymentSummaryOptions,
@@ -28,6 +35,7 @@ export default function OrderSupportPage() {
   const [filters, setFilters] = useState(getDefaultFilters);
   const [lookupValue, setLookupValue] = useState("");
   const [investigatedOrder, setInvestigatedOrder] = useState(null);
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -40,6 +48,10 @@ export default function OrderSupportPage() {
     () => countOrderSupportActiveFilters(filters),
     [filters],
   );
+
+  useEffect(() => {
+    setSelectedOrderNumber(null);
+  }, [sanitizedOrderFilters]);
 
   const summaryQueries = useQueries({
     queries: [
@@ -71,6 +83,8 @@ export default function OrderSupportPage() {
     }),
     enabled: Boolean(orderSummaryQuery.data?.byUserPageInfo?.hasNextPage),
   });
+
+  const orderDetailQuery = useQuery(adminOrderDetailOptions(selectedOrderNumber));
 
   const orderLookupMutation = useMutation({
     mutationFn: ({ orderNumber }) => fetchAdminOrderDetail(orderNumber),
@@ -124,6 +138,10 @@ export default function OrderSupportPage() {
     orderLookupMutation.reset();
   }, [orderLookupMutation]);
 
+  const handleSelectOrder = useCallback((orderNumber) => {
+    setSelectedOrderNumber(orderNumber);
+  }, []);
+
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: qk.admin.orders.root(), exact: false });
   }, [queryClient]);
@@ -164,6 +182,9 @@ export default function OrderSupportPage() {
         investigatedOrder={investigatedOrder}
         onClearInvestigatedOrder={handleClearInvestigatedOrder}
         summaryNextCursor={orderSummaryQuery.data?.byUserPageInfo?.nextCursor ?? null}
+        selectedOrderNumber={selectedOrderNumber}
+        onSelectOrder={handleSelectOrder}
+        orderDetailQuery={orderDetailQuery}
       />
     </div>
   );

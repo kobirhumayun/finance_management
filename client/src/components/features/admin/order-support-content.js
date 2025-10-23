@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,11 +16,7 @@ import {
   formatNumber,
   resolveNumericValue,
 } from "@/lib/formatters";
-import {
-  sanitizeOrderFilters,
-  sanitizeOrderPaymentSummaryFilters,
-  adminOrderDetailOptions,
-} from "@/lib/queries/admin-orders";
+import { sanitizeOrderFilters, sanitizeOrderPaymentSummaryFilters } from "@/lib/queries/admin-orders";
 import { cn } from "@/lib/utils";
 
 export const ORDER_SUPPORT_PAGE_SIZE = 20;
@@ -806,15 +801,11 @@ export default function OrderSupportContent({
   investigatedOrder,
   onClearInvestigatedOrder,
   summaryNextCursor,
+  selectedOrderNumber,
+  onSelectOrder,
+  orderDetailQuery,
 }) {
-  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const [detailAnchorElement, setDetailAnchorElement] = useState(null);
-
-  const filtersSignature = useMemo(
-    () => JSON.stringify(sanitizeOrderFilters(filters)),
-    [filters],
-  );
-  const lastFiltersSignatureRef = useRef(filtersSignature);
 
   const orderSummary = summaryQuery.data;
   const paymentSummary = paymentSummaryQuery.data;
@@ -860,16 +851,10 @@ export default function OrderSupportContent({
     return orders.find((order) => order?.orderNumber === selectedOrderNumber) ?? null;
   }, [orders, selectedOrderNumber]);
 
-  const orderDetailOptions = useMemo(
-    () => adminOrderDetailOptions(selectedOrderNumber),
-    [selectedOrderNumber],
-  );
-  const orderDetailQuery = useQuery(orderDetailOptions);
-
   const handleDetailClose = useCallback(() => {
     setDetailAnchorElement(null);
-    setSelectedOrderNumber(null);
-  }, []);
+    onSelectOrder?.(null);
+  }, [onSelectOrder]);
 
   const handleOrderSelect = useCallback(
     (orderNumber, anchorNode) => {
@@ -883,9 +868,9 @@ export default function OrderSupportContent({
           ? anchorNode
           : null,
       );
-      setSelectedOrderNumber(orderNumber);
+      onSelectOrder?.(orderNumber);
     },
-    [handleDetailClose],
+    [handleDetailClose, onSelectOrder],
   );
 
   useEffect(() => {
@@ -893,15 +878,6 @@ export default function OrderSupportContent({
       setDetailAnchorElement(null);
     }
   }, [selectedOrderNumber]);
-
-  useEffect(() => {
-    if (lastFiltersSignatureRef.current === filtersSignature) {
-      return;
-    }
-
-    lastFiltersSignatureRef.current = filtersSignature;
-    handleDetailClose();
-  }, [filtersSignature, handleDetailClose]);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
