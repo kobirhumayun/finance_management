@@ -882,7 +882,7 @@ function OrderDetailPopover({
         side={popoverSide}
         sideOffset={12}
         collisionPadding={16}
-        className="z-50 w-[28rem] max-w-[min(28rem,calc(100vw-2rem))] p-0 shadow-xl"
+        className="z-50 w-[28rem] max-h-[calc(100vh-4rem)] max-w-[min(28rem,calc(100vw-2rem))] overflow-y-auto p-0 shadow-xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           bodyRef.current?.focus();
