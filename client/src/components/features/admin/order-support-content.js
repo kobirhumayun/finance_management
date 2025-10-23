@@ -150,6 +150,22 @@ const clamp = (value, min, max) => {
   return numericValue;
 };
 
+const escapeForSelector = (value) => {
+  const stringValue = value == null ? "" : String(value);
+  const css =
+    (typeof CSS !== "undefined" && typeof CSS.escape === "function" && CSS.escape) ||
+    (typeof globalThis !== "undefined" &&
+      globalThis.CSS &&
+      typeof globalThis.CSS.escape === "function" &&
+      globalThis.CSS.escape);
+
+  if (css) {
+    return css(stringValue);
+  }
+
+  return stringValue.replace(/[^a-zA-Z0-9_-]/g, (char) => `\\${char}`);
+};
+
 const BreakdownTable = ({
   title,
   description,
@@ -262,6 +278,7 @@ function OrderDetailPopover({
   isLoading,
   isError,
   selectedOrderNumber,
+  isReattaching = false,
   onClose,
 }) {
   const bodyRef = useRef(null);
@@ -278,10 +295,14 @@ function OrderDetailPopover({
   }, [isOpen]);
 
   useEffect(() => {
+    if (isReattaching) {
+      return;
+    }
+
     if (anchorElement && !anchorElement.isConnected) {
       onClose?.();
     }
-  }, [anchorElement, onClose]);
+  }, [anchorElement, isReattaching, onClose]);
 
   useEffect(() => {
     if (!isOpen || !anchorElement) {
@@ -637,6 +658,9 @@ function OrderDetailPopover({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
+          if (isReattaching) {
+            return;
+          }
           onClose?.();
         }
       }}
@@ -806,6 +830,19 @@ export default function OrderSupportContent({
   orderDetailQuery,
 }) {
   const [detailAnchorElement, setDetailAnchorElement] = useState(null);
+  const [isReattachingAnchor, setIsReattachingAnchor] = useState(false);
+  const reattachFrameRef = useRef(null);
+
+  const cancelReattachFrame = useCallback(() => {
+    if (
+      reattachFrameRef.current != null &&
+      typeof window !== "undefined" &&
+      typeof window.cancelAnimationFrame === "function"
+    ) {
+      window.cancelAnimationFrame(reattachFrameRef.current);
+    }
+    reattachFrameRef.current = null;
+  }, []);
 
   const orderSummary = summaryQuery.data;
   const paymentSummary = paymentSummaryQuery.data;
@@ -852,9 +889,11 @@ export default function OrderSupportContent({
   }, [orders, selectedOrderNumber]);
 
   const handleDetailClose = useCallback(() => {
+    cancelReattachFrame();
+    setIsReattachingAnchor(false);
     setDetailAnchorElement(null);
     onSelectOrder?.(null);
-  }, [onSelectOrder]);
+  }, [cancelReattachFrame, onSelectOrder]);
 
   const handleOrderSelect = useCallback(
     (orderNumber, anchorNode) => {
@@ -863,6 +902,8 @@ export default function OrderSupportContent({
         return;
       }
 
+      cancelReattachFrame();
+      setIsReattachingAnchor(false);
       setDetailAnchorElement(
         anchorNode && typeof anchorNode.getBoundingClientRect === "function"
           ? anchorNode
@@ -870,14 +911,88 @@ export default function OrderSupportContent({
       );
       onSelectOrder?.(orderNumber);
     },
-    [handleDetailClose, onSelectOrder],
+    [cancelReattachFrame, handleDetailClose, onSelectOrder],
   );
 
   useEffect(() => {
     if (!selectedOrderNumber) {
+      cancelReattachFrame();
+      setIsReattachingAnchor(false);
       setDetailAnchorElement(null);
     }
-  }, [selectedOrderNumber]);
+  }, [cancelReattachFrame, selectedOrderNumber]);
+
+  useEffect(() => {
+    if (!selectedOrderNumber || !detailAnchorElement) {
+      return;
+    }
+
+    if (detailAnchorElement.isConnected) {
+      if (isReattachingAnchor) {
+        setIsReattachingAnchor(false);
+      }
+      return;
+    }
+
+    if (typeof document === "undefined") {
+      handleDetailClose();
+      return;
+    }
+
+    cancelReattachFrame();
+    setIsReattachingAnchor(true);
+
+    const escapedOrderNumber = escapeForSelector(selectedOrderNumber);
+    const selector = `[data-order-support-row="${escapedOrderNumber}"]`;
+
+    const attemptReattach = () => {
+      reattachFrameRef.current = null;
+
+      const nextAnchor = document.querySelector(selector);
+      if (nextAnchor instanceof HTMLElement) {
+        setDetailAnchorElement(nextAnchor);
+        setIsReattachingAnchor(false);
+        return;
+      }
+
+      const orderStillVisible = orders.some(
+        (candidate) => candidate?.orderNumber === selectedOrderNumber,
+      );
+
+      if (orderStillVisible) {
+        if (
+          typeof window !== "undefined" &&
+          typeof window.requestAnimationFrame === "function"
+        ) {
+          reattachFrameRef.current = window.requestAnimationFrame(attemptReattach);
+        }
+        return;
+      }
+
+      setIsReattachingAnchor(false);
+      handleDetailClose();
+    };
+
+    if (
+      typeof window !== "undefined" &&
+      typeof window.requestAnimationFrame === "function"
+    ) {
+      reattachFrameRef.current = window.requestAnimationFrame(attemptReattach);
+    } else {
+      attemptReattach();
+    }
+
+    return () => {
+      cancelReattachFrame();
+    };
+  }, [
+    orders,
+    selectedOrderNumber,
+    detailAnchorElement,
+    cancelReattachFrame,
+    handleDetailClose,
+    isReattachingAnchor,
+  ]);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
   const ordersErrorMessage = ordersQuery.isError
@@ -1232,6 +1347,9 @@ export default function OrderSupportContent({
                       return (
                         <TableRow
                           key={order.id ?? order.orderNumber}
+                          data-order-support-row={
+                            order?.orderNumber != null ? String(order.orderNumber) : undefined
+                          }
                           className={cn("relative cursor-pointer", isSelected && "bg-muted/40")}
                           tabIndex={0}
                           aria-selected={isSelected}
@@ -1302,6 +1420,7 @@ export default function OrderSupportContent({
         isLoading={Boolean(orderDetailQuery.isFetching)}
         isError={Boolean(orderDetailQuery.isError)}
         selectedOrderNumber={selectedOrderNumber}
+        isReattaching={isReattachingAnchor}
         onClose={handleDetailClose}
       />
 
