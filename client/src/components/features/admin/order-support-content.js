@@ -278,7 +278,6 @@ function OrderDetailPopover({
   isLoading,
   isError,
   selectedOrderNumber,
-  isReattaching = false,
   onClose,
 }) {
   const bodyRef = useRef(null);
@@ -287,6 +286,11 @@ function OrderDetailPopover({
   const [virtualAnchorRef, setVirtualAnchorRef] = useState({ current: null });
   const [popoverSide, setPopoverSide] = useState("right");
   const isOpen = Boolean(selectedOrderNumber && anchorElement);
+  const activeAnchorRef = useRef(null);
+
+  useEffect(() => {
+    activeAnchorRef.current = anchorElement || null;
+  }, [anchorElement]);
 
   useEffect(() => {
     if (!isOpen && bodyRef.current) {
@@ -306,11 +310,7 @@ function OrderDetailPopover({
     }
 
     const measure = () => {
-      if (
-        !anchorElement ||
-        !anchorElement.isConnected ||
-        typeof anchorElement.getBoundingClientRect !== "function"
-      ) {
+      if (!anchorElement || typeof anchorElement.getBoundingClientRect !== "function") {
         return;
       }
 
@@ -646,14 +646,6 @@ function OrderDetailPopover({
   return (
     <Popover
       open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          if (isReattaching || (anchorElement && !anchorElement.isConnected)) {
-            return;
-          }
-          onClose?.();
-        }
-      }}
     >
       <PopoverAnchor virtualRef={virtualAnchorRef} />
       <PopoverContent
@@ -665,6 +657,35 @@ function OrderDetailPopover({
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           bodyRef.current?.focus();
+        }}
+        onEscapeKeyDown={() => {
+          onClose?.();
+        }}
+        onPointerDownOutside={(event) => {
+          const anchorNode = activeAnchorRef.current;
+          if (
+            anchorNode &&
+            typeof Node !== "undefined" &&
+            event.target instanceof Node &&
+            anchorNode.contains(event.target)
+          ) {
+            event.preventDefault();
+            return;
+          }
+          onClose?.();
+        }}
+        onFocusOutside={(event) => {
+          const anchorNode = activeAnchorRef.current;
+          if (
+            anchorNode &&
+            typeof Node !== "undefined" &&
+            event.target instanceof Node &&
+            anchorNode.contains(event.target)
+          ) {
+            event.preventDefault();
+            return;
+          }
+          onClose?.();
         }}
       >
         <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-4 p-4 focus:outline-none">
@@ -820,7 +841,6 @@ export default function OrderSupportContent({
   orderDetailQuery,
 }) {
   const [detailAnchorElement, setDetailAnchorElement] = useState(null);
-  const [isReattachingAnchor, setIsReattachingAnchor] = useState(false);
   const reattachFrameRef = useRef(null);
 
   const cancelReattachFrame = useCallback(() => {
@@ -880,7 +900,6 @@ export default function OrderSupportContent({
 
   const handleDetailClose = useCallback(() => {
     cancelReattachFrame();
-    setIsReattachingAnchor(false);
     setDetailAnchorElement(null);
     onSelectOrder?.(null);
   }, [cancelReattachFrame, onSelectOrder]);
@@ -893,7 +912,6 @@ export default function OrderSupportContent({
       }
 
       cancelReattachFrame();
-      setIsReattachingAnchor(false);
       setDetailAnchorElement(
         anchorNode && typeof anchorNode.getBoundingClientRect === "function"
           ? anchorNode
@@ -907,7 +925,6 @@ export default function OrderSupportContent({
   useEffect(() => {
     if (!selectedOrderNumber) {
       cancelReattachFrame();
-      setIsReattachingAnchor(false);
       setDetailAnchorElement(null);
     }
   }, [cancelReattachFrame, selectedOrderNumber]);
@@ -918,9 +935,6 @@ export default function OrderSupportContent({
     }
 
     if (detailAnchorElement.isConnected) {
-      if (isReattachingAnchor) {
-        setIsReattachingAnchor(false);
-      }
       return;
     }
 
@@ -930,7 +944,6 @@ export default function OrderSupportContent({
     }
 
     cancelReattachFrame();
-    setIsReattachingAnchor(true);
 
     const escapedOrderNumber = escapeForSelector(selectedOrderNumber);
     const selector = `[data-order-support-row="${escapedOrderNumber}"]`;
@@ -941,7 +954,6 @@ export default function OrderSupportContent({
       const nextAnchor = document.querySelector(selector);
       if (nextAnchor instanceof HTMLElement) {
         setDetailAnchorElement(nextAnchor);
-        setIsReattachingAnchor(false);
         return;
       }
 
@@ -959,7 +971,6 @@ export default function OrderSupportContent({
         return;
       }
 
-      setIsReattachingAnchor(false);
       handleDetailClose();
     };
 
@@ -981,7 +992,6 @@ export default function OrderSupportContent({
     detailAnchorElement,
     cancelReattachFrame,
     handleDetailClose,
-    isReattachingAnchor,
   ]);
 
   const isOrdersLoading = ordersQuery.isLoading && !ordersQuery.isFetched;
@@ -1410,7 +1420,6 @@ export default function OrderSupportContent({
         isLoading={Boolean(orderDetailQuery.isFetching)}
         isError={Boolean(orderDetailQuery.isError)}
         selectedOrderNumber={selectedOrderNumber}
-        isReattaching={isReattachingAnchor}
         onClose={handleDetailClose}
       />
 
