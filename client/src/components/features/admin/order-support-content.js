@@ -229,7 +229,7 @@ function FiltersSection({ filters, onChange, onReset }) {
             value={filters.status}
             onValueChange={(value) => onChange("status", value)}
           >
-            <SelectTrigger id="order-filter-status">
+            <SelectTrigger id="order-filter-status" className="w-full">
               <SelectValue placeholder="Select order status" />
             </SelectTrigger>
             <SelectContent>
@@ -247,7 +247,7 @@ function FiltersSection({ filters, onChange, onReset }) {
             value={filters.paymentStatus}
             onValueChange={(value) => onChange("paymentStatus", value)}
           >
-            <SelectTrigger id="order-filter-payment-status">
+            <SelectTrigger id="order-filter-payment-status" className="w-full">
               <SelectValue placeholder="Select payment status" />
             </SelectTrigger>
             <SelectContent>
@@ -276,7 +276,7 @@ function FiltersSection({ filters, onChange, onReset }) {
             value={filters.paymentPurpose}
             onValueChange={(value) => onChange("paymentPurpose", value)}
           >
-            <SelectTrigger id="order-filter-purpose">
+            <SelectTrigger id="order-filter-purpose" className="w-full">
               <SelectValue placeholder="Select payment purpose" />
             </SelectTrigger>
             <SelectContent>
