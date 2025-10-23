@@ -82,6 +82,14 @@ const listOrdersValidationRules = () => [
         .trim()
         .isLength({ min: 1, max: 128 })
         .withMessage('gatewayTransactionId must be between 1 and 128 characters long.'),
+    query('purpose')
+        .optional()
+        .isIn(allowedPaymentPurposes)
+        .withMessage(`purpose must be one of: ${allowedPaymentPurposes.join(', ')}.`),
+    query('paymentPurpose')
+        .optional()
+        .isIn(allowedPaymentPurposes)
+        .withMessage(`paymentPurpose must be one of: ${allowedPaymentPurposes.join(', ')}.`),
     query('startDate')
         .optional()
         .isISO8601()
