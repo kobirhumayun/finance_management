@@ -46,7 +46,7 @@ export default function UserNav() {
           <div className="text-xs text-muted-foreground">{session?.user?.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => router.push("/profile")}> {/* Placeholder route */}
+        <DropdownMenuItem onSelect={() => router.push("/profile")}> 
           <User className="mr-2 h-4 w-4" />
           My Profile
         </DropdownMenuItem>

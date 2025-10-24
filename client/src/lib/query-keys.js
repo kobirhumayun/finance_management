@@ -14,6 +14,14 @@ const normalizeParams = (params) => {
 };
 
 export const qk = {
+  self: {
+    profile: () => ["self", "profile"],
+    settings: () => ["self", "settings"],
+    preferences: () => ["self", "preferences"],
+    orders: {
+      list: (params) => ["self", "orders", "list", normalizeParams(params)],
+    },
+  },
   orders: {
     list: (params) => ["orders", "list", params || {}],
     byId: (id) => ["orders", "byId", String(id)],
