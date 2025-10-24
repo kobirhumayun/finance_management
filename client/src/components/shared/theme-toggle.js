@@ -1,21 +1,79 @@
 // File: src/components/shared/theme-toggle.js
 "use client";
 
+import { useCallback } from "react";
 import { useTheme } from "next-themes";
+import { useSession } from "next-auth/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Moon, Sun } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { qk } from "@/lib/query-keys";
+import { updateSelfPreferences } from "@/lib/queries/self";
 
 // Accessible toggle button allowing users to switch between light and dark themes.
 export default function ThemeToggle({ size = "icon" }) {
-  const { setTheme, theme } = useTheme();
-  const isDark = theme === "dark";
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const { setTheme, theme, resolvedTheme } = useTheme();
+  const isAuthenticated = Boolean(session?.user);
+
+  const { mutate: updateThemePreference, isPending } = useMutation({
+    mutationFn: ({ nextTheme }) => updateSelfPreferences({ theme: nextTheme }),
+    onMutate: async ({ nextTheme, initialTheme }) => {
+      const queryKey = qk.self.preferences();
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      const optimistic = {
+        ...(previous || { theme: "system", notifications: {} }),
+        theme: nextTheme,
+      };
+      queryClient.setQueryData(queryKey, optimistic);
+      return {
+        previous,
+        queryKey,
+        previousTheme: previous?.theme ?? initialTheme ?? "system",
+      };
+    },
+    onError: (_error, _value, context) => {
+      if (context?.queryKey && context.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+      if (context?.previousTheme) {
+        setTheme(context.previousTheme);
+      }
+    },
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.setQueryData(qk.self.preferences(), data);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: qk.self.preferences() });
+    },
+  });
+
+  const handleToggle = useCallback(() => {
+    const effectiveTheme = theme === "system" ? resolvedTheme : theme;
+    const nextTheme = effectiveTheme === "dark" ? "light" : "dark";
+    const initialTheme = theme ?? "system";
+    setTheme(nextTheme);
+
+    if (isAuthenticated) {
+      updateThemePreference({ nextTheme, initialTheme });
+    }
+  }, [isAuthenticated, resolvedTheme, setTheme, theme, updateThemePreference]);
+
+  const effectiveTheme = theme === "system" ? resolvedTheme : theme;
+  const isDark = effectiveTheme === "dark";
 
   return (
     <Button
       type="button"
       variant="ghost"
       size={size}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={handleToggle}
+      disabled={isAuthenticated && isPending}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       className="rounded-full"
     >
