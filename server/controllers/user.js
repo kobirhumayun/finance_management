@@ -1,13 +1,150 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const UsedRefreshToken = require('../models/UsedRefreshToken');
+const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
-const { isValidObjectId } = require('mongoose');
+const { isValidObjectId } = mongoose;
 
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
-const COOKIE_OPTIONS = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-    sameSite: 'strict', // Mitigate CSRF attacks
+
+const MAX_SELF_ORDER_PAGE_SIZE = 50;
+const DEFAULT_SELF_ORDER_PAGE_SIZE = 20;
+
+const normalizeDecimal = (value) => {
+    if (value === null || value === undefined) {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return Number.isNaN(parsed) ? value : parsed;
+    }
+
+    if (typeof value === 'object' && typeof value.toString === 'function') {
+        const parsed = parseFloat(value.toString());
+        return Number.isNaN(parsed) ? value : parsed;
+    }
+
+    return value;
+};
+
+const buildProfileResponse = (userDoc) => {
+    if (!userDoc) {
+        return null;
+    }
+
+    const planDoc = userDoc.planId && typeof userDoc.planId === 'object' && userDoc.planId !== null
+        ? {
+            id: userDoc.planId._id,
+            name: userDoc.planId.name,
+            slug: userDoc.planId.slug,
+            billingCycle: userDoc.planId.billingCycle,
+            price: normalizeDecimal(userDoc.planId.price),
+            currency: userDoc.planId.currency,
+        }
+        : null;
+
+    const metadataDisplayName = userDoc.metadata && userDoc.metadata.displayName
+        ? userDoc.metadata.displayName
+        : null;
+
+    const computedDisplayName = metadataDisplayName
+        || [userDoc.firstName, userDoc.lastName].filter(Boolean).join(' ')
+        || userDoc.username;
+
+    return {
+        id: userDoc._id,
+        username: userDoc.username,
+        email: userDoc.email,
+        firstName: userDoc.firstName || '',
+        lastName: userDoc.lastName || '',
+        displayName: computedDisplayName,
+        profilePictureUrl: userDoc.profilePictureUrl || '',
+        subscription: {
+            plan: planDoc,
+            status: userDoc.subscriptionStatus,
+            startDate: userDoc.subscriptionStartDate,
+            endDate: userDoc.subscriptionEndDate,
+            trialEndsAt: userDoc.trialEndsAt,
+            manageSubscriptionUrl: '/pricing',
+        },
+        contact: {
+            email: userDoc.email,
+        },
+        activityLinks: {
+            orders: '/api/users/me/orders',
+        },
+        metadata: {
+            isEmailVerified: userDoc.isEmailVerified,
+            lastLoginAt: userDoc.lastLoginAt,
+            createdAt: userDoc.createdAt,
+        },
+    };
+};
+
+const mapOrderForUser = (order) => {
+    const plan = order.plan
+        ? {
+            id: order.plan._id,
+            name: order.plan.name,
+            slug: order.plan.slug,
+            billingCycle: order.plan.billingCycle,
+            price: normalizeDecimal(order.plan.price),
+            currency: order.plan.currency,
+        }
+        : null;
+
+    const payment = order.payment
+        ? {
+            id: order.payment._id,
+            status: order.payment.status,
+            amount: normalizeDecimal(order.payment.amount),
+            refundedAmount: normalizeDecimal(order.payment.refundedAmount),
+            currency: order.payment.currency,
+            gateway: order.payment.paymentGateway,
+            transactionId: order.payment.gatewayTransactionId,
+            purpose: order.payment.purpose,
+            processedAt: order.payment.processedAt,
+            createdAt: order.payment.createdAt,
+            updatedAt: order.payment.updatedAt,
+        }
+        : null;
+
+    const invoice = order.invoice
+        ? {
+            id: order.invoice._id,
+            number: order.invoice.invoiceNumber,
+            status: order.invoice.status,
+            issuedDate: order.invoice.issuedDate,
+            dueDate: order.invoice.dueDate,
+            amount: normalizeDecimal(order.invoice.amount),
+            currency: order.invoice.currency,
+            subscriptionStartDate: order.invoice.subscriptionStartDate,
+            subscriptionEndDate: order.invoice.subscriptionEndDate,
+            createdAt: order.invoice.createdAt,
+            updatedAt: order.invoice.updatedAt,
+        }
+        : null;
+
+    return {
+        id: order._id,
+        orderNumber: order.orderID,
+        status: order.status,
+        amount: normalizeDecimal(order.amount),
+        currency: order.currency,
+        startDate: order.startDate,
+        endDate: order.endDate,
+        renewalDate: order.renewalDate,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        plan,
+        payment,
+        invoice,
+    };
 };
 
 /**
@@ -69,6 +206,10 @@ const loginUser = async (req, res) => {
 
         if (!user) {
             return res.status(404).json({ message: 'Invalid credentials.' }); //
+        }
+
+        if (user.isActive === false) {
+            return res.status(403).json({ message: 'Account is inactive. Please contact support.' });
         }
 
         // Verify password using the instance method from User model
@@ -157,6 +298,10 @@ const refreshAccessToken = async (req, res) => {
             return res.status(403).json({ message: 'Forbidden: User not found.' });
         }
 
+        if (user.isActive === false) {
+            return res.status(403).json({ message: 'Forbidden: User account is inactive.' });
+        }
+
         // 3. --- The Core Logic for Handling Race Conditions ---
 
         // HAPPY PATH: The token matches the current one in the DB.
@@ -212,6 +357,384 @@ const refreshAccessToken = async (req, res) => {
         }
         // console.error('Error refreshing access token:', error);
         return res.status(500).json({ message: 'Internal server error.' });
+    }
+};
+
+const getCurrentUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user?._id)
+            .populate('planId', 'name slug billingCycle price currency')
+            .lean();
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const profile = buildProfileResponse(user);
+
+        return res.status(200).json({
+            message: 'Profile fetched successfully.',
+            profile,
+        });
+    } catch (error) {
+        console.error('Error fetching current user profile:', error);
+        return res.status(500).json({ message: 'Failed to fetch profile.' });
+    }
+};
+
+const updateCurrentUserProfile = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const {
+            username,
+            firstName,
+            lastName,
+            profilePictureUrl,
+            displayName,
+        } = req.body;
+
+        const user = await User.findById(userId);
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        if (username && username !== user.username) {
+            const existingUsername = await User.findOne({ username, _id: { $ne: userId } }).select('_id');
+
+            if (existingUsername) {
+                return res.status(409).json({ message: 'Username is already taken.' });
+            }
+
+            user.username = username;
+        }
+
+        if (firstName !== undefined) {
+            user.firstName = (firstName === null || firstName === '') ? undefined : firstName;
+        }
+
+        if (lastName !== undefined) {
+            user.lastName = (lastName === null || lastName === '') ? undefined : lastName;
+        }
+
+        if (profilePictureUrl !== undefined) {
+            user.profilePictureUrl = (profilePictureUrl === null || profilePictureUrl === '') ? undefined : profilePictureUrl;
+        }
+
+        if (displayName !== undefined) {
+            const metadata = { ...(user.metadata || {}) };
+
+            if (displayName === null) {
+                delete metadata.displayName;
+            } else {
+                metadata.displayName = displayName;
+            }
+
+            user.metadata = metadata;
+            user.markModified('metadata');
+        }
+
+        await user.save();
+        await user.populate('planId', 'name slug billingCycle price currency');
+
+        const profile = buildProfileResponse(user.toObject());
+
+        return res.status(200).json({
+            message: 'Profile updated successfully.',
+            profile,
+        });
+    } catch (error) {
+        console.error('Error updating current user profile:', error);
+        return res.status(500).json({ message: 'Failed to update profile.' });
+    }
+};
+
+const getCurrentUserSettings = async (req, res) => {
+    try {
+        const user = await User.findById(req.user?._id)
+            .select('email isEmailVerified preferences lastLoginAt createdAt authProvider isActive')
+            .lean();
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const preferences = user.preferences || {};
+
+        return res.status(200).json({
+            email: user.email,
+            isEmailVerified: user.isEmailVerified,
+            notifications: preferences.notifications || {},
+            theme: preferences.theme || 'system',
+            lastLoginAt: user.lastLoginAt,
+            createdAt: user.createdAt,
+            authProvider: user.authProvider,
+        });
+    } catch (error) {
+        console.error('Error fetching current user settings:', error);
+        return res.status(500).json({ message: 'Failed to fetch settings.' });
+    }
+};
+
+const updateCurrentUserEmail = async (req, res) => {
+    const userId = req.user?._id;
+    const { newEmail, currentPassword } = req.body;
+
+    try {
+        const user = await User.findById(userId).select('+password_hash +refreshToken email isEmailVerified isActive metadata');
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const normalizedEmail = newEmail.toLowerCase();
+
+        if (user.email === normalizedEmail) {
+            return res.status(400).json({ message: 'The provided email matches your current email.' });
+        }
+
+        const isPasswordValid = await user.isPasswordCorrect(currentPassword);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Current password is incorrect.' });
+        }
+
+        const duplicateEmail = await User.findOne({ email: normalizedEmail, _id: { $ne: userId } }).select('_id');
+
+        if (duplicateEmail) {
+            return res.status(409).json({ message: 'Email is already in use.' });
+        }
+
+        user.email = normalizedEmail;
+        user.isEmailVerified = false;
+        user.refreshToken = undefined;
+        user.metadata = {
+            ...(user.metadata || {}),
+            lastEmailChangeAt: new Date(),
+        };
+        user.markModified('metadata');
+
+        await user.save();
+        await UsedRefreshToken.deleteMany({ userId });
+
+        return res.status(200).json({ message: 'Email updated successfully.' });
+    } catch (error) {
+        console.error('Error updating user email:', error);
+        return res.status(500).json({ message: 'Failed to update email.' });
+    }
+};
+
+const updateCurrentUserPassword = async (req, res) => {
+    const userId = req.user?._id;
+    const { currentPassword, newPassword } = req.body;
+
+    try {
+        const user = await User.findById(userId).select('+password_hash +refreshToken isActive metadata');
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const isPasswordValid = await user.isPasswordCorrect(currentPassword);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Current password is incorrect.' });
+        }
+
+        const isSamePassword = await user.isPasswordCorrect(newPassword);
+
+        if (isSamePassword) {
+            return res.status(400).json({ message: 'New password must be different from the current password.' });
+        }
+
+        user.password_hash = newPassword;
+        user.refreshToken = undefined;
+        user.metadata = {
+            ...(user.metadata || {}),
+            lastPasswordChangeAt: new Date(),
+        };
+        user.markModified('metadata');
+
+        await user.save();
+        await UsedRefreshToken.deleteMany({ userId });
+
+        return res.status(200).json({ message: 'Password updated successfully.' });
+    } catch (error) {
+        console.error('Error updating user password:', error);
+        return res.status(500).json({ message: 'Failed to update password.' });
+    }
+};
+
+const deleteCurrentUserAccount = async (req, res) => {
+    const userId = req.user?._id;
+    const { currentPassword, reason } = req.body;
+
+    try {
+        const user = await User.findById(userId).select('+password_hash +refreshToken metadata isActive');
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const isPasswordValid = await user.isPasswordCorrect(currentPassword);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Current password is incorrect.' });
+        }
+
+        user.isActive = false;
+        user.refreshToken = undefined;
+        const metadata = { ...(user.metadata || {}), deletedAt: new Date() };
+
+        if (reason) {
+            metadata.deleteReason = reason;
+        } else {
+            delete metadata.deleteReason;
+        }
+
+        user.metadata = metadata;
+        user.markModified('metadata');
+
+        await user.save();
+        await UsedRefreshToken.deleteMany({ userId });
+
+        return res.status(200).json({ message: 'Account deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting user account:', error);
+        return res.status(500).json({ message: 'Failed to delete account.' });
+    }
+};
+
+const getCurrentUserPreferences = async (req, res) => {
+    try {
+        const user = await User.findById(req.user?._id)
+            .select('preferences isActive')
+            .lean();
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const preferences = user.preferences || {};
+
+        return res.status(200).json({
+            theme: preferences.theme || 'system',
+            notifications: preferences.notifications || {},
+        });
+    } catch (error) {
+        console.error('Error fetching user preferences:', error);
+        return res.status(500).json({ message: 'Failed to fetch preferences.' });
+    }
+};
+
+const updateCurrentUserPreferences = async (req, res) => {
+    const userId = req.user?._id;
+    const { theme, notifications } = req.body;
+
+    try {
+        const user = await User.findById(userId).select('preferences isActive');
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const existingPreferences = user.preferences || {};
+
+        if (theme !== undefined) {
+            if (theme === null) {
+                delete existingPreferences.theme;
+            } else {
+                existingPreferences.theme = theme;
+            }
+        }
+
+        if (notifications !== undefined) {
+            if (notifications === null) {
+                delete existingPreferences.notifications;
+            } else {
+                existingPreferences.notifications = {
+                    ...(existingPreferences.notifications || {}),
+                    ...notifications,
+                };
+            }
+        }
+
+        user.preferences = existingPreferences;
+        user.markModified('preferences');
+
+        await user.save({ validateModifiedOnly: true });
+
+        return res.status(200).json({
+            message: 'Preferences updated successfully.',
+            preferences: {
+                theme: existingPreferences.theme || 'system',
+                notifications: existingPreferences.notifications || {},
+            },
+        });
+    } catch (error) {
+        console.error('Error updating user preferences:', error);
+        return res.status(500).json({ message: 'Failed to update preferences.' });
+    }
+};
+
+const listCurrentUserOrders = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const userRecord = await User.findById(userId).select('_id isActive').lean();
+
+        if (!userRecord || userRecord.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const requestedLimit = typeof req.query.limit === 'number' ? req.query.limit : DEFAULT_SELF_ORDER_PAGE_SIZE;
+        const limit = Math.min(requestedLimit || DEFAULT_SELF_ORDER_PAGE_SIZE, MAX_SELF_ORDER_PAGE_SIZE);
+        const cursor = req.query.cursor ? new mongoose.Types.ObjectId(req.query.cursor) : null;
+        const status = req.query.status;
+
+        const filter = { user: userId };
+
+        if (status) {
+            filter.status = status;
+        }
+
+        if (cursor) {
+            filter._id = { $lt: cursor };
+        }
+
+        const orders = await Order.find(filter)
+            .sort({ _id: -1 })
+            .limit(limit + 1)
+            .populate({
+                path: 'plan',
+                select: 'name slug billingCycle price currency',
+            })
+            .populate({
+                path: 'payment',
+                select: 'status amount refundedAmount currency paymentGateway gatewayTransactionId purpose processedAt createdAt updatedAt',
+            })
+            .populate({
+                path: 'invoice',
+                select: 'invoiceNumber status issuedDate dueDate amount currency subscriptionStartDate subscriptionEndDate createdAt updatedAt',
+            })
+            .lean();
+
+        const hasNextPage = orders.length > limit;
+        const effectiveOrders = hasNextPage ? orders.slice(0, limit) : orders;
+
+        const data = effectiveOrders.map(mapOrderForUser);
+        const nextCursor = hasNextPage ? effectiveOrders[effectiveOrders.length - 1]._id.toString() : null;
+
+        return res.status(200).json({
+            data,
+            pageInfo: {
+                hasNextPage,
+                nextCursor,
+                limit,
+            },
+        });
+    } catch (error) {
+        console.error('Error listing current user orders:', error);
+        return res.status(500).json({ message: 'Failed to fetch order history.' });
     }
 };
 
@@ -334,6 +857,15 @@ module.exports = {
     loginUser,
     logoutUser,
     refreshAccessToken,
+    getCurrentUserProfile,
+    updateCurrentUserProfile,
+    getCurrentUserSettings,
+    updateCurrentUserEmail,
+    updateCurrentUserPassword,
+    deleteCurrentUserAccount,
+    getCurrentUserPreferences,
+    updateCurrentUserPreferences,
+    listCurrentUserOrders,
     getUserProfile,
     updateUserProfileByAdmin,
 };
