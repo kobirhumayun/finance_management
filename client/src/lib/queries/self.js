@@ -9,6 +9,85 @@ const toNumber = (value, { fallback = 0 } = {}) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
+const toStringSafe = (value) => {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "object" && typeof value.toString === "function") {
+    return value.toString();
+  }
+  return String(value ?? "");
+};
+
+const extractId = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "object") {
+    if (typeof value.id === "string") return value.id;
+    if (typeof value._id === "string") return value._id;
+    if (value.id && typeof value.id.toString === "function") return value.id.toString();
+    if (value._id && typeof value._id.toString === "function") return value._id.toString();
+  }
+  return null;
+};
+
+const extractDate = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toISOString();
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+  if (typeof value === "object") {
+    if (value.$date) {
+      return extractDate(value.$date);
+    }
+    if (typeof value.toString === "function") {
+      const candidate = value.toString();
+      if (candidate) {
+        return extractDate(candidate);
+      }
+    }
+  }
+  return null;
+};
+
+const normalizeStatus = (status) => {
+  if (typeof status !== "string" || !status.trim()) {
+    return { status: null, label: "Unknown" };
+  }
+  const normalized = status.trim().toLowerCase();
+  const label = normalized
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  return { status: normalized, label: label || status };
+};
+
+const formatPersonName = ({ firstName, lastName, username, userEmail }) => {
+  const parts = [];
+  if (firstName) parts.push(firstName);
+  if (lastName) parts.push(lastName);
+  if (parts.length) {
+    return parts.join(" ");
+  }
+  if (username) return username;
+  if (userEmail) return userEmail;
+  return null;
+};
+
 const normalizePlan = (plan) => {
   if (!plan || typeof plan !== "object") {
     return null;
@@ -127,20 +206,113 @@ const normalizeOrder = (order) => {
     return null;
   }
 
+  const id = extractId(order) || toStringSafe(order.orderID) || order.id || order._id || null;
+  const orderNumber = order.orderNumber ? toStringSafe(order.orderNumber) : id;
+
+  const user = order.user && typeof order.user === "object" ? order.user : {};
+  const plan = order.plan && typeof order.plan === "object" ? order.plan : {};
+  const payment = order.payment && typeof order.payment === "object" ? order.payment : {};
+  const invoice = order.invoice && typeof order.invoice === "object" ? order.invoice : {};
+
+  const { status, label: statusLabel } = normalizeStatus(order.status);
+  const { status: paymentStatus, label: paymentStatusLabel } = normalizeStatus(payment.status);
+  const { status: invoiceStatus, label: invoiceStatusLabel } = normalizeStatus(invoice.status);
+
+  const userFirstName = toStringSafe(user.firstName).trim() || null;
+  const userLastName = toStringSafe(user.lastName).trim() || null;
+  const username = toStringSafe(user.username).trim() || null;
+  const userEmail = toStringSafe(user.email).trim() || null;
+
+  const displayName =
+    formatPersonName({ firstName: userFirstName, lastName: userLastName, username, userEmail }) ||
+    "Unknown customer";
+
+  const normalizedPlan = normalizePlan(plan);
+
+  const resolvedCurrency =
+    order.currency ||
+    payment.currency ||
+    invoice.currency ||
+    normalizedPlan?.currency ||
+    plan.currency;
+  const currency = resolvedCurrency ? toStringSafe(resolvedCurrency) : "";
+
+  const normalizedPayment = {
+    id: extractId(payment),
+    status: paymentStatus,
+    statusLabel: paymentStatusLabel,
+    gateway: payment.paymentGateway ? toStringSafe(payment.paymentGateway) : null,
+    reference: payment.gatewayTransactionId ? toStringSafe(payment.gatewayTransactionId) : null,
+    purpose: payment.purpose ? toStringSafe(payment.purpose) : null,
+    amount: toNumber(payment.amount, { fallback: null }),
+    currency: payment.currency ? toStringSafe(payment.currency) : null,
+    refundedAmount: toNumber(payment.refundedAmount, { fallback: null }),
+    processedAt: extractDate(payment.processedAt),
+    createdAt: extractDate(payment.createdAt),
+    updatedAt: extractDate(payment.updatedAt),
+  };
+
+  const normalizedInvoice = {
+    id: extractId(invoice),
+    invoiceNumber: invoice.invoiceNumber ? toStringSafe(invoice.invoiceNumber) : null,
+    status: invoiceStatus,
+    statusLabel: invoiceStatusLabel,
+    amount: toNumber(invoice.amount, { fallback: null }),
+    currency: invoice.currency ? toStringSafe(invoice.currency) : null,
+    issuedDate: extractDate(invoice.issuedDate),
+    dueDate: extractDate(invoice.dueDate),
+    subscriptionStartDate: extractDate(invoice.subscriptionStartDate),
+    subscriptionEndDate: extractDate(invoice.subscriptionEndDate),
+  };
+
   return {
-    id: order.id ?? order._id ?? "",
-    orderNumber: order.orderNumber ?? "",
-    status: order.status ?? "",
-    amount: toNumber(order.amount),
-    currency: order.currency ?? order.plan?.currency ?? order.payment?.currency ?? "",
-    startDate: order.startDate ?? null,
-    endDate: order.endDate ?? null,
-    renewalDate: order.renewalDate ?? null,
-    createdAt: order.createdAt ?? null,
-    updatedAt: order.updatedAt ?? null,
-    plan: normalizePlan(order.plan),
-    payment: order.payment ?? null,
-    invoice: order.invoice ?? null,
+    id,
+    orderId: id,
+    orderNumber: orderNumber ?? "",
+    status,
+    statusLabel,
+    amount: toNumber(order.amount ?? payment.amount ?? invoice.amount),
+    currency,
+    startDate: extractDate(order.startDate) ?? null,
+    endDate: extractDate(order.endDate) ?? null,
+    renewalDate: extractDate(order.renewalDate) ?? null,
+    createdAt: extractDate(order.createdAt) ?? null,
+    updatedAt: extractDate(order.updatedAt) ?? null,
+    userId: extractId(user),
+    userName: displayName,
+    userEmail,
+    username,
+    planId: extractId(plan),
+    planName: normalizedPlan?.name || (plan.name ? toStringSafe(plan.name) : null),
+    planSlug: normalizedPlan?.slug || (plan.slug ? toStringSafe(plan.slug) : null),
+    planBillingCycle:
+      normalizedPlan?.billingCycle || (plan.billingCycle ? toStringSafe(plan.billingCycle) : null),
+    planCurrency: normalizedPlan?.currency || (plan.currency ? toStringSafe(plan.currency) : null),
+    paymentStatus,
+    paymentStatusLabel,
+    paymentGateway: normalizedPayment.gateway,
+    paymentReference: normalizedPayment.reference,
+    paymentPurpose: normalizedPayment.purpose,
+    paymentAmount: normalizedPayment.amount,
+    paymentCurrency: normalizedPayment.currency,
+    paymentRefundedAmount: normalizedPayment.refundedAmount,
+    paymentProcessedAt: normalizedPayment.processedAt,
+    paymentCreatedAt: normalizedPayment.createdAt,
+    paymentUpdatedAt: normalizedPayment.updatedAt,
+    invoiceId: normalizedInvoice.id,
+    invoiceNumber: normalizedInvoice.invoiceNumber,
+    invoiceStatus,
+    invoiceStatusLabel,
+    invoiceAmount: normalizedInvoice.amount,
+    invoiceCurrency: normalizedInvoice.currency,
+    invoiceIssuedDate: normalizedInvoice.issuedDate,
+    invoiceDueDate: normalizedInvoice.dueDate,
+    invoiceSubscriptionStart: normalizedInvoice.subscriptionStartDate,
+    invoiceSubscriptionEnd: normalizedInvoice.subscriptionEndDate,
+    plan: normalizedPlan,
+    payment: normalizedPayment,
+    invoice: normalizedInvoice,
+    raw: order,
   };
 };
 
