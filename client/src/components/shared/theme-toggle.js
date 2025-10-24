@@ -1,7 +1,7 @@
 // File: src/components/shared/theme-toggle.js
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,9 +14,14 @@ import { updateSelfPreferences } from "@/lib/queries/self";
 // Accessible toggle button allowing users to switch between light and dark themes.
 export default function ThemeToggle({ size = "icon" }) {
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
   const { data: session } = useSession();
   const { setTheme, theme, resolvedTheme } = useTheme();
   const isAuthenticated = Boolean(session?.user);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { mutate: updateThemePreference, isPending } = useMutation({
     mutationFn: ({ nextTheme }) => updateSelfPreferences({ theme: nextTheme }),
@@ -63,6 +68,21 @@ export default function ThemeToggle({ size = "icon" }) {
       updateThemePreference({ nextTheme, initialTheme });
     }
   }, [isAuthenticated, resolvedTheme, setTheme, theme, updateThemePreference]);
+
+  if (!mounted) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size={size}
+        className="rounded-full"
+        aria-label="Toggle theme"
+        disabled
+      >
+        <span className="sr-only">Toggle theme</span>
+      </Button>
+    );
+  }
 
   const effectiveTheme = theme === "system" ? resolvedTheme : theme;
   const isDark = effectiveTheme === "dark";
