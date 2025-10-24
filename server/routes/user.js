@@ -12,6 +12,12 @@ const {
     loginValidationRules,
     requestPasswordResetValidationRules,
     resetPasswordValidationRules,
+    updateProfileValidationRules,
+    updateEmailValidationRules,
+    updatePasswordValidationRules,
+    deleteAccountValidationRules,
+    updatePreferencesValidationRules,
+    listSelfOrdersValidationRules,
     handleValidationErrors
 } = require('../validators/validatorsIndex');
 
@@ -91,6 +97,65 @@ router.post('/logout',
 router.post('/refresh-token',
     refreshLimiter, // Apply specific limiter for token refreshes
     userController.refreshAccessToken
+);
+
+// ## Current User Profile & Settings
+
+router.get('/me',
+    authenticate,
+    userController.getCurrentUserProfile
+);
+
+router.patch('/me',
+    authenticate,
+    updateProfileValidationRules(),
+    handleValidationErrors,
+    userController.updateCurrentUserProfile
+);
+
+router.get('/me/settings',
+    authenticate,
+    userController.getCurrentUserSettings
+);
+
+router.patch('/me/email',
+    authenticate,
+    updateEmailValidationRules(),
+    handleValidationErrors,
+    userController.updateCurrentUserEmail
+);
+
+router.patch('/me/password',
+    authenticate,
+    updatePasswordValidationRules(),
+    handleValidationErrors,
+    userController.updateCurrentUserPassword
+);
+
+router.delete('/me',
+    authenticate,
+    deleteAccountValidationRules(),
+    handleValidationErrors,
+    userController.deleteCurrentUserAccount
+);
+
+router.get('/me/preferences',
+    authenticate,
+    userController.getCurrentUserPreferences
+);
+
+router.patch('/me/preferences',
+    authenticate,
+    updatePreferencesValidationRules(),
+    handleValidationErrors,
+    userController.updateCurrentUserPreferences
+);
+
+router.get('/me/orders',
+    authenticate,
+    listSelfOrdersValidationRules(),
+    handleValidationErrors,
+    userController.listCurrentUserOrders
 );
 
 

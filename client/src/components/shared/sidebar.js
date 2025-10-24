@@ -1,6 +1,7 @@
 // File: src/components/shared/sidebar.js
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -8,13 +9,23 @@ import { Separator } from "@/components/ui/separator";
 import Logo from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
 
+// Shared Sidebar consumers sometimes provide legacy user routes; hide them to keep SSR/CSR markup in sync.
+const HIDDEN_USER_ROUTES = new Set(["/profile", "/settings"]);
+
 // Reusable navigation sidebar with desktop and mobile variants.
 export default function Sidebar({ links = [], mobileOpen, onMobileOpenChange, footer }) {
   const pathname = usePathname();
+  const filteredLinks = useMemo(
+    () =>
+      links.filter((link) =>
+        typeof link?.href === "string" ? !HIDDEN_USER_ROUTES.has(link.href) : true
+      ),
+    [links]
+  );
 
   const renderLinks = () => (
     <nav className="mt-6 space-y-1">
-      {links.map((link) => {
+      {filteredLinks.map((link) => {
         const Icon = link.icon;
         const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
