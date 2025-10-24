@@ -5,7 +5,7 @@ import { useState } from "react";
 import Header from "@/components/shared/header";
 import Sidebar from "@/components/shared/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Home, Layers, PieChart, CreditCard, ListChecks, User, Settings } from "lucide-react";
+import { Home, Layers, PieChart, CreditCard, ListChecks } from "lucide-react";
 
 const userLinks = [
   { label: "Dashboard", href: "/dashboard", icon: Home },
@@ -13,8 +13,6 @@ const userLinks = [
   { label: "Reports", href: "/reports", icon: PieChart },
   { label: "My Plan", href: "/my-plan", icon: CreditCard },
   { label: "Summary", href: "/summary", icon: ListChecks },
-  { label: "My Profile", href: "/profile", icon: User },
-  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 // Layout wrapping all authenticated user pages with sidebar navigation.
