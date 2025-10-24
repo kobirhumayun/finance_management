@@ -2,12 +2,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { OrderDetailPopover } from "@/components/features/orders/order-detail-popover";
 import CashFlowChart from "@/components/features/reports/cash-flow-chart";
 import PageHeader from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ import {
   selfSettingsQueryOptions,
   updateSelfProfile,
 } from "@/lib/queries/self";
+import { cn } from "@/lib/utils";
 
 const profileSchema = z.object({
   username: z
@@ -138,6 +140,14 @@ const resolveStatusVariant = (status) => {
   }
 };
 
+const getOrderIdentifier = (order) => {
+  if (!order || typeof order !== "object") return "";
+  if (order.orderNumber) return String(order.orderNumber);
+  if (order.id) return String(order.id);
+  if (order.orderId) return String(order.orderId);
+  return "";
+};
+
 const mapProfileValuesToPayload = (values) => ({
   username: values.username,
   firstName: values.firstName ?? "",
@@ -208,6 +218,9 @@ const buildMonthlyOrderSeries = (orders) => {
 export default function ProfilePage() {
   const queryClient = useQueryClient();
   const [orderStatus, setOrderStatus] = useState("all");
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
+  const [detailAnchorElement, setDetailAnchorElement] = useState(null);
+  const [hoveredOrderNumber, setHoveredOrderNumber] = useState(null);
 
   const [profileQuery, settingsQuery] = useQueries({
     queries: [selfProfileQueryOptions(), selfSettingsQueryOptions()],
@@ -295,6 +308,57 @@ export default function ProfilePage() {
         amount: Number(order.amount) || 0,
       })),
     [orderPages]
+  );
+
+  const handleDetailClose = useCallback(() => {
+    setDetailAnchorElement(null);
+    setSelectedOrderNumber(null);
+    setHoveredOrderNumber(null);
+  }, []);
+
+  const handleOrderSelect = useCallback(
+    (orderNumber, anchorNode) => {
+      if (!orderNumber) {
+        handleDetailClose();
+        return;
+      }
+
+      setDetailAnchorElement(
+        anchorNode && typeof anchorNode.getBoundingClientRect === "function" ? anchorNode : null,
+      );
+      setSelectedOrderNumber(orderNumber);
+    },
+    [handleDetailClose]
+  );
+
+  useEffect(() => {
+    if (!selectedOrderNumber) {
+      setDetailAnchorElement(null);
+    }
+  }, [selectedOrderNumber]);
+
+  const selectedOrderDetail = useMemo(
+    () => orders.find((order) => getOrderIdentifier(order) === selectedOrderNumber) ?? null,
+    [orders, selectedOrderNumber]
+  );
+
+  useEffect(() => {
+    if (!selectedOrderNumber) {
+      return;
+    }
+
+    const stillVisible = orders.some((order) => getOrderIdentifier(order) === selectedOrderNumber);
+    if (!stillVisible) {
+      handleDetailClose();
+    }
+  }, [orders, selectedOrderNumber, handleDetailClose]);
+
+  const selectedOrderDisplayNumber = selectedOrderDetail?.orderNumber
+    ? String(selectedOrderDetail.orderNumber)
+    : selectedOrderNumber;
+
+  const isOrderDetailLoading = Boolean(
+    selectedOrderNumber && !selectedOrderDetail && (ordersQuery.isLoading || ordersQuery.isFetching)
   );
 
   const ordersSummary = useMemo(() => {
@@ -580,19 +644,36 @@ export default function ProfilePage() {
                     </TableCell>
                   </TableRow>
                 ) : null}
-                {orders.map((order) => (
-                  <TableRow key={order.id ?? order.orderNumber}>
-                    <TableCell className="font-medium">{order.orderNumber || "—"}</TableCell>
-                    <TableCell>{order.plan?.name || "—"}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrencyWithCode(order.amount, order.currency || profile?.subscription?.plan?.currency || "BDT")}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={resolveStatusVariant(order.status)}>{formatStatus(order.status)}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(order.createdAt)}</TableCell>
-                  </TableRow>
-                ))}
+                {orders.map((order, index) => {
+                  const orderIdentifier = getOrderIdentifier(order);
+                  const rowKey = orderIdentifier || order.id || order.orderId || `order-${index}`;
+                  const isSelected = selectedOrderNumber === orderIdentifier;
+                  const isHovered = hoveredOrderNumber === orderIdentifier;
+
+                  return (
+                    <TableRow
+                      key={rowKey}
+                      className={cn(
+                        "cursor-pointer",
+                        isSelected && "bg-muted/60",
+                        isHovered && !isSelected && "bg-muted/40",
+                      )}
+                      onMouseEnter={() => setHoveredOrderNumber(orderIdentifier || null)}
+                      onMouseLeave={() => setHoveredOrderNumber(null)}
+                      onClick={(event) => handleOrderSelect(orderIdentifier, event.currentTarget)}
+                    >
+                      <TableCell className="font-medium">{order.orderNumber || "—"}</TableCell>
+                      <TableCell>{order.plan?.name || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrencyWithCode(order.amount, order.currency || profile?.subscription?.plan?.currency || "BDT")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={resolveStatusVariant(order.status)}>{formatStatus(order.status)}</Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 {isOrdersLoading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
@@ -619,6 +700,14 @@ export default function ProfilePage() {
           </Button>
         </CardFooter>
       </Card>
+      <OrderDetailPopover
+        anchorElement={detailAnchorElement}
+        detail={selectedOrderDetail}
+        isLoading={isOrderDetailLoading}
+        isError={Boolean(selectedOrderNumber && ordersError)}
+        selectedOrderNumber={selectedOrderDisplayNumber}
+        onClose={handleDetailClose}
+      />
     </div>
   );
 }
