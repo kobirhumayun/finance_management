@@ -46,16 +46,16 @@ export default function UserNav() {
           <div className="text-xs text-muted-foreground">{session?.user?.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => router.push("/profile")}> 
+        <DropdownMenuItem className="cursor-pointer" onSelect={() => router.push("/profile")}>
           <User className="mr-2 h-4 w-4" />
           My Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push("/settings")}>
+        <DropdownMenuItem className="cursor-pointer" onSelect={() => router.push("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={handleSignOut}>
+        <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Logout
         </DropdownMenuItem>
