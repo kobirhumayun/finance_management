@@ -408,7 +408,8 @@ export const selfPreferencesQueryOptions = () => ({
 export async function updateSelfPreferences(input, { signal } = {}) {
   const body = mapPreferencesInput(input);
   const response = await apiJSON(`${SELF_ENDPOINT}/preferences`, { method: "PATCH", body, signal });
-  return normalizePreferences(response);
+  const preferences = response?.preferences ?? response;
+  return normalizePreferences(preferences);
 }
 
 export async function updateSelfEmail(input, { signal } = {}) {
