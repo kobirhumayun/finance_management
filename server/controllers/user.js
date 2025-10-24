@@ -86,7 +86,7 @@ const buildProfileResponse = (userDoc) => {
     };
 };
 
-const mapOrderForUser = (order) => {
+const mapOrderForUser = (order, userSummary) => {
     const plan = order.plan
         ? {
             id: order.plan._id,
@@ -105,8 +105,8 @@ const mapOrderForUser = (order) => {
             amount: normalizeDecimal(order.payment.amount),
             refundedAmount: normalizeDecimal(order.payment.refundedAmount),
             currency: order.payment.currency,
-            gateway: order.payment.paymentGateway,
-            transactionId: order.payment.gatewayTransactionId,
+            paymentGateway: order.payment.paymentGateway,
+            gatewayTransactionId: order.payment.gatewayTransactionId,
             purpose: order.payment.purpose,
             processedAt: order.payment.processedAt,
             createdAt: order.payment.createdAt,
@@ -117,7 +117,7 @@ const mapOrderForUser = (order) => {
     const invoice = order.invoice
         ? {
             id: order.invoice._id,
-            number: order.invoice.invoiceNumber,
+            invoiceNumber: order.invoice.invoiceNumber,
             status: order.invoice.status,
             issuedDate: order.invoice.issuedDate,
             dueDate: order.invoice.dueDate,
@@ -127,6 +127,16 @@ const mapOrderForUser = (order) => {
             subscriptionEndDate: order.invoice.subscriptionEndDate,
             createdAt: order.invoice.createdAt,
             updatedAt: order.invoice.updatedAt,
+        }
+        : null;
+
+    const user = userSummary
+        ? {
+            id: userSummary.id,
+            firstName: userSummary.firstName,
+            lastName: userSummary.lastName,
+            username: userSummary.username,
+            email: userSummary.email,
         }
         : null;
 
@@ -141,6 +151,7 @@ const mapOrderForUser = (order) => {
         renewalDate: order.renewalDate,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
+        user,
         plan,
         payment,
         invoice,
@@ -680,7 +691,9 @@ const updateCurrentUserPreferences = async (req, res) => {
 const listCurrentUserOrders = async (req, res) => {
     try {
         const userId = req.user?._id;
-        const userRecord = await User.findById(userId).select('_id isActive').lean();
+        const userRecord = await User.findById(userId)
+            .select('_id isActive username email firstName lastName')
+            .lean();
 
         if (!userRecord || userRecord.isActive === false) {
             return res.status(404).json({ message: 'User not found.' });
@@ -721,7 +734,15 @@ const listCurrentUserOrders = async (req, res) => {
         const hasNextPage = orders.length > limit;
         const effectiveOrders = hasNextPage ? orders.slice(0, limit) : orders;
 
-        const data = effectiveOrders.map(mapOrderForUser);
+        const userSummary = {
+            id: userRecord._id ? userRecord._id.toString() : undefined,
+            firstName: userRecord.firstName || '',
+            lastName: userRecord.lastName || '',
+            username: userRecord.username || '',
+            email: userRecord.email || '',
+        };
+
+        const data = effectiveOrders.map((order) => mapOrderForUser(order, userSummary));
         const nextCursor = hasNextPage ? effectiveOrders[effectiveOrders.length - 1]._id.toString() : null;
 
         return res.status(200).json({
