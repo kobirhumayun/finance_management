@@ -69,22 +69,36 @@ export default function ThemeToggle({ size = "icon" }) {
     }
   }, [isAuthenticated, resolvedTheme, setTheme, theme, updateThemePreference]);
 
+  if (!mounted) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size={size}
+        aria-label="Toggle theme"
+        className="rounded-full"
+        disabled
+      >
+        <span className="sr-only">Toggle theme</span>
+      </Button>
+    );
+  }
+
   const effectiveTheme = theme === "system" ? resolvedTheme : theme;
   const isDark = effectiveTheme === "dark";
-  const ariaLabel =
-    !mounted || !effectiveTheme
-      ? "Toggle theme"
-      : isDark
-        ? "Switch to light theme"
-        : "Switch to dark theme";
+  const ariaLabel = !effectiveTheme
+    ? "Toggle theme"
+    : isDark
+      ? "Switch to light theme"
+      : "Switch to dark theme";
 
   return (
     <Button
       type="button"
       variant="ghost"
       size={size}
-      onClick={mounted ? handleToggle : undefined}
-      disabled={!mounted || (isAuthenticated && isPending)}
+      onClick={handleToggle}
+      disabled={isAuthenticated && isPending}
       aria-label={ariaLabel}
       className="rounded-full"
     >
