@@ -1,12 +1,13 @@
 // File: src/app/(user)/settings/page.js
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
 
 import PageHeader from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -124,6 +125,7 @@ const formatDate = (value) => {
 // Account settings page with TanStack Query powered forms and optimistic preference toggles.
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const { setTheme } = useTheme();
 
   const [settingsQuery, preferencesQuery] = useQueries({
     queries: [selfSettingsQueryOptions(), selfPreferencesQueryOptions()],
@@ -133,6 +135,10 @@ export default function SettingsPage() {
   const preferences = preferencesQuery.data;
   const settingsError = settingsQuery.error;
   const preferencesError = preferencesQuery.error;
+
+  useEffect(() => {
+    setTheme(preferences?.theme ?? "system");
+  }, [preferences?.theme, setTheme]);
 
   const emailForm = useForm({
     resolver: zodResolver(emailSchema),
@@ -245,6 +251,7 @@ export default function SettingsPage() {
   };
 
   const handleThemeChange = (value) => {
+    setTheme(value);
     preferencesMutation.mutate({ theme: value });
   };
 
