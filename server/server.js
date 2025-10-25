@@ -71,7 +71,8 @@ const startServer = async () => {
     try {
         // 1. Connect to Database (and wait for it)
         await connectDB();
-        initializeEnforcer();
+        await initializeEnforcer();
+        console.log('Authorization enforcer initialized');
         scheduleSubscriptionExpiryCheck();
 
         // 2. Start Listening for Requests
