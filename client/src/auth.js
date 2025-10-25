@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { jwtDecode } from "jwt-decode";
 import { randomUUID, createHmac } from "crypto";
 import { getRedis } from "@/lib/redis";
+import { withBackendPath } from "@/lib/backend";
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const EARLY_REFRESH_WINDOW_MS = 30_000;
@@ -15,10 +16,7 @@ const POLL_INTERVAL_MS = 200;
 const RESULT_TTL_CAP_MS = 20_000;
 const KEY_SALT = process.env.AUTH_KEY_SALT || process.env.NEXTAUTH_SECRET || "dev-salt";
 
-function backendUrl(path = "") {
-  const base = (process.env.AUTH_BACKEND_URL || "http://localhost:4000").replace(/\/$/, "");
-  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
-}
+function backendUrl(path = "") { return withBackendPath(path); }
 async function safeJSON(res) {
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { raw: text }; }

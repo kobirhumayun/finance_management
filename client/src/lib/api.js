@@ -1,4 +1,6 @@
-﻿// lib/api.js
+import { getBackendBaseUrl } from "@/lib/backend";
+
+// lib/api.js
 function isServer() { return typeof window === "undefined"; }
 
 function buildAbs(urlOrPath, base) {
@@ -50,7 +52,7 @@ export async function apiRequest(input, init = {}) {
   await markDynamicIfServer();
 
   if (isServer()) {
-    const base = (process.env.AUTH_BACKEND_URL || "http://localhost:4000").replace(/\/$/, "");
+    const base = getBackendBaseUrl();
     const { auth } = await import("@/auth");
     const session = await auth();                  // pulls fresh access token
     const bearer = session?.accessToken || null;

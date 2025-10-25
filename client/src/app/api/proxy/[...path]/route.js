@@ -4,8 +4,9 @@ export const revalidate = 0;
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { getBackendBaseUrl } from "@/lib/backend";
 
-const BACKEND_BASE = (process.env.AUTH_BACKEND_URL || "http://localhost:4000").replace(/\/$/, "");
+const BACKEND_BASE = getBackendBaseUrl();
 const TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS || 15_000);
 
 const STRIP_REQ_HEADERS = new Set(["connection", "content-length", "host", "accept-encoding", "cookie"]);
