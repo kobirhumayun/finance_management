@@ -2,9 +2,21 @@
 const cron = require('node-cron');
 const User = require('../models/User');
 const Plan = require('../models/Plan');
+const { acquireLock, releaseLock } = require('../utils/jobLock');
 
 const DEFAULT_EXPIRED_STATUS = 'canceled'; // Or 'past_due', 'free'
 const REVERT_TO_FREE_PLAN_ON_EXPIRY = true; // Set to true to move expired users to the 'free' plan
+const SUBSCRIPTION_JOB_NAME = 'subscription-expiry-check';
+const LOCK_TTL_MS = parseInt(process.env.SUBSCRIPTION_JOB_LOCK_TTL_MS, 10) || (1000 * 60 * 15);
+
+const getJobInstanceId = () => {
+    if (process.env.JOB_INSTANCE_ID) {
+        return process.env.JOB_INSTANCE_ID;
+    }
+
+    const hostname = process.env.HOSTNAME || 'unknown-host';
+    return `${hostname}:${process.pid}`;
+};
 
 /**
  * Scheduled task to check for expired subscriptions and update user status.
@@ -14,9 +26,27 @@ const scheduleSubscriptionExpiryCheck = () => {
     // Run daily at 3:00 AM ('0 3 * * *')
     // For testing, run every minute: ('* * * * *')
     cron.schedule('0 3 * * *', async () => {
-        console.log(`[${new Date().toISOString()}] Running scheduled job: Check Expired Subscriptions...`);
-
         const now = new Date();
+        const runId = `${SUBSCRIPTION_JOB_NAME}:${now.toISOString()}`;
+        const owner = getJobInstanceId();
+        console.log(`[${runId}] Trigger received by ${owner}. Attempting to acquire lock...`);
+
+        let lock;
+        try {
+            lock = await acquireLock(SUBSCRIPTION_JOB_NAME, LOCK_TTL_MS, owner);
+        } catch (lockError) {
+            console.error(`[${runId}] Failed to acquire lock due to error:`, lockError);
+            return;
+        }
+
+        if (!lock) {
+            console.log(`[${runId}] Skipping run. Another instance currently holds the lock.`);
+            return;
+        }
+
+        console.log(`[${runId}] Lock acquired by ${owner}. Proceeding with subscription expiry check.`);
+
+        const runStartTime = Date.now();
         let updatedCount = 0;
         let freePlanId = null;
 
@@ -87,10 +117,18 @@ const scheduleSubscriptionExpiryCheck = () => {
             }
 
 
-            console.log(`[${new Date().toISOString()}] Scheduled Job Finished: Check Expired Subscriptions. Total users updated: ${updatedCount}`);
+            const runtimeMs = Date.now() - runStartTime;
+            console.log(`[${runId}] Scheduled Job Finished. Total users updated: ${updatedCount}. Duration: ${runtimeMs}ms.`);
 
         } catch (error) {
-            console.error(`[${new Date().toISOString()}] Error during scheduled subscription check:`, error);
+            console.error(`[${runId}] Error during scheduled subscription check:`, error);
+        } finally {
+            const released = await releaseLock(SUBSCRIPTION_JOB_NAME, owner);
+            if (released) {
+                console.log(`[${runId}] Lock released by ${owner}.`);
+            } else {
+                console.warn(`[${runId}] Lock held by ${owner} could not be released (it may have expired).`);
+            }
         }
     }, {
         scheduled: true,
