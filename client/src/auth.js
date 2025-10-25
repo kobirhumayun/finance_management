@@ -7,7 +7,7 @@ import { getRedis } from "@/lib/redis";
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const EARLY_REFRESH_WINDOW_MS = 30_000;
-const REFRESH_PATH = process.env.AUTH_REFRESH_PATH || "/api/auth/refresh";
+const REFRESH_PATH = process.env.AUTH_REFRESH_PATH || "/api/users/refresh-token";
 const REDIS_PREFIX = (process.env.AUTH_REDIS_PREFIX || "auth:v1").replace(/:$/, "");
 const LOCK_TTL_MS = 8_000;
 const WAIT_TIMEOUT_MS = 9_000;
