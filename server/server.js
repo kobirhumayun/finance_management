@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
+const { isOriginAllowed } = require('../shared/allowed-origins.cjs');
 const connectDB = require('./config/database');
 const userRoutes = require('./routes/user');
 const authRoutes = require('./routes/authRoutes');
@@ -28,8 +29,18 @@ app.use(helmet());
 // Middleware
 app.use(
     cors({
-        origin: "http://localhost:3000",
-        methods: ["GET", "POST", "DELETE", "PUT"],
+        origin: (origin, callback) => {
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            if (isOriginAllowed(origin)) {
+                return callback(null, true);
+            }
+
+            return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+        },
+        methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "HEAD", "OPTIONS"],
         allowedHeaders: [
             "Content-Type",
             "Authorization",
