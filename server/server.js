@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
+const { createCorsOriginEvaluator } = require('./config/cors');
 const connectDB = require('./config/database');
 const userRoutes = require('./routes/user');
 const authRoutes = require('./routes/authRoutes');
@@ -28,7 +29,7 @@ app.use(helmet());
 // Middleware
 app.use(
     cors({
-        origin: "http://localhost:3000",
+        origin: createCorsOriginEvaluator(),
         methods: ["GET", "POST", "DELETE", "PUT"],
         allowedHeaders: [
             "Content-Type",
