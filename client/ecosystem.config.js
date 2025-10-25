@@ -15,7 +15,7 @@ module.exports = {
                 NODE_ENV: "production",
                 NEXTAUTH_SECRET: "REPLACE_ME",
                 AUTH_BACKEND_URL: "https://your-express.example.com",
-                AUTH_REFRESH_PATH: "/api/auth/refresh",
+                AUTH_REFRESH_PATH: "/api/users/refresh-token",
                 REDIS_URL: "redis://127.0.0.1:6379", // use rediss:// for TLS
                 AUTH_REDIS_PREFIX: "auth:v1",
                 AUTH_KEY_SALT: "REPLACE_ME"
