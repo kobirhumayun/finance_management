@@ -123,7 +123,7 @@ describe('planController activatedPlan authorization', () => {
     test('allows activation when payment belongs to the authenticated user', async () => {
         const res = createResponseDouble();
         const req = {
-            user: { _id: validUserId },
+            user: { _id: validUserId, role: 'user' },
             body: { newPlanId: validPlanId, paymentId: validPaymentId },
         };
 
@@ -178,7 +178,7 @@ describe('planController activatedPlan authorization', () => {
     test('rejects activation when payment belongs to a different user', async () => {
         const res = createResponseDouble();
         const req = {
-            user: { _id: validUserId },
+            user: { _id: validUserId, role: 'user' },
             body: { newPlanId: validPlanId, paymentId: validPaymentId },
         };
 
@@ -218,5 +218,91 @@ describe('planController activatedPlan authorization', () => {
         assert.equal(res.statusCode, 403, 'Expected forbidden response when payment is for a different user.');
         assert.equal(res.jsonPayload?.message, 'This payment is not eligible for this user.');
         assert.ok(warnLogs.length > 0, 'Unauthorized attempts should be logged.');
+    });
+
+    test('allows admin activation when payment belongs to the applied user', async () => {
+        const adminUserId = '507f1f77bcf86cd799439021';
+        const appliedUserId = '507f1f77bcf86cd799439031';
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: adminUserId, role: 'admin' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId, appliedUserId },
+        };
+
+        const userDoc = {
+            _id: appliedUserId,
+            subscriptionStatus: 'inactive',
+            planId: null,
+            save: async function saveUser() { return this; },
+        };
+
+        const planDoc = {
+            _id: validPlanId,
+            name: 'Pro',
+            slug: 'pro',
+            price: 100,
+            billingCycle: 'monthly',
+            isPublic: true,
+        };
+
+        const orderDoc = {
+            _id: 'order123',
+            status: 'pending',
+            save: async function saveOrder() { return this; },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => appliedUserId },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+            save: async function savePayment() { return this; },
+        };
+
+        Plan.findById = async () => planDoc;
+        User.findById = async () => userDoc;
+        Order.findById = async () => orderDoc;
+        Payment.findById = async () => paymentDoc;
+        Invoice.prototype.save = async function saveInvoice() {
+            this._id = this._id || 'invoice-generated';
+            return this;
+        };
+
+        await activatedPlan(req, res);
+
+        assert.equal(res.statusCode, 200, 'Expected activation to succeed for admin approving another user.');
+        assert.equal(paymentDoc.status, 'succeeded', 'Payment status should be updated to succeeded.');
+        assert.equal(orderDoc.status, 'active', 'Order status should be set to active.');
+    });
+
+    test('rejects admin activation when payment belongs to a different user than appliedUserId', async () => {
+        const adminUserId = '507f1f77bcf86cd799439021';
+        const appliedUserId = '507f1f77bcf86cd799439031';
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: adminUserId, role: 'admin' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId, appliedUserId },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => '507f1f77bcf86cd799439099' },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+            save: async function savePayment() {
+                throw new Error('Payment should not be saved when unauthorized.');
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await activatedPlan(req, res);
+
+        assert.equal(res.statusCode, 403, 'Expected forbidden response when payment is for a different user even for admin.');
+        assert.equal(res.jsonPayload?.message, 'This payment is not eligible for this user.');
     });
 });
