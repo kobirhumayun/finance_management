@@ -520,6 +520,45 @@ const getSubscriptionDetails = async (req, res) => {
  * @param {object} req - The Express request object.
  * @param {object} res - The Express response object.
  */
+const normalizeToNumber = (value) => {
+    if (value == null) {
+        return NaN;
+    }
+
+    if (typeof value === 'number') {
+        return value;
+    }
+
+    if (mongoose.Types.Decimal128 && value instanceof mongoose.Types.Decimal128) {
+        return Number(value.toString());
+    }
+
+    if (typeof value === 'string') {
+        return Number(value);
+    }
+
+    const valueOf = typeof value.valueOf === 'function' ? value.valueOf() : value;
+
+    if (typeof valueOf === 'number') {
+        return valueOf;
+    }
+
+    if (typeof valueOf === 'string') {
+        return Number(valueOf);
+    }
+
+    if (typeof value.toString === 'function') {
+        return Number(value.toString());
+    }
+
+    return NaN;
+};
+
+const amountsAreEqual = (a, b) => {
+    const tolerance = Number.EPSILON * Math.max(1, Math.abs(a), Math.abs(b));
+    return Math.abs(a - b) <= tolerance;
+};
+
 const manualPaymentSubmit = async (req, res) => {
     const {
         amount,
@@ -534,7 +573,15 @@ const manualPaymentSubmit = async (req, res) => {
     if (!payment) {
         return res.status(404).json({ message: 'Payment not found' });
     }
-    if (payment.amount !== amount) {
+
+    const storedAmount = normalizeToNumber(payment.amount);
+    const requestedAmount = normalizeToNumber(amount);
+
+    if (!Number.isFinite(requestedAmount)) {
+        return res.status(400).json({ message: 'Invalid payment amount' });
+    }
+
+    if (!Number.isFinite(storedAmount) || !amountsAreEqual(storedAmount, requestedAmount)) {
         return res.status(400).json({ message: 'Invalid payment amount' });
     }
     if (payment.currency !== currency) {

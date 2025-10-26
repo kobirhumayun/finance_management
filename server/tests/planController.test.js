@@ -1,11 +1,12 @@
 const { describe, test, beforeEach, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
 const Plan = require('../models/Plan');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Invoice = require('../models/Invoice');
-const { addPlan, updatePlan, activatedPlan } = require('../controllers/planController');
+const { addPlan, updatePlan, activatedPlan, manualPaymentSubmit } = require('../controllers/planController');
 
 const BILLING_CYCLES = Plan.schema.path('billingCycle').enumValues;
 
@@ -304,5 +305,83 @@ describe('planController activatedPlan authorization', () => {
 
         assert.equal(res.statusCode, 403, 'Expected forbidden response when payment is for a different user even for admin.');
         assert.equal(res.jsonPayload?.message, 'This payment is not eligible for this user.');
+    });
+});
+
+describe('planController manualPaymentSubmit', () => {
+    const validPaymentId = '507f1f77bcf86cd799439014';
+
+    afterEach(() => {
+        Payment.findById = originalPaymentFindById;
+    });
+
+    test('accepts manual payment submissions when amounts are numerically equal', async () => {
+        const res = createResponseDouble();
+        const req = {
+            body: {
+                amount: '99.99',
+                currency: 'USD',
+                paymentGateway: 'manual',
+                gatewayTransactionId: 'txn-123',
+                paymentId: validPaymentId,
+            },
+        };
+
+        let saveCalled = false;
+        const paymentDoc = {
+            _id: validPaymentId,
+            amount: mongoose.Types.Decimal128.fromString('99.99'),
+            currency: 'USD',
+            paymentGateway: null,
+            gatewayTransactionId: null,
+            save: async function savePayment() {
+                saveCalled = true;
+                return this;
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await manualPaymentSubmit(req, res);
+
+        assert.equal(res.statusCode, 201, 'Expected a successful manual payment submission.');
+        assert.equal(res.jsonPayload?.payment, paymentDoc, 'Expected the persisted payment to be returned.');
+        assert.equal(paymentDoc.paymentGateway, 'manual', 'Expected payment gateway to be updated.');
+        assert.equal(paymentDoc.gatewayTransactionId, 'txn-123', 'Expected gateway transaction ID to be saved.');
+        assert.equal(saveCalled, true, 'Expected payment save to be invoked.');
+    });
+
+    test('rejects manual payment submissions when amounts differ', async () => {
+        const res = createResponseDouble();
+        const req = {
+            body: {
+                amount: 50,
+                currency: 'USD',
+                paymentGateway: 'manual',
+                gatewayTransactionId: 'txn-456',
+                paymentId: validPaymentId,
+            },
+        };
+
+        let saveCalled = false;
+        const paymentDoc = {
+            _id: validPaymentId,
+            amount: mongoose.Types.Decimal128.fromString('60.00'),
+            currency: 'USD',
+            paymentGateway: null,
+            gatewayTransactionId: null,
+            save: async function savePayment() {
+                saveCalled = true;
+                return this;
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await manualPaymentSubmit(req, res);
+
+        assert.equal(res.statusCode, 400, 'Expected manual payment submission with mismatched amounts to fail.');
+        assert.deepEqual(res.jsonPayload, { message: 'Invalid payment amount' }, 'Expected validation error for mismatched amounts.');
+        assert.equal(saveCalled, false, 'Payment should not be saved on validation failure.');
     });
 });
