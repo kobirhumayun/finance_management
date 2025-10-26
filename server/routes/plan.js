@@ -5,6 +5,7 @@ const { authenticate } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/casbinAuthorize');
 const { paymentValidationRules,
     planValidationRules,
+    updatePlanValidationRules,
     planValidationSlugOnlyRules,
     changePlanValidationRules,
     handleValidationErrors } = require('../validators/validatorsIndex');
@@ -29,7 +30,7 @@ router.delete('/plan',
 
 // Update plan route
 router.put('/plan',
-    planValidationRules(),
+    updatePlanValidationRules(),
     handleValidationErrors,
     authenticate,
     authorize("admin"),
