@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Invoice = require('../models/Invoice');
-const { createOrderWithPayment } = require('../utils/order');
+let { createOrderWithPayment } = require('../utils/order');
+const defaultCreateOrderWithPayment = createOrderWithPayment;
 
 /**
  * @desc   Add a new subscription plan (Admin only)
@@ -637,7 +638,7 @@ const placeOrder = async (req, res) => {
         const userId = req.user._id
 
         // --- Basic Input Validation (Optional but Recommended) ---
-        if (!userId || !amount || !currency || !paymentGateway || !paymentMethodDetails || !purpose || !planId) {
+        if (!userId || amount == null || !currency || !paymentGateway || !paymentMethodDetails || !purpose || !planId) {
             return res.status(400).json({ message: 'Missing required order fields.' });
         }
 
@@ -649,28 +650,38 @@ const placeOrder = async (req, res) => {
             return res.status(400).json({ message: 'Invalid Plan ID format.' });
         }
 
+        const normalizedAmount = typeof amount === 'number' ? amount : Number(amount);
+        if (Number.isNaN(normalizedAmount)) {
+            return res.status(400).json({ message: 'Invalid amount. Please provide a numeric value.' });
+        }
+
         const plan = await Plan.findById(planId);
 
         if (!plan) {
             return res.status(404).json({ message: `Plan with ID '${planId}' not found.` });
         }
 
-        if (plan.price !== amount) {
-            return res.status(400).json({ message: `Plan price ${plan.price} does not match the order amount ${amount}.` });
+        const planPrice = typeof plan.price === 'number' ? plan.price : Number(plan.price);
+        if (Number.isNaN(planPrice)) {
+            return res.status(500).json({ message: 'Invalid plan price configured for this plan.' });
+        }
+
+        if (planPrice !== normalizedAmount) {
+            return res.status(400).json({ message: `Plan price ${planPrice} does not match the order amount ${normalizedAmount}.` });
         }
 
         // --- Create and Save Order Document ---
         const orderData = {
             user: userId,
             plan: planId,
-            amount: plan.price,
+            amount: planPrice,
             currency: currency.toUpperCase(),
         };
 
         const paymentData = {
             userId: userId,
             planId: planId,
-            amount: plan.price,
+            amount: planPrice,
             currency: currency.toUpperCase(),
             paymentGateway: paymentGateway.toLowerCase(),
             purpose,
@@ -695,6 +706,15 @@ const placeOrder = async (req, res) => {
 }
 
 
+const setCreateOrderWithPayment = (fn) => {
+    createOrderWithPayment = fn;
+};
+
+const resetCreateOrderWithPayment = () => {
+    createOrderWithPayment = defaultCreateOrderWithPayment;
+};
+
+
 module.exports = {
     addPlan,
     updatePlan,
@@ -705,4 +725,8 @@ module.exports = {
     getPaymentsByStatus,
     manualPaymentSubmit,
     placeOrder,
+    __test__: {
+        setCreateOrderWithPayment,
+        resetCreateOrderWithPayment,
+    },
 };
