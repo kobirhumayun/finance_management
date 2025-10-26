@@ -315,9 +315,10 @@ describe('planController manualPaymentSubmit', () => {
         Payment.findById = originalPaymentFindById;
     });
 
-    test('accepts manual payment submissions when amounts are numerically equal', async () => {
+    test('accepts manual payment submissions when amounts are numerically equal for the owner', async () => {
         const res = createResponseDouble();
         const req = {
+            user: { _id: '507f1f77bcf86cd799439001' },
             body: {
                 amount: '99.99',
                 currency: 'USD',
@@ -332,6 +333,8 @@ describe('planController manualPaymentSubmit', () => {
             _id: validPaymentId,
             amount: mongoose.Types.Decimal128.fromString('99.99'),
             currency: 'USD',
+            userId: { toString: () => '507f1f77bcf86cd799439001' },
+            status: 'pending',
             paymentGateway: null,
             gatewayTransactionId: null,
             save: async function savePayment() {
@@ -354,6 +357,7 @@ describe('planController manualPaymentSubmit', () => {
     test('rejects manual payment submissions when amounts differ', async () => {
         const res = createResponseDouble();
         const req = {
+            user: { _id: '507f1f77bcf86cd799439001' },
             body: {
                 amount: 50,
                 currency: 'USD',
@@ -368,6 +372,8 @@ describe('planController manualPaymentSubmit', () => {
             _id: validPaymentId,
             amount: mongoose.Types.Decimal128.fromString('60.00'),
             currency: 'USD',
+            userId: { toString: () => '507f1f77bcf86cd799439001' },
+            status: 'pending',
             paymentGateway: null,
             gatewayTransactionId: null,
             save: async function savePayment() {
@@ -383,5 +389,79 @@ describe('planController manualPaymentSubmit', () => {
         assert.equal(res.statusCode, 400, 'Expected manual payment submission with mismatched amounts to fail.');
         assert.deepEqual(res.jsonPayload, { message: 'Invalid payment amount' }, 'Expected validation error for mismatched amounts.');
         assert.equal(saveCalled, false, 'Payment should not be saved on validation failure.');
+    });
+
+    test('rejects manual payment submissions for payments owned by a different user', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: '507f1f77bcf86cd799439001' },
+            body: {
+                amount: '99.99',
+                currency: 'USD',
+                paymentGateway: 'manual',
+                gatewayTransactionId: 'txn-123',
+                paymentId: validPaymentId,
+            },
+        };
+
+        let saveCalled = false;
+        const paymentDoc = {
+            _id: validPaymentId,
+            amount: mongoose.Types.Decimal128.fromString('99.99'),
+            currency: 'USD',
+            userId: { toString: () => '507f1f77bcf86cd799439099' },
+            status: 'pending',
+            paymentGateway: null,
+            gatewayTransactionId: null,
+            save: async function savePayment() {
+                saveCalled = true;
+                return this;
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await manualPaymentSubmit(req, res);
+
+        assert.equal(res.statusCode, 403, 'Expected manual payment submission to fail when user does not own payment.');
+        assert.deepEqual(res.jsonPayload, { message: 'You are not allowed to update this payment.' });
+        assert.equal(saveCalled, false, 'Payment should not be saved on authorization failure.');
+    });
+
+    test('rejects manual payment submissions when payment status is not pending', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: '507f1f77bcf86cd799439001' },
+            body: {
+                amount: '99.99',
+                currency: 'USD',
+                paymentGateway: 'manual',
+                gatewayTransactionId: 'txn-123',
+                paymentId: validPaymentId,
+            },
+        };
+
+        let saveCalled = false;
+        const paymentDoc = {
+            _id: validPaymentId,
+            amount: mongoose.Types.Decimal128.fromString('99.99'),
+            currency: 'USD',
+            userId: { toString: () => '507f1f77bcf86cd799439001' },
+            status: 'succeeded',
+            paymentGateway: null,
+            gatewayTransactionId: null,
+            save: async function savePayment() {
+                saveCalled = true;
+                return this;
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await manualPaymentSubmit(req, res);
+
+        assert.equal(res.statusCode, 409, 'Expected manual payment submission to fail when payment is not pending.');
+        assert.deepEqual(res.jsonPayload, { message: 'Payment cannot be updated in its current status.' });
+        assert.equal(saveCalled, false, 'Payment should not be saved when status check fails.');
     });
 });
