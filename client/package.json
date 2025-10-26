@@ -7,7 +7,7 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test"
+    "test": "node --experimental-loader=./test/alias-loader.mjs --test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

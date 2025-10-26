@@ -2,20 +2,55 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { getBackendBaseUrl } from "@/lib/backend";
+import { NextResponse } from "next/server.js";
+import { auth } from "../../../../auth.js";
+import { getBackendBaseUrl } from "../../../../lib/backend.js";
 
 const BACKEND_BASE = getBackendBaseUrl();
 const TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS || 15_000);
 
-const STRIP_REQ_HEADERS = new Set(["connection", "content-length", "host", "accept-encoding", "cookie"]);
+const STRIP_REQ_HEADERS = new Set([
+  "connection",
+  "content-length",
+  "host",
+  "accept-encoding",
+  "cookie",
+  "authorization",
+]);
 const PASS_RES_HEADERS = new Set(["content-type", "content-length", "cache-control", "etag", "last-modified", "location"]);
+
+const PUBLIC_METHODS = new Set(["GET", "HEAD"]);
+const PUBLIC_PATH_PREFIXES = (process.env.PROXY_PUBLIC_PATHS || "")
+  .split(",")
+  .map((path) => path.trim())
+  .filter(Boolean)
+  .map((path) => (path.startsWith("/") ? path : `/${path}`))
+  .map((path) => (path === "/" ? path : path.replace(/\/+$/, "")));
+
+function getPathname(pathSegments) {
+  if (!Array.isArray(pathSegments) || pathSegments.length === 0) return "/";
+  return "/" + pathSegments.join("/");
+}
+
+function isPublicPath(pathname) {
+  if (PUBLIC_PATH_PREFIXES.length === 0) return false;
+  for (const prefix of PUBLIC_PATH_PREFIXES) {
+    if (prefix === "/") return true;
+    if (pathname === prefix) return true;
+    if (pathname.startsWith(prefix + "/")) return true;
+  }
+  return false;
+}
+
+function isPublicRequest(method, pathname) {
+  if (PUBLIC_METHODS.has(method)) return true;
+  return isPublicPath(pathname);
+}
 
 // Build a backend URL from the base, path segments, and original query string.
 function buildBackendUrl(req, pathSegments) {
-  const pathname = "/" + (Array.isArray(pathSegments) ? pathSegments.join("/") : "");
-  const search = req.nextUrl.search || "";
+  const pathname = getPathname(pathSegments);
+  const search = req.nextUrl?.search || "";
   return BACKEND_BASE + pathname + search;
 }
 
@@ -36,19 +71,27 @@ function copyResponseHeaders(from, to) {
 }
 
 // Forward the incoming request to the backend. Accepts path segments rather than a params object.
-async function forward(req, pathSegments) {
-  // Resolve the NextAuth session and reject if none.
-  const session = await auth();
-  if (!session?.accessToken) return new NextResponse("Unauthorized", { status: 401 });
+export async function forward(req, pathSegments, { authFn } = {}) {
+  const method = req.method.toUpperCase();
+  const pathname = getPathname(pathSegments);
+  const requiresAuth = !isPublicRequest(method, pathname);
+
+  // Resolve the NextAuth session when necessary.
+  const resolveAuth = typeof authFn === "function" ? authFn : auth;
+  const session = await resolveAuth();
+  if (requiresAuth && !session?.accessToken) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   // Construct the upstream URL.
   const url = buildBackendUrl(req, pathSegments);
-  const method = req.method.toUpperCase();
   const hasBody = !["GET", "HEAD"].includes(method);
 
   // Prepare headers and include the bearer token.
   const headers = filterRequestHeaders(req.headers);
-  headers.set("Authorization", `Bearer ${session.accessToken}`);
+  if (session?.accessToken && requiresAuth) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
+  }
 
   // Implement a timeout.
   const controller = new AbortController();
