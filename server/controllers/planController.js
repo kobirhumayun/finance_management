@@ -276,8 +276,10 @@ const calculateNextBillingDate = (startingDate, billingCycle) => {
  * @notes  The authenticated user is derived from req.user.
  */
 const activatedPlan = async (req, res) => {
-    const { newPlanId, paymentId } = req.body;
+    const { newPlanId, paymentId, appliedUserId } = req.body;
     const requestUserId = req.user?._id;
+    const requestUserRole = req.user?.role;
+    const isAdmin = requestUserRole === 'admin';
 
     if (!requestUserId) {
         return res.status(401).json({ message: 'Authentication error: User not identified.' });
@@ -289,6 +291,16 @@ const activatedPlan = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(paymentId)) {
         return res.status(400).json({ message: 'Invalid Payment ID format.' });
+    }
+
+    if (isAdmin) {
+        if (!appliedUserId) {
+            return res.status(400).json({ message: 'appliedUserId is required for admin approvals.' });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(appliedUserId)) {
+            return res.status(400).json({ message: 'Invalid appliedUserId format.' });
+        }
     }
 
     try {
@@ -303,17 +315,35 @@ const activatedPlan = async (req, res) => {
             return res.status(404).json({ message: 'Payment is missing associated user information.' });
         }
 
-        if (payment.userId.toString() !== requestUserId.toString()) {
+        const targetUserId = isAdmin && appliedUserId
+            ? appliedUserId
+            : requestUserId;
+
+        if (!targetUserId) {
+            return res.status(401).json({ message: 'Authentication error: User not identified.' });
+        }
+
+        if (!isAdmin && appliedUserId && appliedUserId.toString?.() !== requestUserId.toString()) {
+            console.warn('[planController] Non-admin attempted to approve another user.', {
+                paymentId,
+                requestUserId: requestUserId.toString(),
+                appliedUserId: appliedUserId.toString?.(),
+            });
+            return res.status(403).json({ message: 'This payment is not eligible for this user.' });
+        }
+
+        if (payment.userId.toString() !== targetUserId.toString()) {
             console.warn('[planController] Unauthorized payment activation attempt.', {
                 paymentId,
                 requestUserId: requestUserId.toString(),
+                targetUserId: targetUserId.toString(),
                 paymentUserId: payment.userId.toString(),
             });
             return res.status(403).json({ message: 'This payment is not eligible for this user.' });
         }
 
         const [user, newPlan] = await Promise.all([
-            User.findById(requestUserId),
+            User.findById(targetUserId),
             Plan.findById(newPlanId),
         ]);
 
