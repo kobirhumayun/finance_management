@@ -73,16 +73,39 @@ const humanizeStatus = (statusCode) => STATUS_LABELS[statusCode] || statusCode;
 
 const mapUserToResponse = (user, { includeRaw = false } = {}) => {
     const statusCode = normalizeStatusCode(user);
-    const planDetails = user.planId && typeof user.planId === 'object'
-        ? user.planId
+    const rawPlanId = user?.planId ?? null;
+    const planDetails = rawPlanId
+        && typeof rawPlanId === 'object'
+        && rawPlanId !== null
+        && (typeof rawPlanId._id !== 'undefined'
+            || typeof rawPlanId.slug === 'string'
+            || typeof rawPlanId.name === 'string')
+        ? rawPlanId
         : null;
+    let planId = null;
+
+    if (planDetails?._id) {
+        planId = planDetails._id.toString();
+    } else if (typeof rawPlanId !== 'undefined' && rawPlanId !== null) {
+        if (typeof rawPlanId === 'string' || typeof rawPlanId === 'number') {
+            planId = rawPlanId.toString();
+        } else if (typeof rawPlanId.toString === 'function') {
+            planId = rawPlanId.toString();
+        }
+    }
+    const planSlug = typeof user?.planSlug === 'string'
+        ? user.planSlug
+        : planDetails && typeof planDetails.slug === 'string'
+            ? planDetails.slug
+            : null;
 
     const response = {
         id: user._id.toString(),
         username: user.username,
         email: user.email,
-        planId: planDetails ? planDetails.slug : null,
+        planId,
         plan: planDetails ? planDetails.name : null,
+        planSlug,
         firstName: user.firstName || null,
         lastName: user.lastName || null,
         profilePictureUrl: user.profilePictureUrl || null,
@@ -581,6 +604,7 @@ module.exports = {
     updateUser,
     updateUserStatus,
     triggerPasswordReset,
+    mapUserToResponse,
     ACCOUNT_STATUS_CODES,
     SUBSCRIPTION_STATUS_CODES,
     USER_ROLE_OPTIONS,

@@ -111,10 +111,9 @@ export const normalizeAdminUser = (user) => {
     toStringSafe(merged.plan) ||
     (typeof merged.planId === "object" ? toStringSafe(merged.planId?.name) : null);
   const planSlug =
-    toStringSafe(merged.plan?.slug) ||
     toStringSafe(merged.planSlug) ||
-    (typeof merged.planId === "object" ? toStringSafe(merged.planId?.slug) : null) ||
-    (typeof planId === "string" && planId.includes("-") ? planId : null);
+    toStringSafe(merged.plan?.slug) ||
+    (typeof merged.planId === "object" ? toStringSafe(merged.planId?.slug) : null);
 
   const subscriptionStatus = toStringSafe(merged.subscriptionStatus)?.trim() || null;
   const subscriptionStatusLabel = formatStatusLabel(subscriptionStatus);
