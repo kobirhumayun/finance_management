@@ -775,16 +775,20 @@ const listCurrentUserOrders = async (req, res) => {
 const getUserProfile = async (req, res) => {
     try {
 
-        const { identifier } = req.query;
+        const { identifier: rawIdentifier } = req.query;
+        const identifier = typeof rawIdentifier === 'string' ? rawIdentifier.trim() : '';
+        const normalizedIdentifier = identifier.includes('@')
+            ? identifier.toLowerCase()
+            : identifier;
 
-        if (!identifier) {
+        if (!normalizedIdentifier) {
             return res.status(400).json({ message: 'Please provide a username or email in the query parameters (e.g., /user-profile?identifier=your_username_or_email).' });
         }
 
         // Find user by username or email
         // Ensure you have database indexes on 'username' and 'email' fields for performance.
         const user = await User.findOne({
-            $or: [{ username: identifier }, { email: identifier }]
+            $or: [{ username: normalizedIdentifier }, { email: normalizedIdentifier }]
         }).populate('planId');
 
         if (!user) {
