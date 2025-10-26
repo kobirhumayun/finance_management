@@ -11,18 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const resetSchema = z
-  .object({
-    email: z.string().email("Enter a valid email"),
-    otp: z.string().regex(/^\d{6}$/u, "OTP must be a 6-digit code"),
-    newPassword: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((values) => values.newPassword === values.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords do not match",
-  });
+import { resetSchema } from "./reset-password-schema";
 
 // Form used on the reset password page to submit OTP and new credentials.
 export function ResetPasswordForm() {
