@@ -1,4 +1,4 @@
-﻿const {
+const {
     isNotEmptyString,
     isSlugField,
     isStringField,
@@ -8,6 +8,9 @@
     isMongoIdField,
     isLength,
 } = require('./commonValidators');
+const Plan = require('../models/Plan');
+
+const BILLING_CYCLES = Plan.schema.path('billingCycle').enumValues;
 
 const planValidationRules = () => {
     return [
@@ -18,7 +21,7 @@ const planValidationRules = () => {
         isLength('description', { max: 500 }).optional({ checkFalsy: true }),
         isFloatField('price', { min: 0 }),
         isNotEmptyString('billingCycle'),
-        isInValues('billingCycle', ['monthly', 'yearly', 'one-time']),
+        isInValues('billingCycle', BILLING_CYCLES),
         isInValues('isPublic', ['true', 'false']).optional(),
         ...isArrayOfStringsField('features', { min: 0 }), // Spread because it returns an array of validators
     ];
