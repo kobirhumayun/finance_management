@@ -1,6 +1,9 @@
 ﻿const mongoose = require('mongoose');
 const Counter = require('./Counter');
+const Plan = require('./Plan');
 const Schema = mongoose.Schema;
+
+const FINITE_BILLING_CYCLES = ['monthly', 'annually'];
 
 
 /**
@@ -41,7 +44,7 @@ const invoiceSchema = new Schema({
     },
     subscriptionEndDate: {
         type: Date,
-        required: true
+        required: false
     },
     status: {
         type: String,
@@ -91,6 +94,43 @@ invoiceSchema.pre('save', async function (next) {
         }
     } else {
         next();
+    }
+});
+
+invoiceSchema.pre('validate', async function (next) {
+    if (!this.plan) {
+        return next();
+    }
+
+    const shouldCheckEndDate = this.isNew
+        || this.isModified('plan')
+        || this.isModified('subscriptionEndDate')
+        || this.isModified('subscriptionStartDate');
+
+    if (!shouldCheckEndDate) {
+        return next();
+    }
+
+    try {
+        const planDoc = await Plan.findById(this.plan).select('billingCycle');
+
+        if (!planDoc) {
+            this.invalidate('plan', 'Associated plan not found for invoice validation.');
+        } else if (FINITE_BILLING_CYCLES.includes(planDoc.billingCycle)) {
+            if (!this.subscriptionEndDate) {
+                this.invalidate('subscriptionEndDate', 'Subscription end date is required for recurring billing plans.');
+            } else if (this.subscriptionStartDate && this.subscriptionEndDate <= this.subscriptionStartDate) {
+                this.invalidate('subscriptionEndDate', 'Subscription end date must be after the start date for recurring billing plans.');
+            }
+        }
+
+        if (this.$__.validationError) {
+            return next(this.$__.validationError);
+        }
+
+        return next();
+    } catch (error) {
+        return next(error);
     }
 });
 

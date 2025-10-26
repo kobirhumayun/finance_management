@@ -233,6 +233,68 @@ describe('planController activatedPlan authorization', () => {
         assert.equal(invoicePayload.subscriptionEndDate, null, 'Lifetime plan invoices should not have an end date.');
     });
 
+    test('persists lifetime plan invoices without requiring an end date', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId, role: 'user' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const userDoc = {
+            _id: validUserId,
+            subscriptionStatus: 'inactive',
+            planId: null,
+            subscriptionEndDate: null,
+            save: async function saveUser() { return this; },
+        };
+
+        const planDoc = {
+            _id: validPlanId,
+            name: 'Lifetime Access',
+            slug: 'lifetime-access',
+            price: 0,
+            billingCycle: 'lifetime',
+            isPublic: true,
+        };
+
+        const orderDoc = {
+            _id: 'orderLifetimePersisted',
+            status: 'pending',
+            save: async function saveOrder() { return this; },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => validUserId },
+            amount: 0,
+            currency: 'USD',
+            order: 'orderLifetimePersisted',
+            status: 'pending',
+            save: async function savePayment() { return this; },
+        };
+
+        let saveCalled = 0;
+        Plan.findById = async () => planDoc;
+        User.findById = async () => userDoc;
+        Order.findById = async () => orderDoc;
+        Payment.findById = async () => paymentDoc;
+        Invoice.prototype.save = async function captureInvoice() {
+            saveCalled += 1;
+            this._id = this._id || 'invoice-lifetime-persisted';
+            return this;
+        };
+
+        await activatedPlan(req, res);
+
+        const invoiceId = res.jsonPayload?.invoice?.id;
+
+        assert.equal(res.statusCode, 200, 'Expected activation to succeed for lifetime plan.');
+        assert.equal(saveCalled, 1, 'Lifetime plan activation should persist a single invoice.');
+        assert.ok(invoiceId, 'Response should include the saved invoice identifier.');
+        assert.equal(typeof invoiceId.toString, 'function', 'Invoice identifier should be serializable.');
+        assert.equal(res.jsonPayload?.subscription?.endDate, null, 'Lifetime plan subscriptions should remain open-ended.');
+    });
+
     test('rejects activation when payment belongs to a different user', async () => {
         const res = createResponseDouble();
         const req = {
@@ -276,6 +338,63 @@ describe('planController activatedPlan authorization', () => {
         assert.equal(res.statusCode, 403, 'Expected forbidden response when payment is for a different user.');
         assert.equal(res.jsonPayload?.message, 'This payment is not eligible for this user.');
         assert.ok(warnLogs.length > 0, 'Unauthorized attempts should be logged.');
+    });
+
+    test('rejects self-service activation for a non-public plan when not already subscribed', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId, role: 'user' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const userDoc = {
+            _id: validUserId,
+            subscriptionStatus: 'inactive',
+            planId: new mongoose.Types.ObjectId().toString(),
+            save: async function saveUser() {
+                throw new Error('User should not be saved when plan is not public.');
+            },
+        };
+
+        const planDoc = {
+            _id: validPlanId,
+            name: 'Enterprise',
+            slug: 'enterprise',
+            price: 100,
+            billingCycle: 'monthly',
+            isPublic: false,
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => validUserId },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+            save: async function savePayment() {
+                throw new Error('Payment should not be saved when plan is not public.');
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+        User.findById = async () => userDoc;
+        Plan.findById = async () => planDoc;
+        Order.findById = async () => ({
+            _id: 'order123',
+            status: 'pending',
+            save: async function saveOrder() {
+                throw new Error('Order should not be saved when plan is not public.');
+            },
+        });
+        Invoice.prototype.save = async function saveInvoice() {
+            throw new Error('Invoice should not be created when plan is not public.');
+        };
+
+        await activatedPlan(req, res);
+
+        assert.equal(res.statusCode, 403, 'Expected forbidden response for non-public plan.');
+        assert.equal(res.jsonPayload?.message, 'This plan is not publicly available.');
     });
 
     test('allows admin activation when payment belongs to the applied user', async () => {
@@ -331,6 +450,63 @@ describe('planController activatedPlan authorization', () => {
         await activatedPlan(req, res);
 
         assert.equal(res.statusCode, 200, 'Expected activation to succeed for admin approving another user.');
+        assert.equal(paymentDoc.status, 'succeeded', 'Payment status should be updated to succeeded.');
+        assert.equal(orderDoc.status, 'active', 'Order status should be set to active.');
+    });
+
+    test('allows admin activation for a non-public plan', async () => {
+        const adminUserId = '507f1f77bcf86cd799439021';
+        const appliedUserId = '507f1f77bcf86cd799439031';
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: adminUserId, role: 'admin' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId, appliedUserId },
+        };
+
+        const userDoc = {
+            _id: appliedUserId,
+            subscriptionStatus: 'inactive',
+            planId: null,
+            save: async function saveUser() { return this; },
+        };
+
+        const planDoc = {
+            _id: validPlanId,
+            name: 'Enterprise',
+            slug: 'enterprise',
+            price: 100,
+            billingCycle: 'monthly',
+            isPublic: false,
+        };
+
+        const orderDoc = {
+            _id: 'order123',
+            status: 'pending',
+            save: async function saveOrder() { return this; },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => appliedUserId },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+            save: async function savePayment() { return this; },
+        };
+
+        Plan.findById = async () => planDoc;
+        User.findById = async () => userDoc;
+        Order.findById = async () => orderDoc;
+        Payment.findById = async () => paymentDoc;
+        Invoice.prototype.save = async function saveInvoice() {
+            this._id = this._id || 'invoice-generated';
+            return this;
+        };
+
+        await activatedPlan(req, res);
+
+        assert.equal(res.statusCode, 200, 'Expected admin approval to succeed for non-public plan.');
         assert.equal(paymentDoc.status, 'succeeded', 'Payment status should be updated to succeeded.');
         assert.equal(orderDoc.status, 'active', 'Order status should be set to active.');
     });

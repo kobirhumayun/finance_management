@@ -388,7 +388,7 @@ const activatedPlan = async (req, res) => {
         }
 
         const currentPlanIdString = user.planId?.toString();
-        if (!newPlan.isPublic && currentPlanIdString !== newPlanId) {
+        if (!isAdmin && !newPlan.isPublic && currentPlanIdString !== newPlanId) {
             return res.status(403).json({ message: 'This plan is not publicly available.' });
         }
 
