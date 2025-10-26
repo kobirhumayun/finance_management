@@ -233,6 +233,68 @@ describe('planController activatedPlan authorization', () => {
         assert.equal(invoicePayload.subscriptionEndDate, null, 'Lifetime plan invoices should not have an end date.');
     });
 
+    test('persists lifetime plan invoices without requiring an end date', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId, role: 'user' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const userDoc = {
+            _id: validUserId,
+            subscriptionStatus: 'inactive',
+            planId: null,
+            subscriptionEndDate: null,
+            save: async function saveUser() { return this; },
+        };
+
+        const planDoc = {
+            _id: validPlanId,
+            name: 'Lifetime Access',
+            slug: 'lifetime-access',
+            price: 0,
+            billingCycle: 'lifetime',
+            isPublic: true,
+        };
+
+        const orderDoc = {
+            _id: 'orderLifetimePersisted',
+            status: 'pending',
+            save: async function saveOrder() { return this; },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => validUserId },
+            amount: 0,
+            currency: 'USD',
+            order: 'orderLifetimePersisted',
+            status: 'pending',
+            save: async function savePayment() { return this; },
+        };
+
+        let saveCalled = 0;
+        Plan.findById = async () => planDoc;
+        User.findById = async () => userDoc;
+        Order.findById = async () => orderDoc;
+        Payment.findById = async () => paymentDoc;
+        Invoice.prototype.save = async function captureInvoice() {
+            saveCalled += 1;
+            this._id = this._id || 'invoice-lifetime-persisted';
+            return this;
+        };
+
+        await activatedPlan(req, res);
+
+        const invoiceId = res.jsonPayload?.invoice?.id;
+
+        assert.equal(res.statusCode, 200, 'Expected activation to succeed for lifetime plan.');
+        assert.equal(saveCalled, 1, 'Lifetime plan activation should persist a single invoice.');
+        assert.ok(invoiceId, 'Response should include the saved invoice identifier.');
+        assert.equal(typeof invoiceId.toString, 'function', 'Invoice identifier should be serializable.');
+        assert.equal(res.jsonPayload?.subscription?.endDate, null, 'Lifetime plan subscriptions should remain open-ended.');
+    });
+
     test('rejects activation when payment belongs to a different user', async () => {
         const res = createResponseDouble();
         const req = {
