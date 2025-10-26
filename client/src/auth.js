@@ -201,7 +201,8 @@ export const {
         let decoded = {};
         try { decoded = jwtDecode(accessToken) || {}; } catch { }
 
-        const id = (decoded?.sub ?? data?.user?.id ?? null) && String(decoded?.sub ?? data?.user?.id);
+        const rawId = decoded?._id ?? decoded?.sub ?? data?.user?._id ?? data?.user?.id ?? null;
+        const id = rawId != null ? String(rawId) : null;
         const username = (data?.user?.username ?? decoded?.username ?? data?.user?.name ?? null) || null;
         const email = (data?.user?.email ?? decoded?.email ?? null) || null;
         const role = (data?.user?.role ?? decoded?.role ?? null) || null;
@@ -210,7 +211,8 @@ export const {
         const jitterMs = stableJitterMs(userKey);
 
         return {
-          id, username, email, role,
+          id, _id: id,
+          username, email, role,
           profile: data.user ?? null,
           accessToken,
           refreshToken: data.refreshToken,
