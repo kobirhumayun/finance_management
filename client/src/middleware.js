@@ -1,6 +1,7 @@
 // File: src/middleware.js
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { FREE_PLAN_SLUGS } from "./config/plans";
 
 const PUBLIC_ROUTES = ["/", "/login", "/register", "/pricing", "/request-password-reset", "/reset-password"];
 const USER_DASHBOARD_ROUTE = "/dashboard";
@@ -19,7 +20,13 @@ function isFreePlan(token) {
     token?.planSlug ||
     (typeof token?.user?.plan === "string" ? token.user.plan : token?.user?.plan?.name);
 
-  return typeof planCandidate === "string" && planCandidate.toLowerCase().includes("free");
+  if (typeof planCandidate !== "string") {
+    return false;
+  }
+
+  const normalizedCandidate = planCandidate.trim().toLowerCase();
+
+  return FREE_PLAN_SLUGS.some((slug) => slug.toLowerCase() === normalizedCandidate);
 }
 
 function getRole(token) {
