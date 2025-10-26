@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Token = require('../models/Token');
+const UsedRefreshToken = require('../models/UsedRefreshToken');
 const { generateOtp } = require('../utils/otpUtils');
 const { sendNotification } = require('../services/notificationService');
 
@@ -103,7 +104,13 @@ const resetPassword = async (req, res, next) => {
 
         // The User model's pre-save hook should handle hashing the new password
         user.password_hash = newPassword;
+        user.refreshToken = undefined;
+        if (typeof user.markModified === 'function') {
+            user.markModified('refreshToken');
+        }
+
         await user.save();
+        await UsedRefreshToken.deleteMany({ userId: user._id });
 
         // --- Best Practice: Invalidate the token immediately after use ---
         await Token.deleteOne({ _id: resetToken._id });
