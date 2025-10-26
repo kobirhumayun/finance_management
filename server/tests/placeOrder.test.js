@@ -81,4 +81,36 @@ describe('planController placeOrder', () => {
         assert.equal(receivedPaymentData?.amount, 0, 'Expected payment to record zero amount.');
         assert.equal(receivedOrderData?.currency, 'USD', 'Expected currency to be normalized to uppercase.');
     });
+
+    test('invokes payment handler based on normalized gateway when details is an object', async () => {
+        const planObjectId = '507f191e810c19729de860ec';
+        Plan.findById = async () => ({
+            _id: planObjectId,
+            price: 25,
+        });
+
+        const paymentDetails = { instructions: 'Call support before paying.' };
+
+        const req = {
+            body: {
+                amount: 25,
+                currency: 'eur',
+                paymentGateway: 'Manual',
+                paymentMethodDetails: paymentDetails,
+                purpose: 'subscription',
+                planId: planObjectId,
+            },
+            user: {
+                _id: '507f191e810c19729de860ed',
+            },
+        };
+        const res = createResponseDouble();
+
+        await placeOrder(req, res);
+
+        assert.equal(res.statusCode, 201, 'Expected successful response when placing order with manual gateway.');
+        assert.equal(res.jsonPayload?.status, 'To confirm order pay manually', 'Expected manual payment processor response.');
+        assert.equal(receivedPaymentData?.paymentGateway, 'manual', 'Expected payment gateway to be normalized.');
+        assert.deepEqual(receivedPaymentData?.paymentMethodDetails, paymentDetails, 'Expected payment details to remain unchanged.');
+    });
 });

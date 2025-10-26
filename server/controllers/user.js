@@ -208,11 +208,18 @@ const loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Please provide username/email and password.' });
         } //
 
+        const trimmedIdentifier = typeof identifier === 'string' ? identifier.trim() : identifier;
+        const looksLikeEmail = typeof trimmedIdentifier === 'string' && trimmedIdentifier.includes('@');
+        const normalizedEmail = looksLikeEmail ? trimmedIdentifier.toLowerCase() : trimmedIdentifier;
+
         // Find user by username or email
         // Select '+password_hash' as it's excluded by default but needed for isPasswordCorrect method.
         // Populate 'planId' as it's used by model methods for token generation/subscription checks.
         const user = await User.findOne({
-            $or: [{ username: identifier }, { email: identifier }]
+            $or: [
+                { username: trimmedIdentifier },
+                { email: normalizedEmail }
+            ]
         }).select('+password_hash +refreshToken').populate('planId'); //
 
         if (!user) {
