@@ -6,7 +6,7 @@ import { NextResponse } from "next/server.js";
 import { getBackendBaseUrl } from "../../../../lib/backend.js";
 import originsConfig from "../../../../../../shared/allowed-origins.cjs";
 
-const { allowedOrigins, isOriginAllowed } = originsConfig;
+const { findAllowedOrigin } = originsConfig;
 
 let backendBaseUrl = getBackendBaseUrl();
 let authProvider = null;
@@ -57,12 +57,8 @@ function resolveAllowedOrigin(req) {
   const origin = extractOrigin(req);
   if (!origin) return { origin: null, error: "MissingOrigin" };
 
-  if (isOriginAllowed(origin)) {
-    const canonical = allowedOrigins.find(
-      (candidate) => candidate.toLowerCase() === origin.toLowerCase()
-    );
-    return { origin: canonical ?? origin, error: null };
-  }
+  const canonical = findAllowedOrigin(origin);
+  if (canonical) return { origin: canonical, error: null };
 
   return { origin, error: "DisallowedOrigin" };
 }
@@ -73,9 +69,10 @@ function rejectOrigin(origin, code) {
       ? "Origin header is required"
       : `Origin ${origin} is not allowed`;
 
+  const headers = new Headers({ "vary": "Origin" });
   return NextResponse.json(
     { error: "OriginNotAllowed", message },
-    { status: 403 }
+    { status: 403, headers }
   );
 }
 
@@ -166,9 +163,14 @@ export async function OPTIONS(req) {
   const { origin: allowedOrigin, error: originError } = resolveAllowedOrigin(req);
   if (originError) return rejectOrigin(allowedOrigin, originError);
 
+  const requestedHeaders = req.headers
+    .get("access-control-request-headers")
+    ?.trim();
+  const allowHeaders = requestedHeaders || "content-type,authorization";
+
   const headers = new Headers({
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS",
-    "access-control-allow-headers": "content-type,authorization",
+    "access-control-allow-headers": allowHeaders,
     "access-control-max-age": "600",
   });
   applyCorsHeaders(headers, allowedOrigin);

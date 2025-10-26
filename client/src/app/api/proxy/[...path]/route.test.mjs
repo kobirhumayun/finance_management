@@ -1,9 +1,13 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, after } from "node:test";
 import { mock } from "node:test";
 import assert from "node:assert/strict";
 
 const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
 process.env.ALLOWED_ORIGINS = "http://localhost:3000,https://app.example.com";
+
+const sharedOriginsModule = await import("../../../../../../shared/allowed-origins.cjs");
+const { refreshAllowedOrigins } =
+  sharedOriginsModule.default ?? sharedOriginsModule;
 
 const {
   GET,
@@ -29,6 +33,7 @@ describe("proxy route origin validation", () => {
   afterEach(() => {
     mock.restoreAll();
     __setProxyTestOverrides({ reset: true });
+    refreshAllowedOrigins();
   });
 
   it("allows preflight requests from configured origins", async () => {
@@ -57,6 +62,25 @@ describe("proxy route origin validation", () => {
     assert.strictEqual(response.status, 403);
     const body = await response.json();
     assert.strictEqual(body.error, "OriginNotAllowed");
+    assert.strictEqual(response.headers.get("vary"), "Origin");
+  });
+
+  it("allows preflight requests that specify custom headers", async () => {
+    const request = new Request("http://localhost/api/proxy", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:3000",
+        "access-control-request-headers": "x-custom,authorization",
+      },
+    });
+
+    const response = await OPTIONS(request);
+
+    assert.strictEqual(response.status, 204);
+    assert.strictEqual(
+      response.headers.get("access-control-allow-headers"),
+      "x-custom,authorization"
+    );
   });
 
   it("forwards authenticated requests with allowed origin", async () => {
@@ -104,10 +128,43 @@ describe("proxy route origin validation", () => {
     const payload = await response.json();
     assert.match(payload.message, /not allowed/i);
   });
+
+  it("uses the Referer header as a fallback when Origin is missing", async () => {
+    authStub.mock.mockImplementation(async () => ({ accessToken: "abc123" }));
+
+    const backendResponse = new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const fetchMock = mock.method(globalThis, "fetch", async () => backendResponse);
+
+    const request = new Request("http://localhost/api/proxy/accounts?foo=bar", {
+      method: "GET",
+      headers: { Referer: "https://app.example.com/dashboard" },
+    });
+    request.nextUrl = new URL(request.url);
+
+    const response = await GET(request, paramsContext(["accounts"]));
+
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(
+      response.headers.get("access-control-allow-origin"),
+      "https://app.example.com"
+    );
+    assert.deepEqual(await response.json(), { ok: true });
+
+    const [{ arguments: [calledUrl, calledOptions] }] = fetchMock.mock.calls;
+    assert.strictEqual(calledUrl, "http://backend.test/accounts?foo=bar");
+    assert.strictEqual(calledOptions.method, "GET");
+  });
 });
 
-if (originalAllowedOrigins === undefined) {
-  delete process.env.ALLOWED_ORIGINS;
-} else {
-  process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
-}
+after(() => {
+  if (originalAllowedOrigins === undefined) {
+    delete process.env.ALLOWED_ORIGINS;
+  } else {
+    process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+  }
+  refreshAllowedOrigins();
+});
