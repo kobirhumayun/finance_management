@@ -780,12 +780,14 @@ const placeOrder = async (req, res) => {
             currency: currency.toUpperCase(),
         };
 
+        const gateway = String(paymentGateway).toLowerCase();
+
         const paymentData = {
             userId: userId,
             planId: planId,
             amount: planPrice,
             currency: currency.toUpperCase(),
-            paymentGateway: paymentGateway.toLowerCase(),
+            paymentGateway: gateway,
             purpose,
             paymentMethodDetails,
             processedAt: new Date(),
@@ -793,10 +795,10 @@ const placeOrder = async (req, res) => {
 
         const { order, payment } = await createOrderWithPayment(orderData, paymentData);
 
-        const paymentFunction = paymentMethods[paymentMethodDetails];
+        const paymentFunction = paymentMethods[gateway];
 
         if (!paymentFunction) {
-            return res.status(400).json({ error: `Unsupported payment method: ${paymentMethodDetails}` });
+            return res.status(400).json({ error: `Unsupported payment gateway: ${gateway}` });
         }
 
         paymentFunction(req, res, order, payment)
