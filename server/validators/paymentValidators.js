@@ -9,7 +9,7 @@
 
 const paymentValidationRules = () => {
     return [
-        isFloatField('amount', { min: 0.01 }),
+        isFloatField('amount', { min: 0 }),
         isNotEmptyString('currency'),
         isInValues('currency', ['USD', 'EUR', 'BDT']), // Example currencies
         isNotEmptyString('paymentGateway'),
