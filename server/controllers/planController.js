@@ -272,12 +272,14 @@ const calculateNextBillingDate = (startingDate, billingCycle) => {
  * @desc   Change the user's current subscription plan
  * @route  POST /api/users/change-plan (Example route, adjust as needed)
  * @access Private
- * @body   { appliedUserId: string, newPlanId: string}
+ * @body   { newPlanId: string, paymentId: string }
+ * @notes  The authenticated user is derived from req.user.
  */
 const activatedPlan = async (req, res) => {
-    const { appliedUserId, newPlanId, paymentId } = req.body;
+    const { newPlanId, paymentId } = req.body;
+    const requestUserId = req.user?._id;
 
-    if (!appliedUserId) {
+    if (!requestUserId) {
         return res.status(401).json({ message: 'Authentication error: User not identified.' });
     }
 
@@ -290,10 +292,29 @@ const activatedPlan = async (req, res) => {
     }
 
     try {
-        const [user, newPlan, payment] = await Promise.all([
-            User.findById(appliedUserId),
+        const payment = await Payment.findById(paymentId);
+
+        if (!payment) {
+            return res.status(404).json({ message: `Payment record with ID '${paymentId}' not found.` });
+        }
+
+        if (!payment.userId) {
+            console.warn('[planController] Payment is missing an associated user.', { paymentId });
+            return res.status(404).json({ message: 'Payment is missing associated user information.' });
+        }
+
+        if (payment.userId.toString() !== requestUserId.toString()) {
+            console.warn('[planController] Unauthorized payment activation attempt.', {
+                paymentId,
+                requestUserId: requestUserId.toString(),
+                paymentUserId: payment.userId.toString(),
+            });
+            return res.status(403).json({ message: 'This payment is not eligible for this user.' });
+        }
+
+        const [user, newPlan] = await Promise.all([
+            User.findById(requestUserId),
             Plan.findById(newPlanId),
-            Payment.findById(paymentId),
         ]);
 
         if (!user) {
@@ -302,10 +323,6 @@ const activatedPlan = async (req, res) => {
 
         if (!newPlan) {
             return res.status(404).json({ message: `Plan with ID '${newPlanId}' not found.` });
-        }
-
-        if (!payment) {
-            return res.status(404).json({ message: `Payment record with ID '${paymentId}' not found.` });
         }
 
         if (!payment.order) {

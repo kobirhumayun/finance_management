@@ -1,12 +1,21 @@
-const { describe, test, beforeEach, after } = require('node:test');
+const { describe, test, beforeEach, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const Plan = require('../models/Plan');
-const { addPlan, updatePlan } = require('../controllers/planController');
+const User = require('../models/User');
+const Payment = require('../models/Payment');
+const Order = require('../models/Order');
+const Invoice = require('../models/Invoice');
+const { addPlan, updatePlan, activatedPlan } = require('../controllers/planController');
 
 const BILLING_CYCLES = Plan.schema.path('billingCycle').enumValues;
 
 const originalFindOne = Plan.findOne;
 const originalFindOneAndUpdate = Plan.findOneAndUpdate;
+const originalPlanFindById = Plan.findById;
+const originalUserFindById = User.findById;
+const originalPaymentFindById = Payment.findById;
+const originalOrderFindById = Order.findById;
+const originalInvoiceSave = Invoice.prototype.save;
 const originalSave = Plan.prototype.save;
 
 const createResponseDouble = () => {
@@ -36,6 +45,11 @@ beforeEach(() => {
 after(() => {
     Plan.findOne = originalFindOne;
     Plan.findOneAndUpdate = originalFindOneAndUpdate;
+    Plan.findById = originalPlanFindById;
+    User.findById = originalUserFindById;
+    Payment.findById = originalPaymentFindById;
+    Order.findById = originalOrderFindById;
+    Invoice.prototype.save = originalInvoiceSave;
     Plan.prototype.save = originalSave;
 });
 
@@ -91,4 +105,118 @@ describe('planController updatePlan', () => {
             assert.equal(res.jsonPayload.plan.billingCycle, cycle, 'Expected billing cycle to be updated.');
         });
     }
+});
+
+describe('planController activatedPlan authorization', () => {
+    const validUserId = '507f1f77bcf86cd799439011';
+    const validPlanId = '507f1f77bcf86cd799439012';
+    const validPaymentId = '507f1f77bcf86cd799439013';
+
+    afterEach(() => {
+        Plan.findById = originalPlanFindById;
+        User.findById = originalUserFindById;
+        Payment.findById = originalPaymentFindById;
+        Order.findById = originalOrderFindById;
+        Invoice.prototype.save = originalInvoiceSave;
+    });
+
+    test('allows activation when payment belongs to the authenticated user', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const userDoc = {
+            _id: validUserId,
+            subscriptionStatus: 'inactive',
+            planId: null,
+            save: async function saveUser() { return this; },
+        };
+
+        const planDoc = {
+            _id: validPlanId,
+            name: 'Pro',
+            slug: 'pro',
+            price: 100,
+            billingCycle: 'monthly',
+            isPublic: true,
+        };
+
+        const orderDoc = {
+            _id: 'order123',
+            status: 'pending',
+            save: async function saveOrder() { return this; },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => validUserId },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+            save: async function savePayment() { return this; },
+        };
+
+        Plan.findById = async () => planDoc;
+        User.findById = async () => userDoc;
+        Order.findById = async () => orderDoc;
+        Payment.findById = async () => paymentDoc;
+        Invoice.prototype.save = async function saveInvoice() {
+            this._id = this._id || 'invoice-generated';
+            return this;
+        };
+
+        await activatedPlan(req, res);
+
+        assert.equal(res.statusCode, 200, 'Expected activation to succeed for authorized payment.');
+        assert.equal(paymentDoc.status, 'succeeded', 'Payment status should be updated to succeeded.');
+        assert.equal(orderDoc.status, 'active', 'Order status should be set to active.');
+    });
+
+    test('rejects activation when payment belongs to a different user', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => '507f1f77bcf86cd799439099' },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+            save: async function savePayment() {
+                throw new Error('Payment should not be saved when unauthorized.');
+            },
+        };
+
+        Payment.findById = async () => paymentDoc;
+        User.findById = async () => {
+            throw new Error('User lookup should not occur for unauthorized payments.');
+        };
+        Plan.findById = async () => {
+            throw new Error('Plan lookup should not occur for unauthorized payments.');
+        };
+        Order.findById = async () => {
+            throw new Error('Order lookup should not occur for unauthorized payments.');
+        };
+
+        const warnLogs = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => { warnLogs.push(args); };
+
+        try {
+            await activatedPlan(req, res);
+        } finally {
+            console.warn = originalWarn;
+        }
+
+        assert.equal(res.statusCode, 403, 'Expected forbidden response when payment is for a different user.');
+        assert.equal(res.jsonPayload?.message, 'This payment is not eligible for this user.');
+        assert.ok(warnLogs.length > 0, 'Unauthorized attempts should be logged.');
+    });
 });
