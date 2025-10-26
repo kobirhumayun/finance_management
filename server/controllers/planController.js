@@ -398,7 +398,7 @@ const activatedPlan = async (req, res) => {
             ? user.subscriptionEndDate
             : new Date();
         const calculatedEndDate = calculateNextBillingDate(subscriptionStartDate, newPlan.billingCycle);
-        const subscriptionEndDate = calculatedEndDate || subscriptionStartDate;
+        const subscriptionEndDate = calculatedEndDate ?? null;
 
         user.planId = newPlan._id;
         user.subscriptionStatus = newPlan.price === 0 ? 'free' : 'active';
