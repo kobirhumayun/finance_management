@@ -48,7 +48,7 @@ const orderSchema = z.object({
 const manualPaymentSchema = z.object({
   amount: z.coerce.number().min(0, "Amount must be positive"),
   currency: z.string().min(1, "Currency is required"),
-  paymentGateway: z.string().min(1, "Payment gateway is required"),
+  paymentGateway: z.literal("manual"),
   paymentId: z.string().min(1, "Payment ID is required"),
   gatewayTransactionId: z.string().min(3, "Provide the transaction reference"),
 });
@@ -72,7 +72,7 @@ const defaultOrderValues = {
 const defaultManualValues = {
   amount: 0,
   currency: "",
-  paymentGateway: "",
+  paymentGateway: "manual",
   paymentId: "",
   gatewayTransactionId: "",
 };
@@ -159,7 +159,7 @@ export default function PlanSelection({ plans }) {
       manualPaymentForm.reset({
         amount: orderPayload?.amount ?? Number(selectedPlan?.price) ?? 0,
         currency: orderPayload?.currency ?? selectedPlan?.currency ?? "BDT",
-        paymentGateway: orderPayload?.paymentGateway ?? "Mobile-Banking",
+        paymentGateway: "manual",
         paymentId: orderResponse.paymentId ?? "",
         gatewayTransactionId: "",
       });
@@ -403,7 +403,10 @@ export default function PlanSelection({ plans }) {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Manual payment</DialogTitle>
-            <DialogDescription>Provide the payment reference so we can verify your order.</DialogDescription>
+            <DialogDescription>
+              Provide the payment reference so we can verify your order. The manual gateway and pricing details are locked for
+              this confirmation step.
+            </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <p className="font-medium">Order summary</p>
@@ -423,7 +426,9 @@ export default function PlanSelection({ plans }) {
                 id="manual-payment-amount"
                 type="number"
                 step="0.01"
-                disabled={isSubmittingManualPayment}
+                readOnly
+                aria-readonly="true"
+                className={READ_ONLY_INPUT_STYLES}
                 {...manualPaymentForm.register("amount", { valueAsNumber: true })}
               />
               {manualPaymentForm.formState.errors.amount && (
@@ -432,14 +437,26 @@ export default function PlanSelection({ plans }) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="manual-payment-currency">Currency</Label>
-              <Input id="manual-payment-currency" disabled={isSubmittingManualPayment} {...manualPaymentForm.register("currency")} />
+              <Input
+                id="manual-payment-currency"
+                readOnly
+                aria-readonly="true"
+                className={READ_ONLY_INPUT_STYLES}
+                {...manualPaymentForm.register("currency")}
+              />
               {manualPaymentForm.formState.errors.currency && (
                 <p className="text-sm text-destructive">{manualPaymentForm.formState.errors.currency.message}</p>
               )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="manual-payment-gateway">Payment gateway</Label>
-              <Input id="manual-payment-gateway" disabled={isSubmittingManualPayment} {...manualPaymentForm.register("paymentGateway")} />
+              <Input
+                id="manual-payment-gateway"
+                readOnly
+                aria-readonly="true"
+                className={READ_ONLY_INPUT_STYLES}
+                {...manualPaymentForm.register("paymentGateway")}
+              />
               {manualPaymentForm.formState.errors.paymentGateway && (
                 <p className="text-sm text-destructive">{manualPaymentForm.formState.errors.paymentGateway.message}</p>
               )}
