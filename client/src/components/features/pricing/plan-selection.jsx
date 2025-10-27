@@ -143,8 +143,8 @@ export default function PlanSelection({ plans }) {
     if (dialogOpen && flowStep === "order" && selectedPlan) {
       orderForm.reset({
         planId: selectedPlan.planId,
-        amount: orderPayload?.amount ?? Number(selectedPlan.price) || 0,
-        currency: orderPayload?.currency ?? selectedPlan.currency || "BDT",
+        amount: orderPayload?.amount ?? (Number(selectedPlan.price) || 0),
+        currency: orderPayload?.currency ?? (selectedPlan.currency || "BDT"),
         paymentGateway: "manual",
         paymentMethodDetails: orderPayload?.paymentMethodDetails || "",
         purpose: orderPayload?.purpose || "subscription_renewal",
