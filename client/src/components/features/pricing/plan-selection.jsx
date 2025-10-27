@@ -58,6 +58,8 @@ function formatBillingCycle(cycle) {
   return cycle.charAt(0).toUpperCase() + cycle.slice(1).toLowerCase();
 }
 
+const READ_ONLY_INPUT_STYLES = "bg-muted/60 text-muted-foreground";
+
 const defaultOrderValues = {
   planId: "",
   amount: 0,
@@ -306,7 +308,8 @@ export default function PlanSelection({ plans }) {
                 type="number"
                 step="0.01"
                 readOnly
-                disabled={isSubmittingOrder}
+                aria-readonly="true"
+                className={READ_ONLY_INPUT_STYLES}
                 {...orderForm.register("amount", { valueAsNumber: true })}
               />
               {orderForm.formState.errors.amount && (
@@ -318,7 +321,8 @@ export default function PlanSelection({ plans }) {
               <Input
                 id="plan-order-currency"
                 readOnly
-                disabled={isSubmittingOrder}
+                aria-readonly="true"
+                className={READ_ONLY_INPUT_STYLES}
                 {...orderForm.register("currency")}
               />
               {orderForm.formState.errors.currency && (
@@ -330,7 +334,8 @@ export default function PlanSelection({ plans }) {
               <Input
                 id="plan-order-gateway"
                 readOnly
-                disabled={isSubmittingOrder}
+                aria-readonly="true"
+                className={READ_ONLY_INPUT_STYLES}
                 {...orderForm.register("paymentGateway")}
               />
               {orderForm.formState.errors.paymentGateway && (
