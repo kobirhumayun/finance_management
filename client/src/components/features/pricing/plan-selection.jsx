@@ -25,14 +25,24 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/sonner";
 import { createPlanOrder, submitManualPayment } from "@/lib/plans";
 import { formatPlanAmount, resolveNumericValue } from "@/lib/formatters";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const orderSchema = z.object({
   planId: z.string().min(1, "Plan is required"),
   amount: z.coerce.number().min(0, "Amount must be positive"),
   currency: z.string().min(1, "Currency is required"),
-  paymentGateway: z.string().min(1, "Payment gateway is required"),
-  paymentMethodDetails: z.literal("manual"),
-  purpose: z.string().min(1, "Purpose is required"),
+  paymentGateway: z.literal("manual"),
+  paymentMethodDetails: z
+    .string()
+    .min(1, "Manual payment instructions are required"),
+  purpose: z.enum([
+    "subscription_initial",
+    "subscription_renewal",
+    "plan_upgrade",
+    "plan_downgrade",
+    "one_time_purchase",
+  ]),
 });
 
 const manualPaymentSchema = z.object({
@@ -52,8 +62,8 @@ const defaultOrderValues = {
   planId: "",
   amount: 0,
   currency: "",
-  paymentGateway: "",
-  paymentMethodDetails: "manual",
+  paymentGateway: "manual",
+  paymentMethodDetails: "",
   purpose: "subscription_renewal",
 };
 
@@ -89,6 +99,8 @@ export default function PlanSelection({ plans }) {
     resolver: zodResolver(manualPaymentSchema),
     defaultValues: defaultManualValues,
   });
+
+  const purposeValue = orderForm.watch("purpose");
 
   const resetFlow = useCallback(() => {
     setDialogOpen(false);
@@ -131,10 +143,10 @@ export default function PlanSelection({ plans }) {
     if (dialogOpen && flowStep === "order" && selectedPlan) {
       orderForm.reset({
         planId: selectedPlan.planId,
-        amount: Number(selectedPlan.price) || 0,
-        currency: selectedPlan.currency || "BDT",
-        paymentGateway: orderPayload?.paymentGateway || "Mobile-Banking",
-        paymentMethodDetails: "manual",
+        amount: orderPayload?.amount ?? Number(selectedPlan.price) || 0,
+        currency: orderPayload?.currency ?? selectedPlan.currency || "BDT",
+        paymentGateway: "manual",
+        paymentMethodDetails: orderPayload?.paymentMethodDetails || "",
         purpose: orderPayload?.purpose || "subscription_renewal",
       });
     }
@@ -164,7 +176,6 @@ export default function PlanSelection({ plans }) {
       const payload = {
         ...values,
         planId: selectedPlan.planId,
-        paymentMethodDetails: "manual",
       };
       const response = await createPlanOrder(payload);
       setOrderPayload(payload);
@@ -279,7 +290,6 @@ export default function PlanSelection({ plans }) {
           </DialogHeader>
           <form id="plan-order-form" className="space-y-4" onSubmit={orderForm.handleSubmit(handleOrderSubmit)}>
             <input type="hidden" {...orderForm.register("planId")} />
-            <input type="hidden" {...orderForm.register("paymentMethodDetails")} />
             <div className="grid gap-2">
               <Label>Selected plan</Label>
               <Input value={selectedPlan.name} readOnly disabled />
@@ -295,6 +305,7 @@ export default function PlanSelection({ plans }) {
                 id="plan-order-amount"
                 type="number"
                 step="0.01"
+                readOnly
                 disabled={isSubmittingOrder}
                 {...orderForm.register("amount", { valueAsNumber: true })}
               />
@@ -304,23 +315,69 @@ export default function PlanSelection({ plans }) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="plan-order-currency">Currency</Label>
-              <Input id="plan-order-currency" disabled={isSubmittingOrder} {...orderForm.register("currency")} />
+              <Input
+                id="plan-order-currency"
+                readOnly
+                disabled={isSubmittingOrder}
+                {...orderForm.register("currency")}
+              />
               {orderForm.formState.errors.currency && (
                 <p className="text-sm text-destructive">{orderForm.formState.errors.currency.message}</p>
               )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="plan-order-gateway">Payment gateway</Label>
-              <Input id="plan-order-gateway" disabled={isSubmittingOrder} {...orderForm.register("paymentGateway")} />
+              <Input
+                id="plan-order-gateway"
+                readOnly
+                disabled={isSubmittingOrder}
+                {...orderForm.register("paymentGateway")}
+              />
               {orderForm.formState.errors.paymentGateway && (
                 <p className="text-sm text-destructive">{orderForm.formState.errors.paymentGateway.message}</p>
               )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="plan-order-purpose">Purpose</Label>
-              <Input id="plan-order-purpose" disabled={isSubmittingOrder} {...orderForm.register("purpose")} />
+              <Select
+                value={purposeValue}
+                onValueChange={(value) =>
+                  orderForm.setValue("purpose", value, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                  })
+                }
+                disabled={isSubmittingOrder}
+              >
+                <SelectTrigger id="plan-order-purpose">
+                  <SelectValue placeholder="Select purpose" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="subscription_initial">Subscription initial</SelectItem>
+                  <SelectItem value="subscription_renewal">Subscription renewal</SelectItem>
+                  <SelectItem value="plan_upgrade">Plan upgrade</SelectItem>
+                  <SelectItem value="plan_downgrade">Plan downgrade</SelectItem>
+                  <SelectItem value="one_time_purchase">One-time purchase</SelectItem>
+                </SelectContent>
+              </Select>
               {orderForm.formState.errors.purpose && (
                 <p className="text-sm text-destructive">{orderForm.formState.errors.purpose.message}</p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="plan-order-payment-method-details">Manual payment instructions</Label>
+              <Textarea
+                id="plan-order-payment-method-details"
+                placeholder="Provide instructions for submitting manual payment details"
+                rows={4}
+                disabled={isSubmittingOrder}
+                {...orderForm.register("paymentMethodDetails")}
+              />
+              {orderForm.formState.errors.paymentMethodDetails && (
+                <p className="text-sm text-destructive">
+                  {orderForm.formState.errors.paymentMethodDetails.message}
+                </p>
               )}
             </div>
           </form>
