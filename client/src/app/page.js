@@ -21,7 +21,7 @@ export default function HomePage() {
     },
     {
       title: "Enterprise-grade Security",
-      description: "Safeguard sensitive financial data with RBAC, JWT authentication, and audit trails.",
+      description: "Only the right teammates can view your books and every login is protected.",
       icon: ShieldCheck,
     },
   ];
