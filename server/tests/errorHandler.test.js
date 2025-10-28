@@ -4,6 +4,17 @@ const assert = require('node:assert/strict');
 const errorHandler = require('../middleware/errorHandler');
 const AppError = require('../utils/AppError');
 
+let originalConsoleError;
+
+before(() => {
+    originalConsoleError = console.error;
+    console.error = () => {};
+});
+
+after(() => {
+    console.error = originalConsoleError;
+});
+
 const createResponseDouble = () => {
     const res = {};
     res.statusCode = null;
@@ -114,6 +125,38 @@ describe('errorHandler request path resolution', () => {
         assert.deepEqual(res.jsonPayload, {
             status: 'fail',
             message: 'Handled via fallback path',
+        });
+    });
+
+    test('falls back to baseUrl when originalUrl and url are unavailable', () => {
+        const req = { baseUrl: '/api/base-only' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via baseUrl', 409);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 409);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via baseUrl',
+        });
+    });
+
+    test('falls back to path when no other request url fields are provided', () => {
+        const req = { path: '/api/path-only' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via path', 422);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 422);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via path',
         });
     });
 

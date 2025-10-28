@@ -52,14 +52,18 @@ const resolveRequestPath = (req) => {
         return undefined;
     }
 
-    const originalPath = normalizePath(req.originalUrl);
-    if (originalPath) {
-        return originalPath;
-    }
+    const candidatePaths = [
+        req.originalUrl,
+        req.url,
+        req.baseUrl,
+        req.path,
+    ];
 
-    const fallbackPath = normalizePath(req.url);
-    if (fallbackPath) {
-        return fallbackPath;
+    for (const value of candidatePaths) {
+        const normalized = normalizePath(value);
+        if (normalized) {
+            return normalized;
+        }
     }
 
     return undefined;
