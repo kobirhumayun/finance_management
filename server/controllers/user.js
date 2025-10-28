@@ -223,7 +223,7 @@ const loginUser = async (req, res) => {
         }).select('+password_hash +refreshToken').populate('planId'); //
 
         if (!user) {
-            return res.status(404).json({ message: 'Invalid credentials.' }); //
+            return res.status(401).json({ message: 'Invalid credentials.' }); //
         }
 
         if (user.isActive === false) {
@@ -526,6 +526,7 @@ const updateCurrentUserEmail = async (req, res) => {
         user.email = normalizedEmail;
         user.isEmailVerified = false;
         user.refreshToken = undefined;
+        user.markModified('refreshToken');
         user.metadata = {
             ...(user.metadata || {}),
             lastEmailChangeAt: new Date(),
@@ -567,6 +568,7 @@ const updateCurrentUserPassword = async (req, res) => {
 
         user.password_hash = newPassword;
         user.refreshToken = undefined;
+        user.markModified('refreshToken');
         user.metadata = {
             ...(user.metadata || {}),
             lastPasswordChangeAt: new Date(),
@@ -602,6 +604,7 @@ const deleteCurrentUserAccount = async (req, res) => {
 
         user.isActive = false;
         user.refreshToken = undefined;
+        user.markModified('refreshToken');
         const metadata = { ...(user.metadata || {}), deletedAt: new Date() };
 
         if (reason) {
