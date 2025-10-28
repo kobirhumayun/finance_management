@@ -6,8 +6,25 @@ const handleCastErrorDB = (err) => {
 };
 
 const handleDuplicateFieldsDB = (err) => {
-    const value = err.errmsg.match(/(["'])(\\?.)*?\1/)[0];
-    const message = `Duplicate field value: ${value}. Please use another value!`;
+    let valueDescription;
+
+    if (err.keyValue && typeof err.keyValue === 'object') {
+        const [key, value] = Object.entries(err.keyValue)[0] || [];
+        if (key !== undefined) {
+            valueDescription = `${key}: ${value}`;
+        }
+    }
+
+    if (!valueDescription && typeof err.message === 'string') {
+        const match = err.message.match(/(["'])(\\?.)*?\1/);
+        if (match && match[0]) {
+            valueDescription = match[0];
+        }
+    }
+
+    const message = valueDescription
+        ? `Duplicate field value: ${valueDescription}. Please use another value!`
+        : 'Duplicate field value detected. Please use another value!';
     return new AppError(message, 400);
 };
 
@@ -69,15 +86,16 @@ module.exports = (err, req, res, next) => {
 
     if (process.env.NODE_ENV === 'development') {
         sendErrorDev(err, req, res);
-    } else if (process.env.NODE_ENV === 'production') {
-        let error = { ...err, message: err.message, name: err.name }; // Create a shallow copy
-
-        if (error.name === 'CastError') error = handleCastErrorDB(error);
-        if (error.code === 11000) error = handleDuplicateFieldsDB(error); // MongoDB duplicate key
-        if (error.name === 'ValidationError') error = handleValidationErrorDB(error); // Mongoose validation
-        if (error.name === 'JsonWebTokenError') error = handleJWTError();
-        if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
-
-        sendErrorProd(error, req, res);
+        return;
     }
+
+    let error = { ...err, message: err.message, name: err.name }; // Create a shallow copy
+
+    if (error.name === 'CastError') error = handleCastErrorDB(error);
+    if (error.code === 11000) error = handleDuplicateFieldsDB(error); // MongoDB duplicate key
+    if (error.name === 'ValidationError') error = handleValidationErrorDB(error); // Mongoose validation
+    if (error.name === 'JsonWebTokenError') error = handleJWTError();
+    if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
+
+    sendErrorProd(error, req, res);
 };
