@@ -2,6 +2,18 @@ const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 const errorHandler = require('../middleware/errorHandler');
+const AppError = require('../utils/AppError');
+
+let originalConsoleError;
+
+before(() => {
+    originalConsoleError = console.error;
+    console.error = () => {};
+});
+
+after(() => {
+    console.error = originalConsoleError;
+});
 
 const createResponseDouble = () => {
     const res = {};
@@ -80,6 +92,115 @@ describe('errorHandler fallback environment handling', () => {
         const err = new Error('Unhandled error');
 
         errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 500);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'error',
+            message: 'Something went very wrong!',
+        });
+    });
+});
+
+describe('errorHandler request path resolution', () => {
+    const originalEnv = process.env.NODE_ENV;
+
+    before(() => {
+        process.env.NODE_ENV = 'production';
+    });
+
+    after(() => {
+        process.env.NODE_ENV = originalEnv;
+    });
+
+    test('falls back to req.url when originalUrl is unavailable', () => {
+        const req = { url: '/api/test' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via fallback path', 418);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 418);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via fallback path',
+        });
+    });
+
+    test('falls back to baseUrl when originalUrl and url are unavailable', () => {
+        const req = { baseUrl: '/api/base-only' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via baseUrl', 409);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 409);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via baseUrl',
+        });
+    });
+
+    test('falls back to path when no other request url fields are provided', () => {
+        const req = { path: '/api/path-only' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via path', 422);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 422);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via path',
+        });
+    });
+
+    test('ignores whitespace-only originalUrl values when resolving API requests', () => {
+        const req = { originalUrl: '   ', url: '/api/whitespace' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via trimmed fallback', 409);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 409);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via trimmed fallback',
+        });
+    });
+
+    test('treats non-string paths as non-API requests', () => {
+        const req = { originalUrl: { path: '/api/test' } };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Non API error', 400);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 500);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'error',
+            message: 'Something went very wrong!',
+        });
+    });
+
+    test('handles missing request object safely', () => {
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Missing request', 400);
+
+        assert.doesNotThrow(() => {
+            errorHandler(err, null, res, next);
+        });
 
         assert.equal(res.statusCode, 500);
         assert.deepEqual(res.jsonPayload, {
