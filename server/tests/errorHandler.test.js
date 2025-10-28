@@ -117,6 +117,22 @@ describe('errorHandler request path resolution', () => {
         });
     });
 
+    test('ignores whitespace-only originalUrl values when resolving API requests', () => {
+        const req = { originalUrl: '   ', url: '/api/whitespace' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Handled via trimmed fallback', 409);
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 409);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'fail',
+            message: 'Handled via trimmed fallback',
+        });
+    });
+
     test('treats non-string paths as non-API requests', () => {
         const req = { originalUrl: { path: '/api/test' } };
         const res = createResponseDouble();

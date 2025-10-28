@@ -37,23 +37,38 @@ const handleValidationErrorDB = (err) => {
 const handleJWTError = () => new AppError('Invalid token. Please log in again!', 401);
 const handleJWTExpiredError = () => new AppError('Your token has expired! Please log in again.', 401);
 
-const resolveRequestPath = (req) => {
-    if (!req || typeof req !== 'object') {
-        return '';
+const normalizePath = (value) => {
+    if (typeof value !== 'string') {
+        return undefined;
     }
 
-    if (typeof req.originalUrl === 'string') {
-        return req.originalUrl;
-    }
+    const trimmed = value.trim();
 
-    if (typeof req.url === 'string') {
-        return req.url;
-    }
-
-    return '';
+    return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const isApiRequest = (req) => resolveRequestPath(req).startsWith('/api');
+const resolveRequestPath = (req) => {
+    if (!req || typeof req !== 'object') {
+        return undefined;
+    }
+
+    const originalPath = normalizePath(req.originalUrl);
+    if (originalPath) {
+        return originalPath;
+    }
+
+    const fallbackPath = normalizePath(req.url);
+    if (fallbackPath) {
+        return fallbackPath;
+    }
+
+    return undefined;
+};
+
+const isApiRequest = (req) => {
+    const requestPath = resolveRequestPath(req);
+    return typeof requestPath === 'string' && requestPath.startsWith('/api');
+};
 
 const sendErrorDev = (err, req, res) => {
 
