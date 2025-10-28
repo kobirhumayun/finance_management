@@ -1,30 +1,36 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
-import { resetSchema, PASSWORD_REQUIREMENTS_MESSAGE } from "../reset-password-schema.js";
+import { resetSchema, PASSWORD_REQUIREMENTS_MESSAGE } from "../reset-password-schema.mjs";
 
-const basePayload = {
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+const validData = {
   email: "user@example.com",
   otp: "123456",
+  newPassword: "Password1!",
+  confirmPassword: "Password1!",
 };
 
-test("rejects weak passwords that do not meet complexity requirements", () => {
+test("accepts valid reset payloads", () => {
+  assert.doesNotThrow(() => resetSchema.parse(validData));
+});
+
+test("rejects mismatched passwords", () => {
   const result = resetSchema.safeParse({
-    ...basePayload,
-    newPassword: "password1",
-    confirmPassword: "password1",
+    ...validData,
+    confirmPassword: "Password1?",
   });
 
   assert.equal(result.success, false);
-  const formatted = result.error.format();
-  assert.deepEqual(formatted.newPassword?._errors, [PASSWORD_REQUIREMENTS_MESSAGE]);
+  assert.equal(result.error?.issues?.[0]?.path?.[0], "confirmPassword");
 });
 
-test("accepts strong passwords that meet all complexity requirements", () => {
+test("enforces strong password requirements", () => {
   const result = resetSchema.safeParse({
-    ...basePayload,
-    newPassword: "Str0ng!Pass",
-    confirmPassword: "Str0ng!Pass",
+    ...validData,
+    newPassword: "weakpass",
+    confirmPassword: "weakpass",
   });
 
-  assert.equal(result.success, true);
+  assert.equal(result.success, false);
+  assert.equal(result.error?.issues?.[0]?.message, PASSWORD_REQUIREMENTS_MESSAGE);
 });

@@ -7,7 +7,7 @@ const cookies = [
 ];
 
 test("forwards multiple set-cookie headers from the upstream response", async (t) => {
-  const routeModule = await import("../[...path]/route.js");
+  const routeModule = await import("../[...path]/proxy.mjs");
   t.after(() => {
     routeModule.__resetProxyTestOverrides();
   });
