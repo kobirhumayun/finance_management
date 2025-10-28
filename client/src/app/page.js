@@ -4,25 +4,28 @@ import Footer from "@/components/shared/footer";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, BarChart3, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, BarChart3, LayoutDashboard, Receipt } from "lucide-react";
 
 // Marketing landing page welcoming visitors to FinTrack.
 export default function HomePage() {
   const features = [
     {
-      title: "Unified Financial View",
-      description: "Track budgets, cash flow, and profit across every project from a single dashboard.",
-      icon: Wallet,
+      title: "Projects workspace",
+      description:
+        "Organize project budgets, reconcile transactions, and keep every stakeholder aligned in one place.",
+      icon: LayoutDashboard,
     },
     {
-      title: "Actionable Analytics",
-      description: "Visualize spending trends and quickly identify opportunities to optimize operations.",
+      title: "Interactive reports",
+      description:
+        "Visualize income, expenses, and cash flow trends with filters that adapt to every scenario you explore.",
       icon: BarChart3,
     },
     {
-      title: "Enterprise-grade Security",
-      description: "Only the right teammates can view your books and every login is protected.",
-      icon: ShieldCheck,
+      title: "Plan & billing insights",
+      description:
+        "Review the features in your subscription, monitor usage, and stay ahead of renewals or upcoming changes.",
+      icon: Receipt,
     },
   ];
 
@@ -33,14 +36,14 @@ export default function HomePage() {
         <section className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-6">
             <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              Financial clarity for every team
+              Outcomes-driven finance for modern teams
             </span>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              Grow smarter with unified financial insights.
+              Turn every project update into confident financial decisions.
             </h1>
             <p className="text-lg text-muted-foreground">
-              FinTrack centralizes your budgets, subscriptions, and transactions so you can focus on
-              building a resilient business.
+              Organize project budgets, monitor cash flow trends, and stay ahead on subscription renewals—all
+              from a single connected workspace.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
@@ -68,9 +71,10 @@ export default function HomePage() {
 
         <section id="features" className="space-y-10">
           <div className="space-y-3 text-center">
-            <h2 className="text-3xl font-semibold">Everything you need to own your finances</h2>
+            <h2 className="text-3xl font-semibold">Preview the modules you'll rely on every day</h2>
             <p className="text-muted-foreground">
-              From freelancers to enterprises, FinTrack adapts to your workflows and scales with your ambitions.
+              Each card mirrors the Projects, Reports, and Plan areas inside FinTrack so prospects see exactly
+              how the platform supports real financial workflows.
             </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
