@@ -2,21 +2,52 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { getBackendBaseUrl } from "@/lib/backend";
+import { NextResponse } from "next/server.js";
+import { getBackendBaseUrl } from "../../../../lib/backend.js";
 
-const BACKEND_BASE = getBackendBaseUrl();
+const DEFAULT_CONFIG = {
+  auth: undefined,
+  backendBase: getBackendBaseUrl(),
+  fetch: (...args) => fetch(...args),
+};
+
+let activeConfig = { ...DEFAULT_CONFIG };
+let cachedDefaultAuth;
+
+export function __setProxyTestOverrides(overrides = {}) {
+  if (Object.prototype.hasOwnProperty.call(overrides, "auth")) {
+    activeConfig.auth = overrides.auth ?? DEFAULT_CONFIG.auth;
+  }
+  if (Object.prototype.hasOwnProperty.call(overrides, "backendBase")) {
+    activeConfig.backendBase = overrides.backendBase ?? DEFAULT_CONFIG.backendBase;
+  }
+  if (Object.prototype.hasOwnProperty.call(overrides, "fetch")) {
+    activeConfig.fetch = overrides.fetch ?? DEFAULT_CONFIG.fetch;
+  }
+}
+
+export function __resetProxyTestOverrides() {
+  activeConfig = { ...DEFAULT_CONFIG };
+  cachedDefaultAuth = undefined;
+}
 const TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS || 15_000);
 
 const STRIP_REQ_HEADERS = new Set(["connection", "content-length", "host", "accept-encoding", "cookie"]);
-const PASS_RES_HEADERS = new Set(["content-type", "content-length", "cache-control", "etag", "last-modified", "location"]);
+const PASS_RES_HEADERS = new Set([
+  "content-type",
+  "content-length",
+  "cache-control",
+  "etag",
+  "last-modified",
+  "location",
+  "set-cookie",
+]);
 
 // Build a backend URL from the base, path segments, and original query string.
 function buildBackendUrl(req, pathSegments) {
   const pathname = "/" + (Array.isArray(pathSegments) ? pathSegments.join("/") : "");
   const search = req.nextUrl.search || "";
-  return BACKEND_BASE + pathname + search;
+  return activeConfig.backendBase + pathname + search;
 }
 
 // Drop hop‑by‑hop headers and cookies when forwarding the request.
@@ -30,15 +61,49 @@ function filterRequestHeaders(reqHeaders) {
 
 // Copy only safe response headers back to the client.
 function copyResponseHeaders(from, to) {
+  const seenCookies = new Set();
+
   for (const [k, v] of from.entries()) {
-    if (PASS_RES_HEADERS.has(k.toLowerCase())) to.set(k, v);
+    const lower = k.toLowerCase();
+    if (!PASS_RES_HEADERS.has(lower)) continue;
+
+    if (lower === "set-cookie") {
+      to.append(k, v);
+      seenCookies.add(v);
+    } else {
+      to.set(k, v);
+    }
   }
+
+  if (PASS_RES_HEADERS.has("set-cookie")) {
+    const cookies =
+      typeof from.getSetCookie === "function"
+        ? from.getSetCookie()
+        : typeof from.raw === "function"
+          ? from.raw()["set-cookie"]
+          : undefined;
+
+    if (Array.isArray(cookies)) {
+      for (const cookie of cookies) {
+        if (!seenCookies.has(cookie)) to.append("set-cookie", cookie);
+      }
+    }
+  }
+}
+
+async function resolveAuthFn() {
+  if (activeConfig.auth) return activeConfig.auth;
+  if (!cachedDefaultAuth) {
+    ({ auth: cachedDefaultAuth } = await import("@/auth"));
+  }
+  return cachedDefaultAuth;
 }
 
 // Forward the incoming request to the backend. Accepts path segments rather than a params object.
 async function forward(req, pathSegments) {
   // Resolve the NextAuth session and reject if none.
-  const session = await auth();
+  const authFn = await resolveAuthFn();
+  const session = await authFn();
   if (!session?.accessToken) return new NextResponse("Unauthorized", { status: 401 });
 
   // Construct the upstream URL.
@@ -56,7 +121,7 @@ async function forward(req, pathSegments) {
 
   let fres;
   try {
-    fres = await fetch(url, {
+    fres = await activeConfig.fetch(url, {
       method,
       headers,
       cache: "no-store",
