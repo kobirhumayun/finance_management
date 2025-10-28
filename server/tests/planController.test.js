@@ -153,6 +153,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => validUserId },
+            planId: { toString: () => validPlanId },
             amount: 100,
             currency: 'USD',
             order: 'order123',
@@ -209,6 +210,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => validUserId },
+            planId: { toString: () => validPlanId },
             amount: 0,
             currency: 'USD',
             order: 'orderLifetime',
@@ -266,6 +268,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => validUserId },
+            planId: { toString: () => validPlanId },
             amount: 0,
             currency: 'USD',
             order: 'orderLifetimePersisted',
@@ -305,6 +308,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => '507f1f77bcf86cd799439099' },
+            planId: { toString: () => validPlanId },
             amount: 100,
             currency: 'USD',
             order: 'order123',
@@ -340,6 +344,93 @@ describe('planController activatedPlan authorization', () => {
         assert.ok(warnLogs.length > 0, 'Unauthorized attempts should be logged.');
     });
 
+    test('rejects activation when payment is missing the associated plan', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId, role: 'user' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => validUserId },
+            planId: null,
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+        };
+
+        Payment.findById = async () => paymentDoc;
+        User.findById = async () => {
+            throw new Error('User lookup should not occur when payment is missing a plan.');
+        };
+        Plan.findById = async () => {
+            throw new Error('Plan lookup should not occur when payment is missing a plan.');
+        };
+        Order.findById = async () => {
+            throw new Error('Order lookup should not occur when payment is missing a plan.');
+        };
+
+        const warnLogs = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => { warnLogs.push(args); };
+
+        try {
+            await activatedPlan(req, res);
+        } finally {
+            console.warn = originalWarn;
+        }
+
+        assert.equal(res.statusCode, 400, 'Expected bad request when payment lacks a plan.');
+        assert.equal(res.jsonPayload?.message, 'Payment is missing associated plan information.');
+        assert.ok(warnLogs.length > 0, 'Missing plan information should be logged.');
+    });
+
+    test('rejects activation when payment plan differs from requested plan', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId, role: 'user' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const mismatchedPlanId = '507f1f77bcf86cd799439099';
+        const paymentDoc = {
+            _id: validPaymentId,
+            userId: { toString: () => validUserId },
+            planId: { toString: () => mismatchedPlanId },
+            amount: 100,
+            currency: 'USD',
+            order: 'order123',
+            status: 'pending',
+        };
+
+        Payment.findById = async () => paymentDoc;
+        User.findById = async () => {
+            throw new Error('User lookup should not occur when payment plan mismatches.');
+        };
+        Plan.findById = async () => {
+            throw new Error('Plan lookup should not occur when payment plan mismatches.');
+        };
+        Order.findById = async () => {
+            throw new Error('Order lookup should not occur when payment plan mismatches.');
+        };
+
+        const warnLogs = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => { warnLogs.push(args); };
+
+        try {
+            await activatedPlan(req, res);
+        } finally {
+            console.warn = originalWarn;
+        }
+
+        assert.equal(res.statusCode, 403, 'Expected forbidden response when payment plan mismatches requested plan.');
+        assert.equal(res.jsonPayload?.message, 'This payment is not eligible for the requested plan.');
+        assert.ok(warnLogs.length > 0, 'Plan mismatches should be logged.');
+    });
+
     test('rejects self-service activation for a non-public plan when not already subscribed', async () => {
         const res = createResponseDouble();
         const req = {
@@ -368,6 +459,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => validUserId },
+            planId: { toString: () => validPlanId },
             amount: 100,
             currency: 'USD',
             order: 'order123',
@@ -431,6 +523,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => appliedUserId },
+            planId: { toString: () => validPlanId },
             amount: 100,
             currency: 'USD',
             order: 'order123',
@@ -488,6 +581,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => appliedUserId },
+            planId: { toString: () => validPlanId },
             amount: 100,
             currency: 'USD',
             order: 'order123',
@@ -523,6 +617,7 @@ describe('planController activatedPlan authorization', () => {
         const paymentDoc = {
             _id: validPaymentId,
             userId: { toString: () => '507f1f77bcf86cd799439099' },
+            planId: { toString: () => validPlanId },
             amount: 100,
             currency: 'USD',
             order: 'order123',
