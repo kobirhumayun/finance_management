@@ -6,6 +6,10 @@ export {
   GET,
   POST,
   PUT,
+  PATCH,
+  DELETE,
+  HEAD,
+  OPTIONS,
   __setProxyTestOverrides,
   __resetProxyTestOverrides,
 } from "./proxy.mjs";
