@@ -27,11 +27,14 @@ const createResponseDouble = () => {
 describe('planController placeOrder', () => {
     let receivedOrderData;
     let receivedPaymentData;
+    let createOrderCallCount;
 
     beforeEach(() => {
         receivedOrderData = null;
         receivedPaymentData = null;
+        createOrderCallCount = 0;
         setCreateOrderWithPayment(async (orderData, paymentData) => {
+            createOrderCallCount += 1;
             receivedOrderData = orderData;
             receivedPaymentData = paymentData;
             return {
@@ -112,5 +115,34 @@ describe('planController placeOrder', () => {
         assert.equal(res.jsonPayload?.status, 'To confirm order pay manually', 'Expected manual payment processor response.');
         assert.equal(receivedPaymentData?.paymentGateway, 'manual', 'Expected payment gateway to be normalized.');
         assert.deepEqual(receivedPaymentData?.paymentMethodDetails, paymentDetails, 'Expected payment details to remain unchanged.');
+    });
+
+    test('rejects unsupported gateways before creating order/payment records', async () => {
+        const planObjectId = '507f191e810c19729de860ee';
+        Plan.findById = async () => ({
+            _id: planObjectId,
+            price: 50,
+        });
+
+        const req = {
+            body: {
+                amount: 50,
+                currency: 'usd',
+                paymentGateway: 'mystery-gateway',
+                paymentMethodDetails: 'details',
+                purpose: 'subscription',
+                planId: planObjectId,
+            },
+            user: {
+                _id: '507f191e810c19729de860ef',
+            },
+        };
+        const res = createResponseDouble();
+
+        await placeOrder(req, res);
+
+        assert.equal(res.statusCode, 400, 'Expected 400 response for unsupported payment gateway.');
+        assert.match(res.jsonPayload?.error ?? '', /unsupported payment gateway/i, 'Expected unsupported gateway error message.');
+        assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped for unsupported gateways.');
     });
 });

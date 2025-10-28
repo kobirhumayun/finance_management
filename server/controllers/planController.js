@@ -772,6 +772,14 @@ const placeOrder = async (req, res) => {
             return res.status(400).json({ message: `Plan price ${planPrice} does not match the order amount ${normalizedAmount}.` });
         }
 
+        const gateway = String(paymentGateway).toLowerCase();
+
+        const paymentFunction = paymentMethods[gateway];
+
+        if (!paymentFunction) {
+            return res.status(400).json({ error: `Unsupported payment gateway: ${gateway}` });
+        }
+
         // --- Create and Save Order Document ---
         const orderData = {
             user: userId,
@@ -779,8 +787,6 @@ const placeOrder = async (req, res) => {
             amount: planPrice,
             currency: currency.toUpperCase(),
         };
-
-        const gateway = String(paymentGateway).toLowerCase();
 
         const paymentData = {
             userId: userId,
@@ -794,12 +800,6 @@ const placeOrder = async (req, res) => {
         };
 
         const { order, payment } = await createOrderWithPayment(orderData, paymentData);
-
-        const paymentFunction = paymentMethods[gateway];
-
-        if (!paymentFunction) {
-            return res.status(400).json({ error: `Unsupported payment gateway: ${gateway}` });
-        }
 
         paymentFunction(req, res, order, payment)
 
