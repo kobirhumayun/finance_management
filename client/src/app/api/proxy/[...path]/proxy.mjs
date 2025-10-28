@@ -150,3 +150,30 @@ export async function PUT(req, ctx) {
   const { path } = await ctx.params;
   return forward(req, path);
 }
+
+export async function PATCH(req, ctx) {
+  const { path } = await ctx.params;
+  return forward(req, path);
+}
+
+export async function DELETE(req, ctx) {
+  const { path } = await ctx.params;
+  return forward(req, path);
+}
+
+export async function HEAD(req, ctx) {
+  const { path } = await ctx.params;
+  return forward(req, path);
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD",
+      "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Requested-With",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
