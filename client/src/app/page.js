@@ -32,9 +32,6 @@ export default function HomePage() {
       <main className="mx-auto flex max-w-6xl flex-col gap-20 px-4 py-16 sm:px-6">
         <section className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-6">
-            <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              Financial clarity for every team
-            </span>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
               Grow smarter with unified financial insights.
             </h1>
@@ -53,30 +50,17 @@ export default function HomePage() {
               </Button>
             </div>
           </div>
-          <Card className="border-0 bg-gradient-to-br from-primary/10 via-background to-background shadow-xl">
-            <CardContent className="p-8">
-              <div className="space-y-6">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Monthly Snapshot</p>
-                  <p className="text-3xl font-semibold">$42,560</p>
-                  <p className="text-xs text-muted-foreground">Net cash flow compared to last month</p>
-                </div>
-                <div className="rounded-xl bg-background/60 p-6">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Total Income</span>
-                    <span className="font-semibold text-emerald-500">$68,400</span>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between text-sm">
-                    <span>Total Expense</span>
-                    <span className="font-semibold text-rose-500">$25,840</span>
-                  </div>
-                  <div className="mt-6 h-2 w-full rounded-full bg-muted">
-                    <div className="h-2 w-3/4 rounded-full bg-primary" />
-                  </div>
-                </div>
+          <div className="hidden justify-center lg:flex">
+            <div className="relative w-full max-w-sm">
+              <div className="absolute -inset-4 rounded-3xl bg-primary/20 blur-2xl" aria-hidden />
+              <div className="relative space-y-4 rounded-3xl border border-border/60 bg-background/80 p-8 text-center shadow-2xl backdrop-blur">
+                <p className="text-sm font-semibold text-primary">Plan with confidence</p>
+                <p className="text-sm text-muted-foreground">
+                  Visualize budgets, collaborate with finance teams, and set goals before you ever sign in.
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </section>
 
         <section id="features" className="space-y-10">
