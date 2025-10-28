@@ -315,6 +315,23 @@ const activatedPlan = async (req, res) => {
             return res.status(404).json({ message: 'Payment is missing associated user information.' });
         }
 
+        const requestedPlanId = newPlanId.toString();
+        const paymentPlanId = payment.planId?.toString?.();
+
+        if (!paymentPlanId) {
+            console.warn('[planController] Payment is missing an associated plan.', { paymentId });
+            return res.status(400).json({ message: 'Payment is missing associated plan information.' });
+        }
+
+        if (paymentPlanId !== requestedPlanId) {
+            console.warn('[planController] Payment plan mismatch.', {
+                paymentId,
+                paymentPlanId,
+                requestedPlanId,
+            });
+            return res.status(403).json({ message: 'This payment is not eligible for the requested plan.' });
+        }
+
         const targetUserId = isAdmin && appliedUserId
             ? appliedUserId
             : requestUserId;
@@ -772,6 +789,14 @@ const placeOrder = async (req, res) => {
             return res.status(400).json({ message: `Plan price ${planPrice} does not match the order amount ${normalizedAmount}.` });
         }
 
+        const gateway = String(paymentGateway).toLowerCase();
+
+        const paymentFunction = paymentMethods[gateway];
+
+        if (!paymentFunction) {
+            return res.status(400).json({ error: `Unsupported payment gateway: ${gateway}` });
+        }
+
         // --- Create and Save Order Document ---
         const orderData = {
             user: userId,
@@ -779,8 +804,6 @@ const placeOrder = async (req, res) => {
             amount: planPrice,
             currency: currency.toUpperCase(),
         };
-
-        const gateway = String(paymentGateway).toLowerCase();
 
         const paymentData = {
             userId: userId,
@@ -794,12 +817,6 @@ const placeOrder = async (req, res) => {
         };
 
         const { order, payment } = await createOrderWithPayment(orderData, paymentData);
-
-        const paymentFunction = paymentMethods[gateway];
-
-        if (!paymentFunction) {
-            return res.status(400).json({ error: `Unsupported payment gateway: ${gateway}` });
-        }
 
         paymentFunction(req, res, order, payment)
 
