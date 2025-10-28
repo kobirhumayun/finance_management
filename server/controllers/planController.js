@@ -315,6 +315,23 @@ const activatedPlan = async (req, res) => {
             return res.status(404).json({ message: 'Payment is missing associated user information.' });
         }
 
+        const requestedPlanId = newPlanId.toString();
+        const paymentPlanId = payment.planId?.toString?.();
+
+        if (!paymentPlanId) {
+            console.warn('[planController] Payment is missing an associated plan.', { paymentId });
+            return res.status(400).json({ message: 'Payment is missing associated plan information.' });
+        }
+
+        if (paymentPlanId !== requestedPlanId) {
+            console.warn('[planController] Payment plan mismatch.', {
+                paymentId,
+                paymentPlanId,
+                requestedPlanId,
+            });
+            return res.status(403).json({ message: 'This payment is not eligible for the requested plan.' });
+        }
+
         const targetUserId = isAdmin && appliedUserId
             ? appliedUserId
             : requestUserId;
