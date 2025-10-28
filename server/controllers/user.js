@@ -223,7 +223,7 @@ const loginUser = async (req, res) => {
         }).select('+password_hash +refreshToken').populate('planId'); //
 
         if (!user) {
-            return res.status(404).json({ message: 'Invalid credentials.' }); //
+            return res.status(401).json({ message: 'Invalid credentials.' }); //
         }
 
         if (user.isActive === false) {
