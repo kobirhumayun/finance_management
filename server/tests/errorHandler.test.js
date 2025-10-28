@@ -132,4 +132,21 @@ describe('errorHandler request path resolution', () => {
             message: 'Something went very wrong!',
         });
     });
+
+    test('handles missing request object safely', () => {
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new AppError('Missing request', 400);
+
+        assert.doesNotThrow(() => {
+            errorHandler(err, null, res, next);
+        });
+
+        assert.equal(res.statusCode, 500);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'error',
+            message: 'Something went very wrong!',
+        });
+    });
 });
