@@ -60,3 +60,31 @@ describe('errorHandler duplicate key handling', () => {
         assert.match(res.jsonPayload.message, /duplicateuser/i);
     });
 });
+
+describe('errorHandler fallback environment handling', () => {
+    const originalEnv = process.env.NODE_ENV;
+
+    before(() => {
+        process.env.NODE_ENV = 'staging';
+    });
+
+    after(() => {
+        process.env.NODE_ENV = originalEnv;
+    });
+
+    test('returns generic error response for non-dev/prod environments', () => {
+        const req = { originalUrl: '/api/test' };
+        const res = createResponseDouble();
+        const next = () => {};
+
+        const err = new Error('Unhandled error');
+
+        errorHandler(err, req, res, next);
+
+        assert.equal(res.statusCode, 500);
+        assert.deepEqual(res.jsonPayload, {
+            status: 'error',
+            message: 'Something went very wrong!',
+        });
+    });
+});

@@ -86,15 +86,16 @@ module.exports = (err, req, res, next) => {
 
     if (process.env.NODE_ENV === 'development') {
         sendErrorDev(err, req, res);
-    } else if (process.env.NODE_ENV === 'production') {
-        let error = { ...err, message: err.message, name: err.name }; // Create a shallow copy
-
-        if (error.name === 'CastError') error = handleCastErrorDB(error);
-        if (error.code === 11000) error = handleDuplicateFieldsDB(error); // MongoDB duplicate key
-        if (error.name === 'ValidationError') error = handleValidationErrorDB(error); // Mongoose validation
-        if (error.name === 'JsonWebTokenError') error = handleJWTError();
-        if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
-
-        sendErrorProd(error, req, res);
+        return;
     }
+
+    let error = { ...err, message: err.message, name: err.name }; // Create a shallow copy
+
+    if (error.name === 'CastError') error = handleCastErrorDB(error);
+    if (error.code === 11000) error = handleDuplicateFieldsDB(error); // MongoDB duplicate key
+    if (error.name === 'ValidationError') error = handleValidationErrorDB(error); // Mongoose validation
+    if (error.name === 'JsonWebTokenError') error = handleJWTError();
+    if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
+
+    sendErrorProd(error, req, res);
 };
