@@ -757,9 +757,15 @@ const placeOrder = async (req, res) => {
         const userId = req.user._id
 
         // --- Basic Input Validation (Optional but Recommended) ---
-        if (!userId || amount == null || !currency || !paymentGateway || !paymentMethodDetails || !purpose || !planId) {
+        if (!userId || amount == null || !paymentGateway || !paymentMethodDetails || !purpose || !planId) {
             return res.status(400).json({ message: 'Missing required order fields.' });
         }
+
+        if (typeof currency !== 'string' || currency.trim() === '') {
+            return res.status(400).json({ message: 'Invalid currency. Please provide a valid currency code.' });
+        }
+
+        const normalizedRequestCurrency = currency.trim().toUpperCase();
 
         // Validate ObjectIds if provided
         if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -778,6 +784,20 @@ const placeOrder = async (req, res) => {
 
         if (!plan) {
             return res.status(404).json({ message: `Plan with ID '${planId}' not found.` });
+        }
+
+        const planCurrency = typeof plan.currency === 'string'
+            ? plan.currency.trim().toUpperCase()
+            : null;
+
+        if (!planCurrency) {
+            return res.status(500).json({ message: 'Plan currency is not configured.' });
+        }
+
+        if (normalizedRequestCurrency !== planCurrency) {
+            return res.status(400).json({
+                message: `Plan currency ${planCurrency} does not match the requested currency ${normalizedRequestCurrency}.`
+            });
         }
 
         const planPrice = typeof plan.price === 'number' ? plan.price : Number(plan.price);
@@ -802,14 +822,14 @@ const placeOrder = async (req, res) => {
             user: userId,
             plan: planId,
             amount: planPrice,
-            currency: currency.toUpperCase(),
+            currency: planCurrency,
         };
 
         const paymentData = {
             userId: userId,
             planId: planId,
             amount: planPrice,
-            currency: currency.toUpperCase(),
+            currency: planCurrency,
             paymentGateway: gateway,
             purpose,
             paymentMethodDetails,
