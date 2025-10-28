@@ -59,6 +59,7 @@ describe('planController placeOrder', () => {
         Plan.findById = async () => ({
             _id: planObjectId,
             price: 0,
+            currency: 'USD',
         });
 
         const req = {
@@ -82,7 +83,8 @@ describe('planController placeOrder', () => {
         assert.equal(res.jsonPayload?.status, 'To confirm order pay manually', 'Expected manual payment processor response.');
         assert.equal(receivedOrderData?.amount, 0, 'Expected order to record zero amount.');
         assert.equal(receivedPaymentData?.amount, 0, 'Expected payment to record zero amount.');
-        assert.equal(receivedOrderData?.currency, 'USD', 'Expected currency to be normalized to uppercase.');
+        assert.equal(receivedOrderData?.currency, 'USD', 'Expected order currency to match the plan currency.');
+        assert.equal(receivedPaymentData?.currency, 'USD', 'Expected payment currency to match the plan currency.');
     });
 
     test('invokes payment handler based on normalized gateway when details is an object', async () => {
@@ -90,6 +92,7 @@ describe('planController placeOrder', () => {
         Plan.findById = async () => ({
             _id: planObjectId,
             price: 25,
+            currency: 'EUR',
         });
 
         const paymentDetails = { instructions: 'Call support before paying.' };
@@ -122,6 +125,7 @@ describe('planController placeOrder', () => {
         Plan.findById = async () => ({
             _id: planObjectId,
             price: 50,
+            currency: 'USD',
         });
 
         const req = {
@@ -144,5 +148,35 @@ describe('planController placeOrder', () => {
         assert.equal(res.statusCode, 400, 'Expected 400 response for unsupported payment gateway.');
         assert.match(res.jsonPayload?.error ?? '', /unsupported payment gateway/i, 'Expected unsupported gateway error message.');
         assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped for unsupported gateways.');
+    });
+
+    test('rejects orders when currency does not match plan currency', async () => {
+        const planObjectId = '507f191e810c19729de860f0';
+        Plan.findById = async () => ({
+            _id: planObjectId,
+            price: 30,
+            currency: 'USD',
+        });
+
+        const req = {
+            body: {
+                amount: 30,
+                currency: 'eur',
+                paymentGateway: 'manual',
+                paymentMethodDetails: 'details',
+                purpose: 'subscription',
+                planId: planObjectId,
+            },
+            user: {
+                _id: '507f191e810c19729de860f1',
+            },
+        };
+        const res = createResponseDouble();
+
+        await placeOrder(req, res);
+
+        assert.equal(res.statusCode, 400, 'Expected 400 response when currency mismatches plan currency.');
+        assert.match(res.jsonPayload?.message ?? '', /currency/i, 'Expected error message to reference currency mismatch.');
+        assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped when currency mismatches.');
     });
 });
