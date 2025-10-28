@@ -39,7 +39,9 @@ const handleJWTExpiredError = () => new AppError('Your token has expired! Please
 
 const sendErrorDev = (err, req, res) => {
 
-    if (req.originalUrl.startsWith('/api')) {
+    const isApiRequest = typeof req.originalUrl === 'string' && req.originalUrl.startsWith('/api');
+
+    if (isApiRequest) {
         return res.status(err.statusCode).json({
             status: err.status,
             error: err,
@@ -60,7 +62,9 @@ const sendErrorDev = (err, req, res) => {
 
 const sendErrorProd = (err, req, res) => {
 
-    if (req.originalUrl.startsWith('/api')) {
+    const isApiRequest = typeof req.originalUrl === 'string' && req.originalUrl.startsWith('/api');
+
+    if (isApiRequest) {
         // Operational, trusted error: send message to client
         if (err.isOperational) {
             return res.status(err.statusCode).json({
