@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server.js";
-import { getBackendBaseUrl } from "../../../../lib/backend.js";
+
+const DEFAULT_BACKEND_BASE = (
+  process.env.AUTH_BACKEND_URL || "http://localhost:5000"
+).replace(/\/$/, "");
 
 const DEFAULT_CONFIG = {
   auth: undefined,
-  backendBase: getBackendBaseUrl(),
+  backendBase: DEFAULT_BACKEND_BASE,
   fetch: (...args) => fetch(...args),
 };
 
