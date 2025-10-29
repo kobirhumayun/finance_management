@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { currencySymbol } from "@/lib/formatters";
 import {
   ArrowRight,
   BarChart4,
@@ -191,7 +192,7 @@ export default function HomePage() {
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Faster reporting cycles</p>
                 </div>
                 <div className="rounded-2xl border border-border/40 bg-background/70 p-4 shadow-sm">
-                  <p className="text-2xl font-semibold">$3.1M</p>
+                  <p className="text-2xl font-semibold">{currencySymbol}3.1M</p>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Spend governed across projects</p>
                 </div>
                 <div className="rounded-2xl border border-border/40 bg-background/70 p-4 shadow-sm">
