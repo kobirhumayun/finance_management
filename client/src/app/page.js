@@ -109,31 +109,6 @@ export default function HomePage() {
     },
   ];
 
-  const planTiers = [
-    {
-      name: "Starter",
-      price: "$0",
-      cadence: "for 14 days",
-      description: "Pilot FinTrack with essential dashboards, exports, and live chat guidance.",
-      perks: ["1 workspace admin", "Core dashboards and summaries", "Email + live chat support"],
-    },
-    {
-      name: "Growth",
-      price: "$79",
-      cadence: "per month",
-      description: "Upgrade reporting depth, automated exports, and collaboration controls for scaling teams.",
-      perks: ["Unlimited projects", "Scheduled PDF & Excel exports", "Role-based permissions"],
-      badge: "Most popular",
-    },
-    {
-      name: "Enterprise",
-      price: "Let’s chat",
-      cadence: "annual partnerships",
-      description: "Unlock SSO, sandbox environments, and a dedicated success pod for global operations.",
-      perks: ["Custom data residency", "Dedicated admin delegation", "24/5 finance-specialist hotline"],
-    },
-  ];
-
   const testimonials = [
     {
       name: "Priya Desai",
@@ -373,55 +348,6 @@ export default function HomePage() {
               Export any filtered report as a PDF for leadership reviews or Excel workbook for detailed modeling—no manual formatting
               required.
             </p>
-          </div>
-        </section>
-
-        <section id="pricing" className="space-y-10 rounded-3xl border border-border/40 bg-background/80 p-10 shadow-xl">
-          <div className="space-y-3 text-center">
-            <Badge variant="outline" className="border-primary/40 text-primary">
-              Subscription plans
-            </Badge>
-            <h2 className="text-3xl font-semibold">Choose the plan that unlocks the right finance stack</h2>
-            <p className="text-base text-muted-foreground">
-              Every subscription includes export-ready reporting and a responsive admin and support team. Upgrade tiers as your
-              portfolio grows without losing historical context.
-            </p>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-3">
-            {planTiers.map((plan) => (
-              <Card key={plan.name} className="flex h-full flex-col border-border/50 bg-background/90 shadow-lg">
-                <CardHeader className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">{plan.name}</span>
-                    {plan.badge ? (
-                      <Badge variant="secondary" className="bg-primary/15 text-primary">
-                        {plan.badge}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold">{plan.price}</span>
-                    <span className="text-sm text-muted-foreground">{plan.cadence}</span>
-                  </div>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col justify-between gap-6">
-                  <ul className="space-y-3 text-sm text-muted-foreground">
-                    {plan.perks.map((perk) => (
-                      <li key={perk} className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                        <span>{perk}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button asChild size="lg" className="w-full">
-                    <Link href={plan.name === "Enterprise" ? "/contact" : "/register"}>
-                      {plan.name === "Enterprise" ? "Talk to sales" : `Start ${plan.name}`}
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         </section>
 
