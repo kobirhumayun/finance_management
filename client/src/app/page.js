@@ -47,6 +47,12 @@ export default function HomePage() {
         "Track plan perks, renewal dates, trial periods, and usage caps from a dedicated My Plan hub.",
       icon: Receipt,
     },
+    {
+      title: "One-click report exports",
+      description:
+        "Send polished PDFs to leadership or dive deeper in Excel with every filter and grouping intact.",
+      icon: FileDown,
+    },
   ];
 
   const workflow = [
@@ -63,12 +69,12 @@ export default function HomePage() {
     {
       title: "Share confident updates",
       description:
-        "Build narratives around real data with charts, tables, and upcoming export options that keep stakeholders aligned.",
+        "Build narratives around real data with charts, tables, and one-click exports that keep stakeholders aligned.",
     },
   ];
 
-  const upcomingExports = {
-    title: "Report exports (coming soon)",
+  const exportFeature = {
+    title: "Report exports",
     description:
       "Download presentation-ready PDFs or spreadsheet-friendly Excel files from any report view without leaving FinTrack.",
     details: [
@@ -89,11 +95,11 @@ export default function HomePage() {
               Finance leadership, evolved
             </span>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              See every project, report, and renewal before you ever log in.
+              See every project, report, export, and renewal before you ever log in.
             </h1>
             <p className="text-lg text-muted-foreground">
-              FinTrack brings project budgets, transactions, analytics, and subscription insights into one
-              connected workspace so revenue, operations, and delivery stay in lockstep.
+              FinTrack brings project budgets, transactions, analytics, subscription insights, and export-ready reports into
+              one connected workspace so revenue, operations, and delivery stay in lockstep.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
@@ -188,25 +194,22 @@ export default function HomePage() {
             <CardContent className="space-y-5 p-8">
               <div className="flex items-center gap-3 text-primary">
                 <FileDown className="h-5 w-5" />
-                <span className="text-sm font-semibold uppercase tracking-wide">{upcomingExports.title}</span>
+                <span className="text-sm font-semibold uppercase tracking-wide">{exportFeature.title}</span>
               </div>
-              <p className="text-base text-muted-foreground">{upcomingExports.description}</p>
+              <p className="text-base text-muted-foreground">{exportFeature.description}</p>
               <ul className="space-y-3 text-sm text-muted-foreground">
-                {upcomingExports.details.map((detail) => (
+                {exportFeature.details.map((detail) => (
                   <li key={detail} className="flex items-start gap-3">
                     <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
                     {detail}
                   </li>
                 ))}
               </ul>
-              <p className="text-xs uppercase tracking-wide text-primary/80">
-                Join the waitlist at signup to be the first to access exports.
-              </p>
             </CardContent>
           </Card>
           <div className="order-1 space-y-5 text-center lg:order-2 lg:text-left">
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              Upcoming capability
+              Available now
             </span>
             <h2 className="text-3xl font-semibold">Deliver polished updates in minutes</h2>
             <p className="text-base text-muted-foreground">
@@ -220,7 +223,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-semibold">Ready to unite finance and delivery?</h2>
           <p className="mx-auto max-w-2xl text-base text-muted-foreground">
             Launch FinTrack today and give every stakeholder a shared source of truth for projects, transactions,
-            analytics, and billing—plus early access to one-click report exports.
+            analytics, billing, and one-click report exports.
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button asChild size="lg">
