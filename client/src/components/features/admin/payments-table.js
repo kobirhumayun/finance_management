@@ -107,16 +107,31 @@ export default function PaymentsTable({
               return `Reviewed ${pieces.join(" • ")}`;
             })();
 
+            const referenceDetails = Array.isArray(payment.referenceDetails)
+              ? payment.referenceDetails
+              : [];
+            const [primaryReference, ...otherReferences] = referenceDetails;
+
             return (
               <TableRow key={payment.id}>
                 <TableCell>
-                  <div className="font-medium">{payment.reference}</div>
-                  {payment.paymentId && payment.paymentId !== payment.reference ? (
-                    <div className="text-xs text-muted-foreground">{payment.paymentId}</div>
-                  ) : null}
-                  {payment.orderId ? (
-                    <div className="text-xs text-muted-foreground">Order: {payment.orderId}</div>
-                  ) : null}
+                  <div className="space-y-1">
+                    {primaryReference ? (
+                      <div className="font-medium">
+                        {primaryReference.label}: {primaryReference.value}
+                      </div>
+                    ) : (
+                      <div className="font-medium">{payment.reference || "—"}</div>
+                    )}
+                    {otherReferences.map((detail) => (
+                      <div
+                        key={`${detail.type}-${detail.value}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {detail.label}: {detail.value}
+                      </div>
+                    ))}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="font-medium">{payment.userName || "Unknown user"}</div>

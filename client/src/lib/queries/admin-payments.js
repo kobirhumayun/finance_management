@@ -37,6 +37,19 @@ const toNumber = (value) => {
   return null;
 };
 
+const toDisplayString = (value) => {
+  if (value == null) return null;
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value instanceof Date) return value.toISOString();
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
 const extractDate = (value) => {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -122,6 +135,30 @@ export const normalizeAdminPayment = (payment) => {
 
   const reviewComment = typeof payment.reviewComment === "string" ? payment.reviewComment.trim() || null : null;
 
+  const gatewayTransactionId = toDisplayString(payment.gatewayTransactionId);
+  const orderId =
+    extractId(payment.order) ?? (typeof payment.order === "string" ? payment.order : null);
+
+  const referenceDetails = [];
+  const addReferenceDetail = (type, label, rawValue) => {
+    const value = toDisplayString(rawValue);
+    if (!value) return;
+    if (referenceDetails.some((detail) => detail.value === value)) return;
+    referenceDetails.push({ type, label, value });
+  };
+
+  addReferenceDetail("gateway", "Gateway", gatewayTransactionId);
+  addReferenceDetail("payment", "Payment", id);
+  addReferenceDetail("order", "Order", orderId);
+
+  if (!referenceDetails.length) {
+    addReferenceDetail("reference", "Reference", payment.reference ?? id);
+  }
+
+  const reference = referenceDetails.length
+    ? `${referenceDetails[0].label}: ${referenceDetails[0].value}`
+    : toDisplayString(payment.reference) ?? id;
+
   const reviewerCandidate =
     payment.reviewedBy?.data ??
     payment.reviewedBy ??
@@ -157,8 +194,9 @@ export const normalizeAdminPayment = (payment) => {
   return {
     id,
     paymentId: id,
-    reference: payment.gatewayTransactionId || payment.reference || id,
-    gatewayTransactionId: payment.gatewayTransactionId ?? null,
+    reference,
+    referenceDetails,
+    gatewayTransactionId,
     userId,
     userName: payment.userId?.username ?? payment.userId?.name ?? null,
     userEmail: payment.userId?.email ?? null,
@@ -175,7 +213,7 @@ export const normalizeAdminPayment = (payment) => {
     paymentGateway: payment.paymentGateway ?? null,
     paymentMethodDetails: payment.paymentMethodDetails ?? null,
     purpose: payment.purpose ?? null,
-    orderId: extractId(payment.order) ?? (typeof payment.order === "string" ? payment.order : null),
+    orderId,
     submittedAt,
     processedAt: extractDate(payment.processedAt),
     updatedAt,
