@@ -6,7 +6,7 @@ const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Invoice = require('../models/Invoice');
-const { addPlan, updatePlan, activatedPlan, manualPaymentSubmit } = require('../controllers/planController');
+const { addPlan, updatePlan, activatedPlan, manualPaymentSubmit, rejectManualPayment } = require('../controllers/planController');
 
 const BILLING_CYCLES = Plan.schema.path('billingCycle').enumValues;
 
@@ -175,6 +175,28 @@ describe('planController activatedPlan authorization', () => {
         assert.equal(res.statusCode, 200, 'Expected activation to succeed for authorized payment.');
         assert.equal(paymentDoc.status, 'succeeded', 'Payment status should be updated to succeeded.');
         assert.equal(orderDoc.status, 'active', 'Order status should be set to active.');
+    });
+
+    test('blocks activation when payment has already been reviewed', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: validUserId, role: 'user' },
+            body: { newPlanId: validPlanId, paymentId: validPaymentId },
+        };
+
+        const paymentDoc = {
+            _id: validPaymentId,
+            status: 'rejected',
+            userId: { toString: () => validUserId },
+            planId: { toString: () => validPlanId },
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await activatedPlan(req, res);
+
+        assert.equal(res.statusCode, 409, 'Activation should fail when payment status is not pending.');
+        assert.equal(res.jsonPayload?.message, 'Only pending payments can be approved.');
     });
 
     test('sets invoice subscriptionEndDate to null for lifetime plans', async () => {
@@ -633,6 +655,75 @@ describe('planController activatedPlan authorization', () => {
 
         assert.equal(res.statusCode, 403, 'Expected forbidden response when payment is for a different user even for admin.');
         assert.equal(res.jsonPayload?.message, 'This payment is not eligible for this user.');
+    });
+});
+
+describe('planController rejectManualPayment', () => {
+    const adminUserId = '507f1f77bcf86cd799439111';
+    const appliedUserId = '507f1f77bcf86cd799439112';
+    const paymentId = '507f1f77bcf86cd799439113';
+    const orderId = '507f1f77bcf86cd799439114';
+
+    afterEach(() => {
+        Payment.findById = originalPaymentFindById;
+        Order.findById = originalOrderFindById;
+    });
+
+    test('rejects a pending manual payment and records review metadata', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: adminUserId, role: 'admin' },
+            body: { paymentId, appliedUserId, comment: ' Needs clarification ' },
+        };
+
+        const paymentDoc = {
+            _id: paymentId,
+            status: 'pending',
+            userId: { toString: () => appliedUserId },
+            order: orderId,
+            save: async function savePayment() { return this; },
+        };
+
+        const orderDoc = {
+            _id: orderId,
+            status: 'pending',
+            user: { toString: () => appliedUserId },
+            save: async function saveOrder() { return this; },
+        };
+
+        Payment.findById = async () => paymentDoc;
+        Order.findById = async () => orderDoc;
+
+        await rejectManualPayment(req, res);
+
+        assert.equal(res.statusCode, 200, 'Expected rejection to succeed for pending payment.');
+        assert.equal(paymentDoc.status, 'rejected', 'Payment status should be updated to rejected.');
+        assert.equal(paymentDoc.reviewComment, 'Needs clarification', 'Review comment should be trimmed.');
+        assert.equal(paymentDoc.reviewedBy, adminUserId, 'Reviewer should be recorded.');
+        assert.ok(paymentDoc.reviewedAt instanceof Date, 'Review timestamp should be set.');
+        assert.equal(orderDoc.status, 'cancelled', 'Order should be cancelled on rejection.');
+    });
+
+    test('prevents rejecting a payment that is already reviewed', async () => {
+        const res = createResponseDouble();
+        const req = {
+            user: { _id: adminUserId, role: 'admin' },
+            body: { paymentId, appliedUserId, comment: 'duplicate review' },
+        };
+
+        const paymentDoc = {
+            _id: paymentId,
+            status: 'rejected',
+            userId: { toString: () => appliedUserId },
+            order: orderId,
+        };
+
+        Payment.findById = async () => paymentDoc;
+
+        await rejectManualPayment(req, res);
+
+        assert.equal(res.statusCode, 409, 'Expected rejection to fail for non-pending payment.');
+        assert.equal(res.jsonPayload?.message, 'Only pending payments can be reviewed.');
     });
 });
 

@@ -8,6 +8,7 @@ const { paymentValidationRules,
     updatePlanValidationRules,
     planValidationSlugOnlyRules,
     changePlanValidationRules,
+    rejectPaymentValidationRules,
     handleValidationErrors } = require('../validators/validatorsIndex');
 
 // Optional: Add rate limiting middleware
@@ -69,6 +70,13 @@ router.post('/manual-payment',
     handleValidationErrors,
     authenticate,
     planController.manualPaymentSubmit);
+
+router.post('/reject-payment',
+    rejectPaymentValidationRules(),
+    handleValidationErrors,
+    authenticate,
+    authorize("admin"),
+    planController.rejectManualPayment);
 
 // Get payments by status route
 router.get('/payment',

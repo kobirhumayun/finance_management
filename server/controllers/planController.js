@@ -310,6 +310,10 @@ const activatedPlan = async (req, res) => {
             return res.status(404).json({ message: `Payment record with ID '${paymentId}' not found.` });
         }
 
+        if (payment.status !== 'pending') {
+            return res.status(409).json({ message: 'Only pending payments can be approved.' });
+        }
+
         if (!payment.userId) {
             console.warn('[planController] Payment is missing an associated user.', { paymentId });
             return res.status(404).json({ message: 'Payment is missing associated user information.' });
@@ -445,6 +449,10 @@ const activatedPlan = async (req, res) => {
         payment.status = 'succeeded';
         payment.planId = newPlan._id;
         payment.processedAt = payment.processedAt || new Date();
+
+        payment.reviewComment = null;
+        payment.reviewedBy = null;
+        payment.reviewedAt = null;
 
         const savedInvoice = await invoice.save();
 
@@ -624,6 +632,91 @@ const manualPaymentSubmit = async (req, res) => {
 };
 
 
+const rejectManualPayment = async (req, res) => {
+    const { paymentId, appliedUserId, comment } = req.body;
+    const reviewerId = req.user?._id;
+
+    if (!reviewerId) {
+        return res.status(401).json({ message: 'Authentication error: Reviewer not identified.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId) || !mongoose.Types.ObjectId.isValid(appliedUserId)) {
+        return res.status(400).json({ message: 'Invalid identifier provided.' });
+    }
+
+    try {
+        const payment = await Payment.findById(paymentId);
+
+        if (!payment) {
+            return res.status(404).json({ message: `Payment record with ID '${paymentId}' not found.` });
+        }
+
+        if (!payment.userId) {
+            return res.status(404).json({ message: 'Payment is missing associated user information.' });
+        }
+
+        if (payment.userId.toString() !== appliedUserId.toString()) {
+            return res.status(403).json({ message: 'This payment is not associated with the specified user.' });
+        }
+
+        if (!payment.order) {
+            return res.status(404).json({ message: 'No order is associated with this payment.' });
+        }
+
+        if (payment.status !== 'pending') {
+            return res.status(409).json({ message: 'Only pending payments can be reviewed.' });
+        }
+
+        const order = await Order.findById(payment.order);
+
+        if (!order) {
+            return res.status(404).json({ message: 'Associated order not found.' });
+        }
+
+        if (order.user?.toString?.() !== appliedUserId.toString()) {
+            return res.status(403).json({ message: 'Order does not belong to the specified user.' });
+        }
+
+        const trimmedComment = typeof comment === 'string' ? comment.trim() : '';
+
+        payment.status = 'rejected';
+        payment.reviewComment = trimmedComment ? trimmedComment : null;
+        payment.reviewedBy = reviewerId;
+        payment.reviewedAt = new Date();
+
+        order.status = 'cancelled';
+
+        await Promise.all([
+            payment.save(),
+            order.save(),
+        ]);
+
+        return res.status(200).json({
+            message: 'Payment rejected successfully.',
+            payment: {
+                id: payment._id,
+                status: payment.status,
+                reviewComment: payment.reviewComment,
+                reviewedBy: payment.reviewedBy,
+                reviewedAt: payment.reviewedAt,
+            },
+            order: {
+                id: order._id,
+                status: order.status,
+            },
+        });
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ message: 'Validation failed during payment rejection.', errors: messages });
+        }
+
+        console.error('Error rejecting manual payment:', error);
+        return res.status(500).json({ message: 'Server error while rejecting manual payment.' });
+    }
+};
+
+
 /**
  * @desc   Get payment records based on status
  * @route  GET /api/payments?status=<status_value>&page=<page_number>&limit=<limit_value>
@@ -676,6 +769,7 @@ const getPaymentsByStatus = async (req, res) => {
             .limit(limit)
             .populate('userId', 'email username firstName lastName') // Example: Populate user email/name
             .populate('planId', 'name slug') // Example: Populate plan name/slug
+            .populate('reviewedBy', 'email username firstName lastName')
             .exec(); // Execute the query
 
         // Get total count for pagination metadata
@@ -864,6 +958,7 @@ module.exports = {
     getSubscriptionDetails,
     getPlans,
     getPaymentsByStatus,
+    rejectManualPayment,
     manualPaymentSubmit,
     placeOrder,
     __test__: {

@@ -1,4 +1,4 @@
-const {
+const { 
     isNotEmptyString,
     isSlugField,
     isStringField,
@@ -57,9 +57,18 @@ const changePlanValidationRules = () => {
     ];
 };
 
+const rejectPaymentValidationRules = () => {
+    return [
+        isMongoIdField('paymentId'),
+        isMongoIdField('appliedUserId'),
+        isLength('comment', { max: 500 }).optional({ checkFalsy: true }),
+    ];
+};
+
 module.exports = {
     planValidationRules,
     updatePlanValidationRules,
     planValidationSlugOnlyRules,
     changePlanValidationRules,
+    rejectPaymentValidationRules,
 };

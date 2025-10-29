@@ -57,6 +57,7 @@ module.exports = {
     updatePlanValidationRules: planValidators.updatePlanValidationRules,
     planValidationSlugOnlyRules: planValidators.planValidationSlugOnlyRules,
     changePlanValidationRules: planValidators.changePlanValidationRules,
+    rejectPaymentValidationRules: planValidators.rejectPaymentValidationRules,
     projectCreateValidationRules: projectValidators.projectCreateValidationRules,
     projectUpdateValidationRules: projectValidators.projectUpdateValidationRules,
     projectIdParamValidationRules: projectValidators.projectIdParamValidationRules,
