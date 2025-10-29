@@ -392,10 +392,18 @@ export default function AdminPaymentsPage() {
       </Card>
       {showPaginationSummary ? (
         <p className="text-sm text-muted-foreground">
-          Showing {formatNumber(payments.length, { fallback: "0" })}{" "}
+          Showing
+          {" "}
+          {formatNumber(payments.length, {
+            fallback: "0",
+            minimumFractionDigits: 0,
+          })}{" "}
           {filters.status ? `${formatStatusLabel(filters.status).toLowerCase()} ` : ""}payments
           {typeof pagination.totalItems === "number"
-            ? ` (of ${formatNumber(pagination.totalItems, { fallback: "0" })})`
+            ? ` (of ${formatNumber(pagination.totalItems, {
+                fallback: "0",
+                minimumFractionDigits: 0,
+              })})`
             : ""}
           .
         </p>
