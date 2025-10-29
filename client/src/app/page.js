@@ -88,14 +88,22 @@ export default function HomePage() {
     <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main className="mx-auto flex max-w-6xl flex-col gap-24 px-4 py-20 sm:px-6 lg:py-24">
-        <section className="grid items-center gap-16 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="relative grid items-center gap-16 overflow-hidden rounded-[3rem] border border-border/60 bg-gradient-to-br from-background via-background to-muted/40 p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-12">
+          <div
+            className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -bottom-32 -right-12 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
+            aria-hidden
+          />
           <div className="space-y-7">
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <span className="h-2 w-2 rounded-full bg-primary" aria-hidden />
               Finance leadership, evolved
             </span>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              See every project, report, export, and renewal before you ever log in.
+              Translate every transaction into proactive financial strategy.
             </h1>
             <p className="text-lg text-muted-foreground">
               FinTrack brings project budgets, transactions, analytics, subscription insights, and export-ready reports into
