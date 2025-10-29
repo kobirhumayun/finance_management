@@ -723,6 +723,8 @@ const rejectManualPayment = async (req, res) => {
  * @access Private (Adjust access control as needed, e.g., Admin only)
  * @query  status (optional), userId (optional), planId (optional), order (optional), gatewayTransactionId (optional), page (optional, default 1), limit (optional, default 10)
  */
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const getPaymentsByStatus = async (req, res) => {
     const { status, userId, planId, order, gatewayTransactionId } = req.query;
     const page = parseInt(req.query.page, 10) || 1; // Default to page 1
@@ -758,6 +760,46 @@ const getPaymentsByStatus = async (req, res) => {
 
     if (gatewayTransactionId) {
         filters.gatewayTransactionId = gatewayTransactionId;
+    }
+
+    const searchRaw = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    let searchRegex;
+    if (searchRaw) {
+        searchRegex = new RegExp(escapeRegex(searchRaw), 'i');
+
+        try {
+            const [matchingUsers, matchingOrders] = await Promise.all([
+                User.find({
+                    $or: [
+                        { username: searchRegex },
+                        { email: searchRegex },
+                    ],
+                })
+                    .select('_id')
+                    .lean(),
+                Order.find({ orderID: searchRegex })
+                    .select('_id')
+                    .lean(),
+            ]);
+
+            const userIds = matchingUsers.map(user => user._id);
+            const orderIds = matchingOrders.map(orderDoc => orderDoc._id);
+
+            const orConditions = [{ gatewayTransactionId: searchRegex }];
+
+            if (userIds.length) {
+                orConditions.push({ userId: { $in: userIds } });
+            }
+
+            if (orderIds.length) {
+                orConditions.push({ order: { $in: orderIds } });
+            }
+
+            filters.$or = orConditions;
+        } catch (lookupError) {
+            console.error('Error applying payment search filters:', lookupError);
+            return res.status(500).json({ message: 'Server error while applying search filters.' });
+        }
     }
 
     // --- Query Database ---

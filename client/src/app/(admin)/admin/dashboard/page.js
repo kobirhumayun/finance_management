@@ -378,20 +378,74 @@ export default function AdminDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{payment.reference}</TableCell>
-                    <TableCell>
-                      <div className="font-medium">{payment.userName || "Unknown user"}</div>
-                      {payment.userEmail ? (
-                        <div className="text-xs text-muted-foreground">{payment.userEmail}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
-                    <TableCell>{payment.statusLabel || formatStatus(payment.status, "Unknown")}</TableCell>
-                    <TableCell>{formatDateTime(payment.submittedAt)}</TableCell>
-                  </TableRow>
-                ))}
+                {recentPayments.map((payment) => {
+                  const statusLabel = payment.statusLabel || formatStatus(payment.status, "Unknown");
+                  const reviewComment =
+                    typeof payment.reviewComment === "string" ? payment.reviewComment.trim() : "";
+                  const hasReviewComment = Boolean(reviewComment);
+                  const reviewMeta = (() => {
+                    const pieces = [];
+                    if (payment.reviewerLabel) {
+                      pieces.push(`by ${payment.reviewerLabel}`);
+                    }
+                    if (payment.reviewedAt) {
+                      const reviewedLabel = payment.reviewerLabel
+                        ? formatDateTime(payment.reviewedAt)
+                        : `on ${formatDateTime(payment.reviewedAt)}`;
+                      pieces.push(reviewedLabel);
+                    }
+                    if (pieces.length === 0) return null;
+                    return `Reviewed ${pieces.join(" • ")}`;
+                  })();
+
+                  const referenceDetails = Array.isArray(payment.referenceDetails)
+                    ? payment.referenceDetails
+                    : [];
+                  const [primaryReference, ...otherReferences] = referenceDetails;
+
+                  return (
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {primaryReference ? (
+                            <div className="font-medium">
+                              {primaryReference.label}: {primaryReference.value}
+                            </div>
+                          ) : (
+                            <div className="font-medium">{payment.reference || "—"}</div>
+                          )}
+                          {otherReferences.map((detail) => (
+                            <div
+                              key={`${detail.type}-${detail.value}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              {detail.label}: {detail.value}
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{payment.userName || "Unknown user"}</div>
+                        {payment.userEmail ? (
+                          <div className="text-xs text-muted-foreground">{payment.userEmail}</div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <span>{statusLabel}</span>
+                          {hasReviewComment ? (
+                            <p className="text-xs text-muted-foreground break-words">&ldquo;{reviewComment}&rdquo;</p>
+                          ) : null}
+                          {reviewMeta ? (
+                            <p className="text-xs text-muted-foreground">{reviewMeta}</p>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>{formatDateTime(payment.submittedAt)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

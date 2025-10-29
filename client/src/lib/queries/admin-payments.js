@@ -4,6 +4,7 @@ import { qk } from "@/lib/query-keys";
 
 const PAYMENT_ENDPOINT = "/api/plans/payment";
 const APPROVE_ENDPOINT = "/api/plans/approve-plan";
+const REJECT_ENDPOINT = "/api/plans/reject-payment";
 
 const ensureArray = (value) => {
   if (!value) return [];
@@ -34,6 +35,19 @@ const toNumber = (value) => {
     if (value.$numberLong != null) return toNumber(value.$numberLong);
   }
   return null;
+};
+
+const toDisplayString = (value) => {
+  if (value == null) return null;
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value instanceof Date) return value.toISOString();
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 };
 
 const extractDate = (value) => {
@@ -82,6 +96,24 @@ const sanitizeFilters = (filters = {}) => {
       result.status = trimmed;
     }
   }
+  if (filters.page != null) {
+    const page = Number(filters.page);
+    if (Number.isFinite(page) && page > 0) {
+      result.page = page;
+    }
+  }
+  if (filters.limit != null) {
+    const limit = Number(filters.limit);
+    if (Number.isFinite(limit) && limit > 0) {
+      result.limit = limit;
+    }
+  }
+  if (typeof filters.search === "string") {
+    const trimmedSearch = filters.search.trim();
+    if (trimmedSearch) {
+      result.search = trimmedSearch;
+    }
+  }
   return result;
 };
 
@@ -117,12 +149,72 @@ export const normalizeAdminPayment = (payment) => {
 
   const submittedAt = extractDate(payment.createdAt) ?? extractDate(payment.processedAt);
   const updatedAt = extractDate(payment.updatedAt);
+  const reviewedAt = extractDate(payment.reviewedAt);
+
+  const reviewComment = typeof payment.reviewComment === "string" ? payment.reviewComment.trim() || null : null;
+
+  const gatewayTransactionId = toDisplayString(payment.gatewayTransactionId);
+  const orderId =
+    extractId(payment.order) ?? (typeof payment.order === "string" ? payment.order : null);
+
+  const referenceDetails = [];
+  const addReferenceDetail = (type, label, rawValue) => {
+    const value = toDisplayString(rawValue);
+    if (!value) return;
+    if (referenceDetails.some((detail) => detail.value === value)) return;
+    referenceDetails.push({ type, label, value });
+  };
+
+  addReferenceDetail("gateway", "Gateway", gatewayTransactionId);
+  addReferenceDetail("payment", "Payment", id);
+  addReferenceDetail("order", "Order", orderId);
+
+  if (!referenceDetails.length) {
+    addReferenceDetail("reference", "Reference", payment.reference ?? id);
+  }
+
+  const reference = referenceDetails.length
+    ? `${referenceDetails[0].label}: ${referenceDetails[0].value}`
+    : toDisplayString(payment.reference) ?? id;
+
+  const reviewerCandidate =
+    payment.reviewedBy?.data ??
+    payment.reviewedBy ??
+    payment.reviewer ??
+    payment.review ??
+    null;
+
+  const reviewerId = extractId(reviewerCandidate);
+
+  const reviewerNameCandidates = [];
+  if (reviewerCandidate) {
+    if (typeof reviewerCandidate.username === "string") reviewerNameCandidates.push(reviewerCandidate.username);
+    const fullName = [reviewerCandidate.firstName, reviewerCandidate.lastName]
+      .map((part) => (typeof part === "string" ? part.trim() : ""))
+      .filter(Boolean)
+      .join(" ");
+    if (fullName) reviewerNameCandidates.push(fullName);
+    if (typeof reviewerCandidate.name === "string") reviewerNameCandidates.push(reviewerCandidate.name);
+    if (typeof reviewerCandidate.displayName === "string") reviewerNameCandidates.push(reviewerCandidate.displayName);
+  }
+  const reviewerName = reviewerNameCandidates.find((candidate) => typeof candidate === "string" && candidate.trim()) || null;
+  const reviewerEmail =
+    typeof reviewerCandidate?.email === "string" && reviewerCandidate.email.trim()
+      ? reviewerCandidate.email.trim()
+      : null;
+  const reviewerLabel = (() => {
+    if (reviewerName && reviewerEmail) return `${reviewerName} (${reviewerEmail})`;
+    if (reviewerName) return reviewerName;
+    if (reviewerEmail) return reviewerEmail;
+    return null;
+  })();
 
   return {
     id,
     paymentId: id,
-    reference: payment.gatewayTransactionId || payment.reference || id,
-    gatewayTransactionId: payment.gatewayTransactionId ?? null,
+    reference,
+    referenceDetails,
+    gatewayTransactionId,
     userId,
     userName: payment.userId?.username ?? payment.userId?.name ?? null,
     userEmail: payment.userId?.email ?? null,
@@ -135,21 +227,32 @@ export const normalizeAdminPayment = (payment) => {
     status,
     statusLabel,
     canApprove: status === "pending",
+    canReject: status === "pending",
     paymentGateway: payment.paymentGateway ?? null,
     paymentMethodDetails: payment.paymentMethodDetails ?? null,
     purpose: payment.purpose ?? null,
-    orderId: extractId(payment.order) ?? (typeof payment.order === "string" ? payment.order : null),
+    orderId,
     submittedAt,
     processedAt: extractDate(payment.processedAt),
     updatedAt,
+    reviewComment,
+    reviewedAt,
+    reviewerId,
+    reviewerName,
+    reviewerEmail,
+    reviewerLabel,
+    reviewer: reviewerCandidate ?? null,
     raw: payment,
   };
 };
 
 export const adminPaymentsOptions = (filters = {}) => {
   const sanitized = sanitizeFilters(filters);
+  const { page: _page, ...queryKeyFiltersSource } = sanitized;
+  const queryKeyFilters = Object.keys(queryKeyFiltersSource).length
+    ? queryKeyFiltersSource
+    : { status: sanitized.status ?? "all" };
   const query = buildQueryString(sanitized);
-  const queryKeyFilters = Object.keys(sanitized).length > 0 ? sanitized : { status: sanitized.status ?? "all" };
 
   return {
     queryKey: qk.admin.payments(queryKeyFilters),
@@ -183,6 +286,84 @@ export const adminPaymentsOptions = (filters = {}) => {
   };
 };
 
+export const adminPaymentsInfiniteOptions = (filters = {}) => {
+  const sanitized = sanitizeFilters(filters);
+  const { page: initialPage = 1, ...queryKeyFiltersSource } = sanitized;
+  const queryKeyFilters = Object.keys(queryKeyFiltersSource).length
+    ? queryKeyFiltersSource
+    : { status: sanitized.status ?? "all" };
+
+  return {
+    queryKey: qk.admin.payments(queryKeyFilters),
+    initialPageParam: initialPage,
+    queryFn: async ({ pageParam = initialPage, signal }) => {
+      const pageNumber = Number(pageParam) || initialPage || 1;
+      const queryFilters = { ...sanitized, page: pageNumber };
+      const query = buildQueryString(queryFilters);
+      const response = await apiJSON(`${PAYMENT_ENDPOINT}${query}`, { signal });
+      const rawItems = ensureArray(response?.data ?? response);
+      const items = rawItems.map(normalizeAdminPayment).filter(Boolean);
+      const pagination = normalizePagination(response?.pagination);
+      const statusSet = new Set();
+      items.forEach((item) => {
+        if (item?.status) statusSet.add(item.status);
+      });
+      if (Array.isArray(response?.availableStatuses)) {
+        response.availableStatuses.forEach((item) => {
+          if (typeof item === "string" && item.trim()) {
+            statusSet.add(item.trim().toLowerCase());
+          }
+        });
+      }
+      if (sanitized.status) {
+        statusSet.add(sanitized.status);
+      }
+
+      return {
+        items,
+        pagination,
+        availableStatuses: Array.from(statusSet),
+        raw: response,
+        pageParam: pageNumber,
+      };
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || typeof lastPage !== "object") return undefined;
+      const pagination = lastPage.pagination;
+      if (!pagination || typeof pagination !== "object") return undefined;
+      const currentPage = Number(pagination.currentPage);
+      const totalPages = Number(pagination.totalPages);
+      if (Number.isFinite(currentPage) && Number.isFinite(totalPages)) {
+        if (currentPage < totalPages) {
+          return currentPage + 1;
+        }
+        return undefined;
+      }
+      const itemsPerPage = Number(pagination.itemsPerPage);
+      const totalItems = Number(pagination.totalItems);
+      const lastPageParam = Number(lastPage.pageParam);
+      if (Number.isFinite(totalPages) && Number.isFinite(lastPageParam)) {
+        if (lastPageParam < totalPages) {
+          return lastPageParam + 1;
+        }
+      }
+      if (
+        Number.isFinite(itemsPerPage) &&
+        Number.isFinite(totalItems) &&
+        itemsPerPage > 0 &&
+        Number.isFinite(lastPageParam)
+      ) {
+        const computedTotalPages = Math.ceil(totalItems / itemsPerPage);
+        if (lastPageParam < computedTotalPages) {
+          return lastPageParam + 1;
+        }
+      }
+      return undefined;
+    },
+    staleTime: 15_000,
+  };
+};
+
 export const approveAdminPayment = ({ appliedUserId, newPlanId, paymentId }) =>
   apiJSON(APPROVE_ENDPOINT, {
     method: "POST",
@@ -190,5 +371,15 @@ export const approveAdminPayment = ({ appliedUserId, newPlanId, paymentId }) =>
       appliedUserId,
       newPlanId,
       paymentId,
+    },
+  });
+
+export const rejectAdminPayment = ({ appliedUserId, paymentId, comment }) =>
+  apiJSON(REJECT_ENDPOINT, {
+    method: "POST",
+    body: {
+      appliedUserId,
+      paymentId,
+      comment,
     },
   });
