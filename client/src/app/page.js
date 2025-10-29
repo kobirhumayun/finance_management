@@ -179,7 +179,7 @@ export default function HomePage() {
                   </Link>
                 </Button>
                 <Button asChild size="lg" variant="outline" className="backdrop-blur">
-                  <Link href="/demo">Book a guided tour</Link>
+                  <Link href="/pricing">Compare plans</Link>
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
