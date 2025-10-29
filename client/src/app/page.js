@@ -51,6 +51,12 @@ export default function HomePage() {
       icon: Receipt,
     },
     {
+      title: "Dedicated admin + support",
+      description:
+        "Partner with finance-trained specialists who configure workspaces, govern access, and coach teams by plan tier.",
+      icon: CheckCircle2,
+    },
+    {
       title: "One-click report exports",
       description:
         "Send polished PDFs to leadership or dive deeper in Excel with every filter and grouping intact.",
@@ -94,11 +100,37 @@ export default function HomePage() {
     },
     {
       title: "Secure workspace controls",
-      description: "Role-based permissions ensure finance, operations, and delivery collaborate with confidence.",
+      description:
+        "Role-based permissions managed by FinTrack admins ensure finance, operations, and delivery collaborate with confidence.",
     },
     {
       title: "Audit-ready history",
       description: "Every adjustment is tracked so compliance reviews and investor questions are effortless.",
+    },
+  ];
+
+  const planTiers = [
+    {
+      name: "Starter",
+      price: "$0",
+      cadence: "for 14 days",
+      description: "Pilot FinTrack with essential dashboards, exports, and live chat guidance.",
+      perks: ["1 workspace admin", "Core dashboards and summaries", "Email + live chat support"],
+    },
+    {
+      name: "Growth",
+      price: "$79",
+      cadence: "per month",
+      description: "Upgrade reporting depth, automated exports, and collaboration controls for scaling teams.",
+      perks: ["Unlimited projects", "Scheduled PDF & Excel exports", "Role-based permissions"],
+      badge: "Most popular",
+    },
+    {
+      name: "Enterprise",
+      price: "Let’s chat",
+      cadence: "annual partnerships",
+      description: "Unlock SSO, sandbox environments, and a dedicated success pod for global operations.",
+      perks: ["Custom data residency", "Dedicated admin delegation", "24/5 finance-specialist hotline"],
     },
   ];
 
@@ -107,13 +139,13 @@ export default function HomePage() {
       name: "Priya Desai",
       role: "VP Finance, Northwind Logistics",
       quote:
-        "FinTrack cut our month-end consolidation time in half. The exports mirror our dashboards perfectly, so reviews are instant.",
+        "FinTrack cut our month-end consolidation time in half. Their support pod set up exports that mirror our dashboards, so reviews are instant.",
     },
     {
       name: "Miguel Alvarez",
       role: "Director of Operations, Lumen Studio",
       quote:
-        "Projects, forecasts, and billing finally live together. We spot variances before they spiral and share context in seconds.",
+        "Projects, forecasts, and billing finally live together. Our assigned admin keeps permissions tidy so variances never spiral and context is shared in seconds.",
     },
   ];
 
@@ -127,6 +159,11 @@ export default function HomePage() {
       question: "How quickly can my team get started?",
       answer:
         "Most customers launch in under a week using our CSV importers and guided onboarding with a dedicated success manager.",
+    },
+    {
+      question: "Which subscription plan should I choose?",
+      answer:
+        "Start with Starter for proof-of-concept, scale into Growth when you need scheduled exports and advanced permissions, or partner with us on Enterprise for custom controls and delegated admins.",
     },
     {
       question: "Do you integrate with my accounting stack?",
@@ -156,8 +193,9 @@ export default function HomePage() {
                 Translate every transaction into proactive financial strategy.
               </h1>
               <p className="max-w-xl text-lg text-muted-foreground">
-                FinTrack unifies project budgets, transaction histories, analytics, subscription oversight, and export-ready reports
-                so every stakeholder steers the business with clarity.
+                FinTrack pairs flexible subscription plans with hands-on admin and support specialists. Unify project budgets,
+                transaction histories, analytics, subscription oversight, and export-ready reports so every stakeholder steers the
+                business with clarity from day one.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg">
@@ -169,6 +207,9 @@ export default function HomePage() {
                   <Link href="/demo">Book a guided tour</Link>
                 </Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                All plans include concierge onboarding, admin delegation, and 24/5 finance-specialist support.
+              </p>
               <div className="grid gap-6 sm:grid-cols-3">
                 <div className="rounded-2xl border border-border/40 bg-background/70 p-4 shadow-sm">
                   <p className="text-2xl font-semibold">52%</p>
@@ -335,6 +376,55 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section id="pricing" className="space-y-10 rounded-3xl border border-border/40 bg-background/80 p-10 shadow-xl">
+          <div className="space-y-3 text-center">
+            <Badge variant="outline" className="border-primary/40 text-primary">
+              Subscription plans
+            </Badge>
+            <h2 className="text-3xl font-semibold">Choose the plan that unlocks the right finance stack</h2>
+            <p className="text-base text-muted-foreground">
+              Every subscription includes export-ready reporting and a responsive admin and support team. Upgrade tiers as your
+              portfolio grows without losing historical context.
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            {planTiers.map((plan) => (
+              <Card key={plan.name} className="flex h-full flex-col border-border/50 bg-background/90 shadow-lg">
+                <CardHeader className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">{plan.name}</span>
+                    {plan.badge ? (
+                      <Badge variant="secondary" className="bg-primary/15 text-primary">
+                        {plan.badge}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold">{plan.price}</span>
+                    <span className="text-sm text-muted-foreground">{plan.cadence}</span>
+                  </div>
+                  <CardDescription>{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between gap-6">
+                  <ul className="space-y-3 text-sm text-muted-foreground">
+                    {plan.perks.map((perk) => (
+                      <li key={perk} className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                        <span>{perk}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="lg" className="w-full">
+                    <Link href={plan.name === "Enterprise" ? "/contact" : "/register"}>
+                      {plan.name === "Enterprise" ? "Talk to sales" : `Start ${plan.name}`}
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
         <section className="grid gap-10 rounded-3xl border border-border/40 bg-background/80 p-10 shadow-2xl lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div className="space-y-8">
             <Badge variant="outline" className="border-primary/40 text-primary">
@@ -400,8 +490,8 @@ export default function HomePage() {
         <section className="space-y-8 rounded-3xl border border-primary/30 bg-primary/10 p-12 text-center shadow-lg">
           <h2 className="text-3xl font-semibold">Ready to unite finance and delivery?</h2>
           <p className="mx-auto max-w-2xl text-base text-muted-foreground">
-            Launch FinTrack today and give every stakeholder a shared source of truth for projects, transactions, analytics, billing,
-            and one-click report exports.
+            Choose the subscription tier that fits your operation and partner with our admin and support team to give every stakeholder
+            a shared source of truth for projects, transactions, analytics, billing, and one-click report exports.
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button asChild size="lg">
