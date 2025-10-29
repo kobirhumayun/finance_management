@@ -96,6 +96,18 @@ const sanitizeFilters = (filters = {}) => {
       result.status = trimmed;
     }
   }
+  if (filters.page != null) {
+    const page = Number(filters.page);
+    if (Number.isFinite(page) && page > 0) {
+      result.page = page;
+    }
+  }
+  if (filters.limit != null) {
+    const limit = Number(filters.limit);
+    if (Number.isFinite(limit) && limit > 0) {
+      result.limit = limit;
+    }
+  }
   return result;
 };
 
@@ -230,8 +242,11 @@ export const normalizeAdminPayment = (payment) => {
 
 export const adminPaymentsOptions = (filters = {}) => {
   const sanitized = sanitizeFilters(filters);
+  const { page: _page, ...queryKeyFiltersSource } = sanitized;
+  const queryKeyFilters = Object.keys(queryKeyFiltersSource).length
+    ? queryKeyFiltersSource
+    : { status: sanitized.status ?? "all" };
   const query = buildQueryString(sanitized);
-  const queryKeyFilters = Object.keys(sanitized).length > 0 ? sanitized : { status: sanitized.status ?? "all" };
 
   return {
     queryKey: qk.admin.payments(queryKeyFilters),
@@ -260,6 +275,84 @@ export const adminPaymentsOptions = (filters = {}) => {
         availableStatuses: Array.from(statusSet),
         raw: response,
       };
+    },
+    staleTime: 15_000,
+  };
+};
+
+export const adminPaymentsInfiniteOptions = (filters = {}) => {
+  const sanitized = sanitizeFilters(filters);
+  const { page: initialPage = 1, ...queryKeyFiltersSource } = sanitized;
+  const queryKeyFilters = Object.keys(queryKeyFiltersSource).length
+    ? queryKeyFiltersSource
+    : { status: sanitized.status ?? "all" };
+
+  return {
+    queryKey: qk.admin.payments(queryKeyFilters),
+    initialPageParam: initialPage,
+    queryFn: async ({ pageParam = initialPage, signal }) => {
+      const pageNumber = Number(pageParam) || initialPage || 1;
+      const queryFilters = { ...sanitized, page: pageNumber };
+      const query = buildQueryString(queryFilters);
+      const response = await apiJSON(`${PAYMENT_ENDPOINT}${query}`, { signal });
+      const rawItems = ensureArray(response?.data ?? response);
+      const items = rawItems.map(normalizeAdminPayment).filter(Boolean);
+      const pagination = normalizePagination(response?.pagination);
+      const statusSet = new Set();
+      items.forEach((item) => {
+        if (item?.status) statusSet.add(item.status);
+      });
+      if (Array.isArray(response?.availableStatuses)) {
+        response.availableStatuses.forEach((item) => {
+          if (typeof item === "string" && item.trim()) {
+            statusSet.add(item.trim().toLowerCase());
+          }
+        });
+      }
+      if (sanitized.status) {
+        statusSet.add(sanitized.status);
+      }
+
+      return {
+        items,
+        pagination,
+        availableStatuses: Array.from(statusSet),
+        raw: response,
+        pageParam: pageNumber,
+      };
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || typeof lastPage !== "object") return undefined;
+      const pagination = lastPage.pagination;
+      if (!pagination || typeof pagination !== "object") return undefined;
+      const currentPage = Number(pagination.currentPage);
+      const totalPages = Number(pagination.totalPages);
+      if (Number.isFinite(currentPage) && Number.isFinite(totalPages)) {
+        if (currentPage < totalPages) {
+          return currentPage + 1;
+        }
+        return undefined;
+      }
+      const itemsPerPage = Number(pagination.itemsPerPage);
+      const totalItems = Number(pagination.totalItems);
+      const lastPageParam = Number(lastPage.pageParam);
+      if (Number.isFinite(totalPages) && Number.isFinite(lastPageParam)) {
+        if (lastPageParam < totalPages) {
+          return lastPageParam + 1;
+        }
+      }
+      if (
+        Number.isFinite(itemsPerPage) &&
+        Number.isFinite(totalItems) &&
+        itemsPerPage > 0 &&
+        Number.isFinite(lastPageParam)
+      ) {
+        const computedTotalPages = Math.ceil(totalItems / itemsPerPage);
+        if (lastPageParam < computedTotalPages) {
+          return lastPageParam + 1;
+        }
+      }
+      return undefined;
     },
     staleTime: 15_000,
   };

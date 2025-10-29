@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
 import PaymentsTable from "@/components/features/admin/payments-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { qk } from "@/lib/query-keys";
 import { toast } from "@/components/ui/sonner";
-import { adminPaymentsOptions, approveAdminPayment, rejectAdminPayment } from "@/lib/queries/admin-payments";
+import {
+  adminPaymentsInfiniteOptions,
+  approveAdminPayment,
+  rejectAdminPayment,
+} from "@/lib/queries/admin-payments";
 import { formatNumber } from "@/lib/formatters";
 
 // Payments moderation view for administrators.
@@ -36,17 +40,54 @@ export default function AdminPaymentsPage() {
     return { status: statusFilter };
   }, [statusFilter]);
 
+  const PAGE_SIZE = 20;
+
+  const paginatedFilters = useMemo(() => ({ ...filters, limit: PAGE_SIZE }), [filters]);
+
   const {
-    data: paymentsData,
+    data: paymentsPages,
     isLoading,
     isError,
     error,
     isFetching,
-  } = useQuery(adminPaymentsOptions(filters));
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery(adminPaymentsInfiniteOptions(paginatedFilters));
 
-  const payments = useMemo(() => paymentsData?.items ?? [], [paymentsData]);
-  const pagination = paymentsData?.pagination ?? null;
-  const availableStatuses = useMemo(() => paymentsData?.availableStatuses ?? [], [paymentsData]);
+  const payments = useMemo(() => {
+    if (!paymentsPages?.pages?.length) return [];
+    return paymentsPages.pages.flatMap((page) =>
+      Array.isArray(page?.items) ? page.items : []
+    );
+  }, [paymentsPages]);
+
+  const pagination = useMemo(() => {
+    if (!paymentsPages?.pages?.length) return null;
+    const lastPage = paymentsPages.pages[paymentsPages.pages.length - 1];
+    return lastPage?.pagination ?? paymentsPages.pages[0]?.pagination ?? null;
+  }, [paymentsPages]);
+
+  const availableStatuses = useMemo(() => {
+    const statusSet = new Set();
+    paymentsPages?.pages?.forEach((page) => {
+      if (Array.isArray(page?.availableStatuses)) {
+        page.availableStatuses.forEach((status) => {
+          if (typeof status === "string" && status.trim()) {
+            statusSet.add(status.trim().toLowerCase());
+          }
+        });
+      }
+      if (Array.isArray(page?.items)) {
+        page.items.forEach((item) => {
+          if (item?.status) {
+            statusSet.add(item.status);
+          }
+        });
+      }
+    });
+    return Array.from(statusSet);
+  }, [paymentsPages]);
 
   const getErrorMessage = (err, fallback) => {
     if (!err) return fallback;
@@ -93,49 +134,93 @@ export default function AdminPaymentsPage() {
         activeFilters && typeof activeFilters.status === "string"
           ? activeFilters.status.trim().toLowerCase()
           : undefined;
-      const normalizedFilters = normalizedStatus && normalizedStatus !== "all"
-        ? { status: normalizedStatus }
-        : { status: "all" };
+      const normalizedFilters =
+        normalizedStatus && normalizedStatus !== "all"
+          ? { status: normalizedStatus, limit: PAGE_SIZE }
+          : { limit: PAGE_SIZE };
       const key = qk.admin.payments(normalizedFilters);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData(key);
       queryClient.setQueryData(key, (current) => {
         if (!current) return current;
+
+        const shouldFilterByStatus =
+          normalizedFilters.status && normalizedFilters.status !== "all";
+
+        const updateItems = (items = []) =>
+          items.map((item) =>
+            item.id === payment.id
+              ? { ...item, status: "approved", statusLabel: "Approved", canApprove: false }
+              : item
+          );
+
+        const filterItems = (items = []) =>
+          shouldFilterByStatus
+            ? items.filter((item) => item.status === normalizedFilters.status)
+            : items;
+
+        const mapStatuses = (items = []) => {
+          const statuses = new Set();
+          items.forEach((item) => {
+            if (item?.status) {
+              statuses.add(item.status);
+            }
+          });
+          return statuses;
+        };
+
+        if (Array.isArray(current.pages)) {
+          const updatedPages = current.pages.map((page) => {
+            if (!page) return page;
+            const mappedItems = updateItems(Array.isArray(page.items) ? page.items : []);
+            const filteredItems = filterItems(mappedItems);
+            const updatedStatuses = Array.isArray(page.availableStatuses)
+              ? new Set(
+                  page.availableStatuses.map((status) =>
+                    typeof status === "string" ? status.toLowerCase() : status
+                  )
+                )
+              : new Set();
+            mapStatuses(mappedItems).forEach((status) => updatedStatuses.add(status));
+            if (
+              shouldFilterByStatus &&
+              !filteredItems.some((item) => item.status === normalizedFilters.status)
+            ) {
+              updatedStatuses.delete(normalizedFilters.status);
+            }
+            return {
+              ...page,
+              items: filteredItems,
+              availableStatuses: Array.from(updatedStatuses),
+            };
+          });
+          return {
+            ...current,
+            pages: updatedPages,
+          };
+        }
+
         const items = Array.isArray(current.items) ? current.items : [];
-        const mappedItems = items.map((item) =>
-          item.id === payment.id
-            ? { ...item, status: "approved", statusLabel: "Approved", canApprove: false }
-            : item
-        );
-        const shouldFilterByStatus = normalizedFilters.status && normalizedFilters.status !== "all";
-        const filteredItems = shouldFilterByStatus
-          ? mappedItems.filter((item) => item.status === normalizedFilters.status)
-          : mappedItems;
+        const mappedItems = updateItems(items);
+        const filteredItems = filterItems(mappedItems);
         let updatedStatuses = Array.isArray(current.availableStatuses)
-          ? new Set(current.availableStatuses.map((status) => (typeof status === "string" ? status.toLowerCase() : status)))
+          ? new Set(
+              current.availableStatuses.map((status) =>
+                typeof status === "string" ? status.toLowerCase() : status
+              )
+            )
           : new Set();
-        mappedItems.forEach((item) => {
-          if (item?.status) {
-            updatedStatuses.add(item.status);
-          }
-        });
-        if (shouldFilterByStatus && !filteredItems.some((item) => item.status === normalizedFilters.status)) {
+        mapStatuses(mappedItems).forEach((status) => updatedStatuses.add(status));
+        if (
+          shouldFilterByStatus &&
+          !filteredItems.some((item) => item.status === normalizedFilters.status)
+        ) {
           updatedStatuses.delete(normalizedFilters.status);
         }
-        const pagination = current.pagination
-          ? {
-              ...current.pagination,
-              totalItems:
-                shouldFilterByStatus && current.pagination.totalItems != null
-                  ? Math.max(current.pagination.totalItems - 1, 0)
-                  : current.pagination.totalItems,
-            }
-          : current.pagination;
         return {
           ...current,
           items: filteredItems,
           availableStatuses: Array.from(updatedStatuses),
-          pagination,
         };
       });
       return { previous, key };
@@ -169,8 +254,8 @@ export default function AdminPaymentsPage() {
           : undefined;
       const normalizedFilters =
         normalizedStatus && normalizedStatus !== "all"
-          ? { status: normalizedStatus }
-          : { status: "all" };
+          ? { status: normalizedStatus, limit: PAGE_SIZE }
+          : { limit: PAGE_SIZE };
       const key = qk.admin.payments(normalizedFilters);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData(key);
@@ -180,25 +265,73 @@ export default function AdminPaymentsPage() {
 
       queryClient.setQueryData(key, (current) => {
         if (!current) return current;
-        const items = Array.isArray(current.items) ? current.items : [];
-        const mappedItems = items.map((item) =>
-          item.id === payment.id
-            ? {
-                ...item,
-                status: "rejected",
-                statusLabel: "Rejected",
-                canApprove: false,
-                canReject: false,
-                reviewComment: commentValue,
-                reviewedAt: optimisticReviewedAt,
-              }
-            : item
-        );
         const shouldFilterByStatus =
           normalizedFilters.status && normalizedFilters.status !== "all";
-        const filteredItems = shouldFilterByStatus
-          ? mappedItems.filter((item) => item.status === normalizedFilters.status)
-          : mappedItems;
+
+        const updateItems = (items = []) =>
+          items.map((item) =>
+            item.id === payment.id
+              ? {
+                  ...item,
+                  status: "rejected",
+                  statusLabel: "Rejected",
+                  canApprove: false,
+                  canReject: false,
+                  reviewComment: commentValue,
+                  reviewedAt: optimisticReviewedAt,
+                }
+              : item
+          );
+
+        const filterItems = (items = []) =>
+          shouldFilterByStatus
+            ? items.filter((item) => item.status === normalizedFilters.status)
+            : items;
+
+        const mapStatuses = (items = []) => {
+          const statuses = new Set();
+          items.forEach((item) => {
+            if (item?.status) {
+              statuses.add(item.status);
+            }
+          });
+          return statuses;
+        };
+
+        if (Array.isArray(current.pages)) {
+          const updatedPages = current.pages.map((page) => {
+            if (!page) return page;
+            const mappedItems = updateItems(Array.isArray(page.items) ? page.items : []);
+            const filteredItems = filterItems(mappedItems);
+            const updatedStatuses = Array.isArray(page.availableStatuses)
+              ? new Set(
+                  page.availableStatuses.map((status) =>
+                    typeof status === "string" ? status.toLowerCase() : status
+                  )
+                )
+              : new Set();
+            mapStatuses(mappedItems).forEach((status) => updatedStatuses.add(status));
+            if (
+              shouldFilterByStatus &&
+              !filteredItems.some((item) => item.status === normalizedFilters.status)
+            ) {
+              updatedStatuses.delete(normalizedFilters.status);
+            }
+            return {
+              ...page,
+              items: filteredItems,
+              availableStatuses: Array.from(updatedStatuses),
+            };
+          });
+          return {
+            ...current,
+            pages: updatedPages,
+          };
+        }
+
+        const items = Array.isArray(current.items) ? current.items : [];
+        const mappedItems = updateItems(items);
+        const filteredItems = filterItems(mappedItems);
         let updatedStatuses = Array.isArray(current.availableStatuses)
           ? new Set(
               current.availableStatuses.map((status) =>
@@ -206,31 +339,17 @@ export default function AdminPaymentsPage() {
               )
             )
           : new Set();
-        mappedItems.forEach((item) => {
-          if (item?.status) {
-            updatedStatuses.add(item.status);
-          }
-        });
+        mapStatuses(mappedItems).forEach((status) => updatedStatuses.add(status));
         if (
           shouldFilterByStatus &&
           !filteredItems.some((item) => item.status === normalizedFilters.status)
         ) {
           updatedStatuses.delete(normalizedFilters.status);
         }
-        const pagination = current.pagination
-          ? {
-              ...current.pagination,
-              totalItems:
-                shouldFilterByStatus && current.pagination.totalItems != null
-                  ? Math.max(current.pagination.totalItems - 1, 0)
-                  : current.pagination.totalItems,
-            }
-          : current.pagination;
         return {
           ...current,
           items: filteredItems,
           availableStatuses: Array.from(updatedStatuses),
-          pagination,
         };
       });
 
@@ -264,7 +383,7 @@ export default function AdminPaymentsPage() {
       toast.error("Payment record is missing required identifiers.");
       return;
     }
-    approvePaymentMutation.mutate({ payment, filters });
+    approvePaymentMutation.mutate({ payment, filters: paginatedFilters });
   };
 
   const handleRejectIntent = (payment) => {
@@ -305,7 +424,7 @@ export default function AdminPaymentsPage() {
     rejectPaymentMutation.mutate({
       payment: paymentToReject,
       comment: trimmedComment ? trimmedComment : undefined,
-      filters,
+      filters: paginatedFilters,
     });
     setRejectDialogOpen(false);
     setPaymentToReject(null);
@@ -323,7 +442,7 @@ export default function AdminPaymentsPage() {
 
   const errorMessage = isError ? getErrorMessage(error, "Failed to load payments.") : null;
   const showPaginationSummary = !isLoading && !errorMessage && pagination?.totalItems != null;
-  const isRefetching = isFetching && !isLoading;
+  const isRefetching = isFetching && !isLoading && !isFetchingNextPage;
 
   return (
     <>
@@ -368,60 +487,74 @@ export default function AdminPaymentsPage() {
           description="Review and approve manual payment submissions from customers."
         />
         <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="grid max-w-xs gap-2">
-          <Label>Status</Label>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {formatStatusLabel(status)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isRefetching ? (
-            <p className="text-xs text-muted-foreground">Refreshing…</p>
-          ) : null}
-        </CardContent>
-      </Card>
-      {showPaginationSummary ? (
-        <p className="text-sm text-muted-foreground">
-          Showing
-          {" "}
-          {formatNumber(payments.length, {
-            fallback: "0",
-            minimumFractionDigits: 0,
-          })}{" "}
-          {filters.status ? `${formatStatusLabel(filters.status).toLowerCase()} ` : ""}payments
-          {typeof pagination.totalItems === "number"
-            ? ` (of ${formatNumber(pagination.totalItems, {
-                fallback: "0",
-                minimumFractionDigits: 0,
-              })})`
-            : ""}
-          .
-        </p>
-      ) : null}
-      {errorMessage ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      ) : (
-        <PaymentsTable
-          payments={payments}
-          isLoading={isLoading}
-          approvingId={approvingId}
-          rejectingId={rejectingId}
-          onApprove={handleApprove}
-          onReject={handleRejectIntent}
-        />
-      )}
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="grid max-w-xs gap-2">
+            <Label>Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {formatStatusLabel(status)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isRefetching ? (
+              <p className="text-xs text-muted-foreground">Refreshing…</p>
+            ) : null}
+          </CardContent>
+        </Card>
+        {showPaginationSummary ? (
+          <p className="text-sm text-muted-foreground">
+            Showing
+            {" "}
+            {formatNumber(payments.length, {
+              fallback: "0",
+              minimumFractionDigits: 0,
+            })}{" "}
+            {filters.status ? `${formatStatusLabel(filters.status).toLowerCase()} ` : ""}payments
+            {typeof pagination.totalItems === "number"
+              ? ` (of ${formatNumber(pagination.totalItems, {
+                  fallback: "0",
+                  minimumFractionDigits: 0,
+                })})`
+              : ""}
+            .
+          </p>
+        ) : null}
+        {errorMessage ? (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+            {errorMessage}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <PaymentsTable
+              payments={payments}
+              isLoading={isLoading}
+              approvingId={approvingId}
+              rejectingId={rejectingId}
+              onApprove={handleApprove}
+              onReject={handleRejectIntent}
+            />
+            {hasNextPage ? (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? "Loading more…" : "Load more"}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </>
   );
