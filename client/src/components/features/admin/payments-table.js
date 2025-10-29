@@ -51,7 +51,14 @@ const badgeVariantForStatus = (status) => {
 };
 
 // Displays manual payment submissions awaiting review.
-export default function PaymentsTable({ payments = [], isLoading = false, approvingId = null, onApprove }) {
+export default function PaymentsTable({
+  payments = [],
+  isLoading = false,
+  approvingId = null,
+  rejectingId = null,
+  onApprove,
+  onReject,
+}) {
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading payments…</p>;
   }
@@ -71,16 +78,34 @@ export default function PaymentsTable({ payments = [], isLoading = false, approv
             <TableHead>Method</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Submitted</TableHead>
-            <TableHead className="text-right">Action</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {payments.map((payment) => {
             const isApproving = approvingId === payment.id;
+            const isRejecting = rejectingId === payment.id;
             const statusLabel = payment.statusLabel || toTitleCase(payment.status) || "Unknown";
             const purposeLabel = payment.purpose ? toTitleCase(payment.purpose) : null;
             const methodLabel = payment.paymentGateway ? toTitleCase(payment.paymentGateway) : null;
             const methodDetails = payment.paymentMethodDetails ? toTitleCase(payment.paymentMethodDetails) : null;
+            const reviewComment =
+              typeof payment.reviewComment === "string" ? payment.reviewComment.trim() : "";
+            const hasReviewComment = Boolean(reviewComment);
+            const reviewMeta = (() => {
+              const pieces = [];
+              if (payment.reviewerLabel) {
+                pieces.push(`by ${payment.reviewerLabel}`);
+              }
+              if (payment.reviewedAt) {
+                const reviewedLabel = payment.reviewerLabel
+                  ? formatDateTime(payment.reviewedAt)
+                  : `on ${formatDateTime(payment.reviewedAt)}`;
+                pieces.push(reviewedLabel);
+              }
+              if (pieces.length === 0) return null;
+              return `Reviewed ${pieces.join(" • ")}`;
+            })();
 
             return (
               <TableRow key={payment.id}>
@@ -115,17 +140,39 @@ export default function PaymentsTable({ payments = [], isLoading = false, approv
                   ) : null}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={badgeVariantForStatus(payment.status)}>{statusLabel}</Badge>
+                  <div className="space-y-1">
+                    <Badge variant={badgeVariantForStatus(payment.status)}>{statusLabel}</Badge>
+                    {hasReviewComment ? (
+                      <p className="text-xs text-muted-foreground break-words">&ldquo;{reviewComment}&rdquo;</p>
+                    ) : null}
+                    {reviewMeta ? (
+                      <p className="text-xs text-muted-foreground">{reviewMeta}</p>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell>{formatDateTime(payment.submittedAt)}</TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    disabled={!payment.canApprove || isApproving || !onApprove}
-                    onClick={() => onApprove?.(payment)}
-                  >
-                    {isApproving ? "Approving…" : "Approve"}
-                  </Button>
+                  <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+                    {onApprove ? (
+                      <Button
+                        size="sm"
+                        disabled={!payment.canApprove || isApproving || isRejecting}
+                        onClick={() => onApprove?.(payment)}
+                      >
+                        {isApproving ? "Approving…" : "Approve"}
+                      </Button>
+                    ) : null}
+                    {onReject ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={!payment.canReject || isApproving || isRejecting}
+                        onClick={() => onReject?.(payment)}
+                      >
+                        {isRejecting ? "Rejecting…" : "Reject"}
+                      </Button>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             );

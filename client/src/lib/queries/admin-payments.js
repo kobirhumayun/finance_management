@@ -4,6 +4,7 @@ import { qk } from "@/lib/query-keys";
 
 const PAYMENT_ENDPOINT = "/api/plans/payment";
 const APPROVE_ENDPOINT = "/api/plans/approve-plan";
+const REJECT_ENDPOINT = "/api/plans/reject-payment";
 
 const ensureArray = (value) => {
   if (!value) return [];
@@ -117,6 +118,41 @@ export const normalizeAdminPayment = (payment) => {
 
   const submittedAt = extractDate(payment.createdAt) ?? extractDate(payment.processedAt);
   const updatedAt = extractDate(payment.updatedAt);
+  const reviewedAt = extractDate(payment.reviewedAt);
+
+  const reviewComment = typeof payment.reviewComment === "string" ? payment.reviewComment.trim() || null : null;
+
+  const reviewerCandidate =
+    payment.reviewedBy?.data ??
+    payment.reviewedBy ??
+    payment.reviewer ??
+    payment.review ??
+    null;
+
+  const reviewerId = extractId(reviewerCandidate);
+
+  const reviewerNameCandidates = [];
+  if (reviewerCandidate) {
+    if (typeof reviewerCandidate.username === "string") reviewerNameCandidates.push(reviewerCandidate.username);
+    const fullName = [reviewerCandidate.firstName, reviewerCandidate.lastName]
+      .map((part) => (typeof part === "string" ? part.trim() : ""))
+      .filter(Boolean)
+      .join(" ");
+    if (fullName) reviewerNameCandidates.push(fullName);
+    if (typeof reviewerCandidate.name === "string") reviewerNameCandidates.push(reviewerCandidate.name);
+    if (typeof reviewerCandidate.displayName === "string") reviewerNameCandidates.push(reviewerCandidate.displayName);
+  }
+  const reviewerName = reviewerNameCandidates.find((candidate) => typeof candidate === "string" && candidate.trim()) || null;
+  const reviewerEmail =
+    typeof reviewerCandidate?.email === "string" && reviewerCandidate.email.trim()
+      ? reviewerCandidate.email.trim()
+      : null;
+  const reviewerLabel = (() => {
+    if (reviewerName && reviewerEmail) return `${reviewerName} (${reviewerEmail})`;
+    if (reviewerName) return reviewerName;
+    if (reviewerEmail) return reviewerEmail;
+    return null;
+  })();
 
   return {
     id,
@@ -135,6 +171,7 @@ export const normalizeAdminPayment = (payment) => {
     status,
     statusLabel,
     canApprove: status === "pending",
+    canReject: status === "pending",
     paymentGateway: payment.paymentGateway ?? null,
     paymentMethodDetails: payment.paymentMethodDetails ?? null,
     purpose: payment.purpose ?? null,
@@ -142,6 +179,13 @@ export const normalizeAdminPayment = (payment) => {
     submittedAt,
     processedAt: extractDate(payment.processedAt),
     updatedAt,
+    reviewComment,
+    reviewedAt,
+    reviewerId,
+    reviewerName,
+    reviewerEmail,
+    reviewerLabel,
+    reviewer: reviewerCandidate ?? null,
     raw: payment,
   };
 };
@@ -190,5 +234,15 @@ export const approveAdminPayment = ({ appliedUserId, newPlanId, paymentId }) =>
       appliedUserId,
       newPlanId,
       paymentId,
+    },
+  });
+
+export const rejectAdminPayment = ({ appliedUserId, paymentId, comment }) =>
+  apiJSON(REJECT_ENDPOINT, {
+    method: "POST",
+    body: {
+      appliedUserId,
+      paymentId,
+      comment,
     },
   });
