@@ -60,7 +60,8 @@ const paymentSchema = new Schema({
             'refunded',         // Payment fully refunded
             'partially_refunded',// Payment partially refunded
             'requires_action',  // Needs additional user action (e.g., 3D Secure)
-            'canceled'          // Payment was explicitly canceled before completion
+            'canceled',         // Payment was explicitly canceled before completion
+            'rejected',         // Payment was reviewed and rejected by an administrator
         ],
         default: 'pending',
         index: true // Useful for querying payments by status (e.g., finding failed payments)
@@ -146,6 +147,30 @@ const paymentSchema = new Schema({
      */
     processedAt: {
         type: Date
+    },
+    /**
+     * Optional review comment recorded when a manual payment is rejected.
+     */
+    reviewComment: {
+        type: String,
+        trim: true,
+        default: null,
+        maxlength: [500, 'Review comment must be at most 500 characters long.'],
+    },
+    /**
+     * Reference to the admin user who reviewed the manual payment.
+     */
+    reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+    },
+    /**
+     * Timestamp indicating when the manual payment was reviewed.
+     */
+    reviewedAt: {
+        type: Date,
+        default: null,
     }
 }, {
     // Automatically add `createdAt` and `updatedAt` timestamps
