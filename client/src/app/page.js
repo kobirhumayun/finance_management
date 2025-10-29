@@ -112,16 +112,22 @@ export default function HomePage() {
 
   const testimonials = [
     {
-      name: "Priya Desai",
-      role: "VP Finance, Northwind Logistics",
+      name: "Anwarul Islam Dolon",
+      role: "Warehouse inspector at Bangladesh Fire Service & Civil Defence",
       quote:
-        "FinTrack cut our month-end consolidation time in half. Their support pod set up exports that mirror our dashboards, so reviews are instant.",
+        "FinTrack gives us clarity on every shipment. With automated exports, I can reassure leadership that our records match real-world inventory checks.",
     },
     {
-      name: "Miguel Alvarez",
-      role: "Director of Operations, Lumen Studio",
+      name: "Saifuzzaman Raju",
+      role: "Founder, Romoni Shop (https://romonishop.com)",
       quote:
-        "Projects, forecasts, and billing finally live together. Our assigned admin keeps permissions tidy so variances never spiral and context is shared in seconds.",
+        "Reconciliation used to take days. Now I pull live reports before staff meetings and keep cashflow expectations aligned across every retail channel.",
+    },
+    {
+      name: "Md Mooradujjaman",
+      role: "Entrepreneur (https://powerlabbd.com)",
+      quote:
+        "FinTrack connects project budgets with operations in one place. The shared context helps my teams act faster when opportunities appear.",
     },
   ];
 
