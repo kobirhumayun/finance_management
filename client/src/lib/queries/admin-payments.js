@@ -108,6 +108,12 @@ const sanitizeFilters = (filters = {}) => {
       result.limit = limit;
     }
   }
+  if (typeof filters.search === "string") {
+    const trimmedSearch = filters.search.trim();
+    if (trimmedSearch) {
+      result.search = trimmedSearch;
+    }
+  }
   return result;
 };
 

@@ -18,6 +18,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { qk } from "@/lib/query-keys";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -31,14 +32,21 @@ import { formatNumber } from "@/lib/formatters";
 export default function AdminPaymentsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("pending");
+  const [searchFilter, setSearchFilter] = useState("");
   const [isRejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [paymentToReject, setPaymentToReject] = useState(null);
   const [rejectComment, setRejectComment] = useState("");
 
   const filters = useMemo(() => {
-    if (!statusFilter || statusFilter === "all") return {};
-    return { status: statusFilter };
-  }, [statusFilter]);
+    const normalized = {};
+    if (statusFilter && statusFilter !== "all") {
+      normalized.status = statusFilter;
+    }
+    if (searchFilter && searchFilter.trim()) {
+      normalized.search = searchFilter.trim();
+    }
+    return normalized;
+  }, [statusFilter, searchFilter]);
 
   const PAGE_SIZE = 20;
 
@@ -134,10 +142,17 @@ export default function AdminPaymentsPage() {
         activeFilters && typeof activeFilters.status === "string"
           ? activeFilters.status.trim().toLowerCase()
           : undefined;
-      const normalizedFilters =
-        normalizedStatus && normalizedStatus !== "all"
-          ? { status: normalizedStatus, limit: PAGE_SIZE }
-          : { limit: PAGE_SIZE };
+      const normalizedSearch =
+        activeFilters && typeof activeFilters.search === "string"
+          ? activeFilters.search.trim()
+          : "";
+      const normalizedFilters = { limit: PAGE_SIZE };
+      if (normalizedStatus && normalizedStatus !== "all") {
+        normalizedFilters.status = normalizedStatus;
+      }
+      if (normalizedSearch) {
+        normalizedFilters.search = normalizedSearch;
+      }
       const key = qk.admin.payments(normalizedFilters);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData(key);
@@ -252,10 +267,17 @@ export default function AdminPaymentsPage() {
         activeFilters && typeof activeFilters.status === "string"
           ? activeFilters.status.trim().toLowerCase()
           : undefined;
-      const normalizedFilters =
-        normalizedStatus && normalizedStatus !== "all"
-          ? { status: normalizedStatus, limit: PAGE_SIZE }
-          : { limit: PAGE_SIZE };
+      const normalizedSearch =
+        activeFilters && typeof activeFilters.search === "string"
+          ? activeFilters.search.trim()
+          : "";
+      const normalizedFilters = { limit: PAGE_SIZE };
+      if (normalizedStatus && normalizedStatus !== "all") {
+        normalizedFilters.status = normalizedStatus;
+      }
+      if (normalizedSearch) {
+        normalizedFilters.search = normalizedSearch;
+      }
       const key = qk.admin.payments(normalizedFilters);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData(key);
@@ -490,20 +512,34 @@ export default function AdminPaymentsPage() {
           <CardHeader>
             <CardTitle>Filters</CardTitle>
           </CardHeader>
-          <CardContent className="grid max-w-xs gap-2">
-            <Label>Status</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {formatStatusLabel(status)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="admin-payments-search">Search</Label>
+                <Input
+                  id="admin-payments-search"
+                  value={searchFilter}
+                  onChange={(event) => setSearchFilter(event.target.value)}
+                  placeholder="Username, email, order, or gateway ID"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {formatStatusLabel(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             {isRefetching ? (
               <p className="text-xs text-muted-foreground">Refreshing…</p>
             ) : null}
