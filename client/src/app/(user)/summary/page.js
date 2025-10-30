@@ -484,11 +484,25 @@ export default function SummaryPage() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="summary-from">From</Label>
-            <Input id="summary-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+            <Input
+              id="summary-from"
+              type="date"
+              value={from}
+              min={availableDateRange.earliest || undefined}
+              max={availableDateRange.latest || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="summary-to">To</Label>
-            <Input id="summary-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+            <Input
+              id="summary-to"
+              type="date"
+              value={to}
+              min={availableDateRange.earliest || undefined}
+              max={availableDateRange.latest || undefined}
+              onChange={(event) => setTo(event.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
