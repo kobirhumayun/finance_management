@@ -17,11 +17,28 @@ import { fetchReportCharts, fetchReportFilters } from "@/lib/queries/reports";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { toNumeric } from "@/lib/utils/numbers";
 
+const toDateInputString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getStartOfCurrentYear = () => {
+  const now = new Date();
+  return toDateInputString(new Date(now.getFullYear(), 0, 1));
+};
+
+const getTodayDate = () => toDateInputString(new Date());
+
 // Financial reports page featuring interactive filters and charts backed by real data.
 export default function ReportsPage() {
   const [project, setProject] = useState("all");
   const [type, setType] = useState("all");
-  const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [dateRange, setDateRange] = useState(() => ({
+    from: getStartOfCurrentYear(),
+    to: getTodayDate(),
+  }));
 
   const from = dateRange.from;
   const to = dateRange.to;
@@ -94,16 +111,39 @@ export default function ReportsPage() {
   }, [typeOptions, type]);
 
   useEffect(() => {
-    if (dateRange.from || dateRange.to) {
-      return;
-    }
     const earliest = availableDateRange.earliest ?? "";
     const latest = availableDateRange.latest ?? "";
     if (!earliest && !latest) {
       return;
     }
-    setDateRange({ from: earliest || "", to: latest || "" });
-  }, [availableDateRange.earliest, availableDateRange.latest, dateRange.from, dateRange.to]);
+    setDateRange((previous) => {
+      let nextFrom = previous.from;
+      let nextTo = previous.to;
+
+      if (earliest && (!nextFrom || nextFrom < earliest)) {
+        nextFrom = earliest;
+      }
+
+      if (latest && (!nextTo || nextTo > latest)) {
+        nextTo = latest;
+      }
+
+      if (nextFrom && nextTo && nextFrom > nextTo) {
+        if (latest) {
+          nextFrom = latest;
+          nextTo = latest;
+        } else if (earliest) {
+          nextFrom = earliest;
+        }
+      }
+
+      if (nextFrom === previous.from && nextTo === previous.to) {
+        return previous;
+      }
+
+      return { from: nextFrom, to: nextTo };
+    });
+  }, [availableDateRange.earliest, availableDateRange.latest]);
 
   const appliedDateStart = chartsData?.dateRange?.start ?? null;
   const appliedDateEnd = chartsData?.dateRange?.end ?? null;
@@ -115,7 +155,7 @@ export default function ReportsPage() {
         : projectOptions.find((option) => option.value === project)?.label || "Selected project";
     const typeLabel =
       type === "all"
-        ? "All transaction types"
+        ? "Both transaction types"
         : `${typeOptions.find((option) => option.value === type)?.label || "Selected type"} only`;
 
     let rangeLabel = "Complete history";
@@ -197,7 +237,7 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="grid gap-2">
-            <Label>Project</Label>
+            <Label>Projects</Label>
             <Select value={project} onValueChange={setProject} disabled={filtersLoading}>
               <SelectTrigger>
                 <SelectValue placeholder="Select project" />
@@ -216,10 +256,10 @@ export default function ReportsPage() {
             <Label>Transaction type</Label>
             <Select value={type} onValueChange={setType} disabled={filtersLoading}>
               <SelectTrigger>
-                <SelectValue placeholder="All types" />
+                <SelectValue placeholder="Both" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="all">Both</SelectItem>
                 {typeOptions.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label || item.value}
