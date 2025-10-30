@@ -53,7 +53,7 @@ export default function TransactionTable({
           </Label>
           <Input
             id="transaction-search"
-            placeholder="Search by description"
+            placeholder="Search by description or subcategory"
             value={searchValue}
             onChange={handleSearchChange}
           />
