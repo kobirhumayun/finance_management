@@ -1,6 +1,7 @@
 // File: src/app/(user)/summary/page.js
 "use client";
 
+import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { qk } from "@/lib/query-keys";
 import { fetchSummaryFilters, fetchSummaryReport } from "@/lib/queries/reports";
+import { myPlanQueryOptions } from "@/lib/queries/plans";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 const PAGE_SIZE = 20;
@@ -60,10 +62,19 @@ function focusDropdownSearch(input, selection) {
 
 // Summary view combining filters with a tabular report.
 export default function SummaryPage() {
-  const { data: filtersData, isLoading: filtersLoading } = useQuery({
+  const planQuery = useQuery(myPlanQueryOptions());
+  const planLimits = planQuery.data?.plan?.limits ?? {};
+  const planSummaryLimits = planLimits.summary ?? {};
+  const planFiltersAllowed = planSummaryLimits.allowFilters !== false;
+  const planPaginationAllowed = planSummaryLimits.allowPagination !== false;
+
+  const filtersQuery = useQuery({
     queryKey: qk.reports.summaryFilters(),
     queryFn: fetchSummaryFilters,
+    enabled: planFiltersAllowed,
   });
+  const filtersData = filtersQuery.data;
+  const filtersLoading = planFiltersAllowed && filtersQuery.isLoading;
   const [projectFilter, setProjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [subcategoryFilter, setSubcategoryFilter] = useState("all");
@@ -79,39 +90,18 @@ export default function SummaryPage() {
   const subcategorySearchInputRef = useRef(null);
   const projectSearchSelectionRef = useRef(null);
   const subcategorySearchSelectionRef = useRef(null);
-  const projectOptions = useMemo(() => filtersData?.projects ?? [], [filtersData?.projects]);
-  const subcategoryOptions = useMemo(() => filtersData?.subcategories ?? [], [filtersData?.subcategories]);
-
-  useEffect(() => {
-    if (!filtersData?.projects?.length || projectFilter === "all") {
-      return;
+  const filtersKey = useMemo(() => {
+    if (!planFiltersAllowed) {
+      return {};
     }
-
-    const exists = filtersData.projects.some((project) => project.value === projectFilter);
-    if (!exists) {
-      setProjectFilter("all");
-    }
-  }, [filtersData?.projects, projectFilter]);
-
-  useEffect(() => {
-    if (!filtersData?.subcategories?.length || subcategoryFilter === "all") {
-      return;
-    }
-
-    const exists = filtersData.subcategories.some((item) => item.value === subcategoryFilter);
-    if (!exists) {
-      setSubcategoryFilter("all");
-    }
-  }, [filtersData?.subcategories, subcategoryFilter]);
-
-
-  const filtersKey = useMemo(() => ({
-    projectId: projectFilter !== "all" ? projectFilter : undefined,
-    type: typeFilter !== "all" ? typeFilter : undefined,
-    startDate: from || undefined,
-    endDate: to || undefined,
-    subcategory: subcategoryFilter !== "all" ? subcategoryFilter : undefined,
-  }), [projectFilter, typeFilter, from, to, subcategoryFilter]);
+    return {
+      projectId: projectFilter !== "all" ? projectFilter : undefined,
+      type: typeFilter !== "all" ? typeFilter : undefined,
+      startDate: from || undefined,
+      endDate: to || undefined,
+      subcategory: subcategoryFilter !== "all" ? subcategoryFilter : undefined,
+    };
+  }, [planFiltersAllowed, projectFilter, typeFilter, from, to, subcategoryFilter]);
 
   const isDateRangeInvalid = useMemo(() => {
     if (!from || !to) {
@@ -122,17 +112,29 @@ export default function SummaryPage() {
     return Number.isFinite(start.getTime()) && Number.isFinite(end.getTime()) && start > end;
   }, [from, to]);
 
+  const summaryQueryKeyParams = useMemo(
+    () => ({
+      ...filtersKey,
+      allowFilters: planFiltersAllowed,
+      allowPagination: planPaginationAllowed,
+    }),
+    [filtersKey, planFiltersAllowed, planPaginationAllowed],
+  );
+
   const summaryQuery = useInfiniteQuery({
-    queryKey: qk.reports.summaryTable(filtersKey),
+    queryKey: qk.reports.summaryTable(summaryQueryKeyParams),
     queryFn: ({ pageParam, signal }) =>
       fetchSummaryReport({
         ...filtersKey,
-        cursor: pageParam?.cursor,
-        limit: PAGE_SIZE,
+        cursor: planPaginationAllowed ? pageParam?.cursor : undefined,
+        limit: planPaginationAllowed ? PAGE_SIZE : undefined,
         signal,
       }),
     initialPageParam: { cursor: undefined },
     getNextPageParam: (lastPage) => {
+      if (!planPaginationAllowed) {
+        return undefined;
+      }
       if (!lastPage?.pageInfo?.hasNextPage) {
         return undefined;
       }
@@ -148,19 +150,90 @@ export default function SummaryPage() {
   }, [summaryQuery.data]);
 
   const summaryPages = summaryQuery.data?.pages ?? [];
+  const latestCapabilities = useMemo(() => {
+    for (let index = summaryPages.length - 1; index >= 0; index -= 1) {
+      const pageCapabilities = summaryPages[index]?.capabilities;
+      if (pageCapabilities) {
+        return pageCapabilities;
+      }
+    }
+    return null;
+  }, [summaryPages]);
   const latestSummary = summaryPages.length ? summaryPages[summaryPages.length - 1]?.summary : null;
   const summaryTotals = latestSummary ?? { income: 0, expense: 0, balance: 0, counts: { income: 0, expense: 0, total: 0 } };
   const summaryCounts = summaryTotals.counts ?? { income: 0, expense: 0, total: 0 };
   const totalCount = summaryPages.length ? summaryPages[0]?.totalCount ?? 0 : 0;
 
+  const filtersCapabilityFromServer = filtersData?.capabilities?.filters;
+  const filtersEnabled = planFiltersAllowed && (filtersCapabilityFromServer ?? true) && (latestCapabilities?.filters ?? true);
+  const paginationEnabled = planPaginationAllowed && (latestCapabilities?.pagination ?? true);
+
+  const projectOptions = useMemo(() => {
+    if (!filtersEnabled) {
+      return [];
+    }
+    return filtersData?.projects ?? [];
+  }, [filtersEnabled, filtersData?.projects]);
+
+  const subcategoryOptions = useMemo(() => {
+    if (!filtersEnabled) {
+      return [];
+    }
+    return filtersData?.subcategories ?? [];
+  }, [filtersEnabled, filtersData?.subcategories]);
+
+  useEffect(() => {
+    if (!filtersEnabled) {
+      return;
+    }
+    if (!filtersData?.projects?.length || projectFilter === "all") {
+      return;
+    }
+
+    const exists = filtersData.projects.some((project) => project.value === projectFilter);
+    if (!exists) {
+      setProjectFilter("all");
+    }
+  }, [filtersEnabled, filtersData?.projects, projectFilter]);
+
+  useEffect(() => {
+    if (!filtersEnabled) {
+      return;
+    }
+    if (!filtersData?.subcategories?.length || subcategoryFilter === "all") {
+      return;
+    }
+
+    const exists = filtersData.subcategories.some((item) => item.value === subcategoryFilter);
+    if (!exists) {
+      setSubcategoryFilter("all");
+    }
+  }, [filtersEnabled, filtersData?.subcategories, subcategoryFilter]);
+
+  useEffect(() => {
+    if (filtersEnabled) {
+      return;
+    }
+    setProjectSearch("");
+    setSubcategorySearch("");
+    setProjectMenuOpen(false);
+    setSubcategoryMenuOpen(false);
+  }, [filtersEnabled]);
+
   const hasTransactions = transactions.length > 0;
   const isInitialLoading = summaryQuery.isLoading;
   const isRefetching = summaryQuery.isRefetching;
   const isFetchingNextPage = summaryQuery.isFetchingNextPage;
-  const hasNextPage = Boolean(summaryQuery.hasNextPage);
+  const serverHasNextPage = summaryPages.length
+    ? Boolean(summaryPages[summaryPages.length - 1]?.pageInfo?.hasNextPage)
+    : false;
+  const hasNextPage = paginationEnabled && serverHasNextPage;
   const errorMessage = summaryQuery.error?.body?.message || summaryQuery.error?.message;
 
   const filteredProjectOptions = useMemo(() => {
+    if (!filtersEnabled) {
+      return projectOptions;
+    }
     if (!deferredProjectSearch) {
       return projectOptions;
     }
@@ -178,18 +251,24 @@ export default function SummaryPage() {
         String(project.id ?? "").toLowerCase().includes(searchValue)
       );
     });
-  }, [deferredProjectSearch, projectOptions]);
+  }, [filtersEnabled, deferredProjectSearch, projectOptions]);
   const selectedProjectOption = useMemo(
     () => projectOptions.find((project) => project.value === projectFilter),
     [projectOptions, projectFilter],
   );
   const isProjectSelectionFilteredOut = useMemo(() => {
+    if (!filtersEnabled) {
+      return false;
+    }
     if (projectFilter === "all") {
       return false;
     }
     return !filteredProjectOptions.some((project) => project.value === projectFilter);
-  }, [filteredProjectOptions, projectFilter]);
+  }, [filtersEnabled, filteredProjectOptions, projectFilter]);
   const filteredSubcategoryOptions = useMemo(() => {
+    if (!filtersEnabled) {
+      return subcategoryOptions;
+    }
     if (!deferredSubcategorySearch) {
       return subcategoryOptions;
     }
@@ -207,20 +286,26 @@ export default function SummaryPage() {
         String(subcategory.id ?? "").toLowerCase().includes(searchValue)
       );
     });
-  }, [deferredSubcategorySearch, subcategoryOptions]);
+  }, [filtersEnabled, deferredSubcategorySearch, subcategoryOptions]);
   const selectedSubcategoryOption = useMemo(
     () =>
       subcategoryOptions.find((subcategory) => subcategory.value === subcategoryFilter),
     [subcategoryOptions, subcategoryFilter],
   );
   const isSubcategorySelectionFilteredOut = useMemo(() => {
+    if (!filtersEnabled) {
+      return false;
+    }
     if (subcategoryFilter === "all") {
       return false;
     }
     return !filteredSubcategoryOptions.some((subcategory) => subcategory.value === subcategoryFilter);
-  }, [filteredSubcategoryOptions, subcategoryFilter]);
+  }, [filtersEnabled, filteredSubcategoryOptions, subcategoryFilter]);
 
   const handleProjectSearchChange = (event) => {
+    if (!filtersEnabled) {
+      return;
+    }
     const { value, selectionStart, selectionEnd } = event.target;
     setProjectSearch(value);
     projectSearchSelectionRef.current = {
@@ -230,6 +315,9 @@ export default function SummaryPage() {
   };
 
   const handleSubcategorySearchChange = (event) => {
+    if (!filtersEnabled) {
+      return;
+    }
     const { value, selectionStart, selectionEnd } = event.target;
     setSubcategorySearch(value);
     subcategorySearchSelectionRef.current = {
@@ -238,15 +326,15 @@ export default function SummaryPage() {
     };
   };
   useEffect(() => {
-    if (!projectMenuOpen) {
+    if (!filtersEnabled || !projectMenuOpen) {
       return undefined;
     }
 
     return focusDropdownSearch(projectSearchInputRef.current, projectSearchSelectionRef.current);
-  }, [projectMenuOpen, projectSearch]);
+  }, [filtersEnabled, projectMenuOpen, projectSearch]);
 
   useEffect(() => {
-    if (!subcategoryMenuOpen) {
+    if (!filtersEnabled || !subcategoryMenuOpen) {
       return undefined;
     }
 
@@ -254,11 +342,16 @@ export default function SummaryPage() {
       subcategorySearchInputRef.current,
       subcategorySearchSelectionRef.current,
     );
-  }, [subcategoryMenuOpen, subcategorySearch]);
-  const typeOptions = filtersData?.transactionTypes ?? [];
-  const availableDateRange = filtersData?.dateRange ?? { earliest: null, latest: null };
+  }, [filtersEnabled, subcategoryMenuOpen, subcategorySearch]);
+  const typeOptions = filtersEnabled ? filtersData?.transactionTypes ?? [] : [];
+  const availableDateRange = filtersEnabled
+    ? filtersData?.dateRange ?? { earliest: null, latest: null }
+    : { earliest: null, latest: null };
 
   useEffect(() => {
+    if (!filtersEnabled) {
+      return;
+    }
     const earliest = availableDateRange.earliest ?? "";
     const latest = availableDateRange.latest ?? "";
 
@@ -308,7 +401,7 @@ export default function SummaryPage() {
     if (nextTo !== to) {
       setTo(nextTo);
     }
-  }, [availableDateRange.earliest, availableDateRange.latest, from, to]);
+  }, [filtersEnabled, availableDateRange.earliest, availableDateRange.latest, from, to]);
 
   return (
     <div className="space-y-8">
@@ -321,13 +414,31 @@ export default function SummaryPage() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          {!filtersEnabled && (
+            <div className="md:col-span-2 lg:col-span-4 xl:col-span-5">
+              <div className="flex flex-col gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary">
+                <p>Filtering is available on Professional and Enterprise plans.</p>
+                <Button asChild size="sm" variant="outline" className="w-fit">
+                  <Link href="/pricing">See plans</Link>
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label>Projects</Label>
             <Select
               value={projectFilter}
-              onValueChange={setProjectFilter}
-              disabled={filtersLoading}
+              onValueChange={(value) => {
+                if (!filtersEnabled) {
+                  return;
+                }
+                setProjectFilter(value);
+              }}
+              disabled={filtersLoading || !filtersEnabled}
               onOpenChange={(open) => {
+                if (!filtersEnabled) {
+                  return;
+                }
                 setProjectMenuOpen(open);
                 if (!open) {
                   setProjectSearch("");
@@ -346,6 +457,7 @@ export default function SummaryPage() {
                     onChange={handleProjectSearchChange}
                     placeholder="Search projects..."
                     className="h-8"
+                    disabled={!filtersEnabled}
                     onKeyDownCapture={(event) => {
                       // Prevent the parent select from capturing the keystroke and stealing focus.
                       event.stopPropagation();
@@ -396,7 +508,16 @@ export default function SummaryPage() {
           </div>
           <div className="grid gap-2">
             <Label>Transaction Type</Label>
-            <Select value={typeFilter} onValueChange={setTypeFilter} disabled={filtersLoading}>
+            <Select
+              value={typeFilter}
+              onValueChange={(value) => {
+                if (!filtersEnabled) {
+                  return;
+                }
+                setTypeFilter(value);
+              }}
+              disabled={filtersLoading || !filtersEnabled}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Both types" />
               </SelectTrigger>
@@ -414,9 +535,17 @@ export default function SummaryPage() {
             <Label>Subcategories</Label>
             <Select
               value={subcategoryFilter}
-              onValueChange={setSubcategoryFilter}
-              disabled={filtersLoading}
+              onValueChange={(value) => {
+                if (!filtersEnabled) {
+                  return;
+                }
+                setSubcategoryFilter(value);
+              }}
+              disabled={filtersLoading || !filtersEnabled}
               onOpenChange={(open) => {
+                if (!filtersEnabled) {
+                  return;
+                }
                 setSubcategoryMenuOpen(open);
                 if (!open) {
                   setSubcategorySearch("");
@@ -435,6 +564,7 @@ export default function SummaryPage() {
                     onChange={handleSubcategorySearchChange}
                     placeholder="Search subcategories..."
                     className="h-8"
+                    disabled={!filtersEnabled}
                     onKeyDownCapture={(event) => {
                       event.stopPropagation();
                       if (event.nativeEvent.stopImmediatePropagation) {
@@ -491,6 +621,7 @@ export default function SummaryPage() {
               min={availableDateRange.earliest || undefined}
               max={availableDateRange.latest || undefined}
               onChange={(event) => setFrom(event.target.value)}
+              disabled={!filtersEnabled}
             />
           </div>
           <div className="grid gap-2">
@@ -502,6 +633,7 @@ export default function SummaryPage() {
               min={availableDateRange.earliest || undefined}
               max={availableDateRange.latest || undefined}
               onChange={(event) => setTo(event.target.value)}
+              disabled={!filtersEnabled}
             />
           </div>
         </CardContent>
@@ -589,15 +721,27 @@ export default function SummaryPage() {
                   </TableBody>
                 </Table>
                 {!hasTransactions && !isRefetching && !summaryQuery.isError && (
-                  <p className="p-4 text-sm text-muted-foreground">No transactions match the selected filters.</p>
+                  <p className="p-4 text-sm text-muted-foreground">
+                    {filtersEnabled
+                      ? "No transactions match the selected filters."
+                      : "No transactions recorded yet."}
+                  </p>
                 )}
                 {isRefetching && !isInitialLoading && (
                   <div className="p-4 text-sm text-muted-foreground">Updating results…</div>
                 )}
-                {hasNextPage && (
+                {hasNextPage && paginationEnabled && (
                   <div className="mt-4 flex justify-center">
                     <Button onClick={() => summaryQuery.fetchNextPage()} disabled={isFetchingNextPage}>
                       {isFetchingNextPage ? "Loading more..." : "Load more"}
+                    </Button>
+                  </div>
+                )}
+                {!paginationEnabled && (
+                  <div className="mt-4 flex flex-col items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-center text-sm text-primary">
+                    <p>Upgrade to paginate through your full transaction history.</p>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/pricing">Explore plans</Link>
                     </Button>
                   </div>
                 )}

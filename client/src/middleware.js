@@ -1,7 +1,6 @@
 // File: src/middleware.js
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { FREE_PLAN_SLUGS } from "./config/plans";
 
 const PUBLIC_ROUTES = ["/", "/login", "/register", "/pricing", "/request-password-reset", "/reset-password"];
 const USER_DASHBOARD_ROUTE = "/dashboard";
@@ -10,23 +9,6 @@ const ADMIN_DASHBOARD_ROUTE = "/admin/dashboard";
 // Determine whether a pathname belongs to the public marketing surface.
 function isPublicRoute(pathname) {
   return PUBLIC_ROUTES.includes(pathname);
-}
-
-// Helper to decide if the current plan is considered free-tier.
-function isFreePlan(token) {
-  const planCandidate =
-    token?.user?.plan?.slug ||
-    token?.user?.planSlug ||
-    token?.planSlug ||
-    (typeof token?.user?.plan === "string" ? token.user.plan : token?.user?.plan?.name);
-
-  if (typeof planCandidate !== "string") {
-    return false;
-  }
-
-  const normalizedCandidate = planCandidate.trim().toLowerCase();
-
-  return FREE_PLAN_SLUGS.some((slug) => slug.toLowerCase() === normalizedCandidate);
 }
 
 function getRole(token) {
@@ -64,10 +46,6 @@ export async function middleware(request) {
 
   if (pathname.startsWith("/admin") && role !== "admin") {
     return NextResponse.redirect(new URL(USER_DASHBOARD_ROUTE, request.url));
-  }
-
-  if (pathname.startsWith("/summary") && isFreePlan(token)) {
-    return NextResponse.redirect(new URL("/pricing", request.url));
   }
 
   if (pathname === "/dashboard" && role === "admin") {

@@ -1,5 +1,6 @@
 const Project = require('../models/Project');
 const Transaction = require('../models/Transaction');
+const { getPlanLimitsForUser } = require('../services/planLimits');
 
 const {
     clampLimit,
@@ -130,6 +131,23 @@ const createProject = async (req, res, next) => {
             return res.status(409).json({
                 message: 'A project with this name already exists.',
             });
+        }
+
+        const { limits: planLimits } = await getPlanLimitsForUser({
+            userId,
+            planSlug: req.user?.plan,
+        });
+
+        const maxProjects = planLimits.projects?.maxActive;
+        if (Number.isInteger(maxProjects) && maxProjects >= 0) {
+            const userIdentifier = toObjectIdOrNull(userId) ?? userId;
+            const projectCount = await Project.countDocuments({ user_id: userIdentifier });
+            if (projectCount >= maxProjects) {
+                return res.status(403).json({
+                    message: 'You have reached the maximum number of projects allowed by your current plan.',
+                    limit: maxProjects,
+                });
+            }
         }
 
         const project = await Project.create({
@@ -386,6 +404,26 @@ const createTransaction = async (req, res, next) => {
 
         if (!transactionDate) {
             return res.status(400).json({ message: 'Invalid transaction date provided.' });
+        }
+
+        const { limits: planLimits } = await getPlanLimitsForUser({
+            userId,
+            planSlug: req.user?.plan,
+        });
+
+        const perProjectLimit = planLimits.transactions?.perProject;
+        if (Number.isInteger(perProjectLimit) && perProjectLimit >= 0) {
+            const userIdentifier = toObjectIdOrNull(userId) ?? userId;
+            const transactionCount = await Transaction.countDocuments({
+                project_id: project._id,
+                user_id: userIdentifier,
+            });
+            if (transactionCount >= perProjectLimit) {
+                return res.status(403).json({
+                    message: 'This project has reached the maximum number of transactions allowed by your current plan.',
+                    limit: perProjectLimit,
+                });
+            }
         }
 
         const transaction = await Transaction.create({

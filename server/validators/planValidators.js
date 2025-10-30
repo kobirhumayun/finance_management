@@ -1,4 +1,5 @@
-const { 
+const { body } = require('express-validator');
+const {
     isNotEmptyString,
     isSlugField,
     isStringField,
@@ -9,8 +10,26 @@ const {
     isLength,
 } = require('./commonValidators');
 const Plan = require('../models/Plan');
+const { coercePlanLimitsInput } = require('../services/planLimits');
 
 const BILLING_CYCLES = Plan.schema.path('billingCycle').enumValues;
+
+const normalizeLimitsField = () =>
+    body('limits')
+        .optional()
+        .custom((value, { req }) => {
+            try {
+                const sanitized = coercePlanLimitsInput(value);
+                if (sanitized === undefined) {
+                    delete req.body.limits;
+                } else {
+                    req.body.limits = sanitized;
+                }
+            } catch (error) {
+                throw new Error(error.message || 'Invalid limits payload.');
+            }
+            return true;
+        });
 
 const planValidationRules = () => {
     return [
@@ -24,6 +43,7 @@ const planValidationRules = () => {
         isInValues('billingCycle', BILLING_CYCLES),
         isInValues('isPublic', ['true', 'false']).optional(),
         ...isArrayOfStringsField('features', { min: 0 }), // Spread because it returns an array of validators
+        normalizeLimitsField(),
     ];
 };
 
@@ -40,6 +60,7 @@ const updatePlanValidationRules = () => {
         isInValues('billingCycle', BILLING_CYCLES).optional(),
         isInValues('isPublic', ['true', 'false']).optional(),
         ...optionalFeaturesValidators,
+        normalizeLimitsField(),
     ];
 };
 
