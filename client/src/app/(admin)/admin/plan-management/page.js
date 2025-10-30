@@ -273,7 +273,7 @@ export default function PlanManagementPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[calc(100vh-4rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPlan ? "Edit plan" : "Add plan"}</DialogTitle>
           </DialogHeader>
