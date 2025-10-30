@@ -8,6 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import PlanForm from "@/components/features/admin/plan-form";
 import { qk } from "@/lib/query-keys";
 import { toast } from "@/components/ui/sonner";
@@ -32,6 +42,7 @@ export default function PlanManagementPage() {
   } = useQuery(adminPlansOptions());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
+  const [planToDelete, setPlanToDelete] = useState(null);
 
   const getErrorMessage = (err, fallback) => {
     if (!err) return fallback;
@@ -129,6 +140,7 @@ export default function PlanManagementPage() {
     },
     onSuccess: (_data, variables) => {
       toast.success(`Plan "${variables?.name || variables?.slug}" deleted.`);
+      setPlanToDelete(null);
     },
     onSettled: () => {
       invalidatePlanQueries();
@@ -189,6 +201,7 @@ export default function PlanManagementPage() {
   const plansForTable = Array.isArray(plans) ? plans : [];
   const isFormSubmitting = createPlanMutation.isPending || updatePlanMutation.isPending;
   const deletingSlug = deletePlanMutation.variables?.slug;
+  const isDeletingPlan = deletePlanMutation.isPending;
   const showEmptyState = !isLoading && !isError && plansForTable.length === 0;
   const errorMessage = isError ? getErrorMessage(error, "Failed to load plans.") : null;
 
@@ -247,10 +260,10 @@ export default function PlanManagementPage() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        disabled={deletePlanMutation.isPending && deletingSlug === plan.slug}
-                        onClick={() => deletePlanMutation.mutate({ slug: plan.slug, name: plan.name })}
+                        disabled={isDeletingPlan}
+                        onClick={() => setPlanToDelete(plan)}
                       >
-                        {deletePlanMutation.isPending && deletingSlug === plan.slug ? "Removing..." : "Delete"}
+                        Delete
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -285,6 +298,37 @@ export default function PlanManagementPage() {
           />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(planToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingPlan) {
+            setPlanToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete plan</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Are you sure you want to delete the plan "${planToDelete?.name || planToDelete?.slug || "this plan"}"? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingPlan}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingPlan || !planToDelete?.slug}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!planToDelete?.slug || isDeletingPlan) return;
+                deletePlanMutation.mutate({ slug: planToDelete.slug, name: planToDelete.name });
+              }}
+            >
+              {isDeletingPlan && deletingSlug === planToDelete?.slug ? "Removing..." : "Delete plan"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
