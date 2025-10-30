@@ -515,21 +515,21 @@ export default function SummaryPage() {
             <p className="text-sm text-muted-foreground">Income</p>
             <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.income)}</p>
             <p className="text-xs text-muted-foreground">
-              {formatNumber(summaryCounts.income)} income transactions
+              {formatNumber(summaryCounts.income, { minimumFractionDigits: 0 })} income transactions
             </p>
           </div>
           <div className="space-y-1 rounded-lg border p-4">
             <p className="text-sm text-muted-foreground">Expenses</p>
             <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.expense)}</p>
             <p className="text-xs text-muted-foreground">
-              {formatNumber(summaryCounts.expense)} expense transactions
+              {formatNumber(summaryCounts.expense, { minimumFractionDigits: 0 })} expense transactions
             </p>
           </div>
           <div className="space-y-1 rounded-lg border p-4 lg:col-span-1">
             <p className="text-sm text-muted-foreground">Net balance</p>
             <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.balance)}</p>
             <p className="text-xs text-muted-foreground">
-              {formatNumber(summaryCounts.total)} total transactions
+              {formatNumber(summaryCounts.total, { minimumFractionDigits: 0 })} total transactions
             </p>
           </div>
         </CardContent>
@@ -541,7 +541,7 @@ export default function SummaryPage() {
             <p className="text-sm text-muted-foreground">
               {isInitialLoading
                 ? "Loading transactions..."
-                : `Showing ${formatNumber(transactions.length)} of ${formatNumber(totalCount)} transactions`}
+                : `Showing ${formatNumber(transactions.length, { minimumFractionDigits: 0 })} of ${formatNumber(totalCount, { minimumFractionDigits: 0 })} transactions`}
             </p>
           </div>
         </CardHeader>
