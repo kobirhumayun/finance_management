@@ -9,6 +9,16 @@ import TransactionTable from "@/components/features/projects/transaction-table";
 import AddProjectDialog from "@/components/features/projects/add-project-dialog";
 import AddTransactionDialog from "@/components/features/projects/add-transaction-dialog";
 import { Card } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { qk } from "@/lib/query-keys";
 import {
   createProject,
@@ -50,6 +60,8 @@ export default function ProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projectDialogState, setProjectDialogState] = useState({ open: false, project: null });
   const [transactionDialogState, setTransactionDialogState] = useState({ open: false, transaction: null });
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [transactionToDelete, setTransactionToDelete] = useState(null);
 
   const debouncedProjectSearch = useDebouncedValue(projectSearch, 300);
   const debouncedTransactionSearch = useDebouncedValue(transactionSearch, 300);
@@ -365,6 +377,7 @@ export default function ProjectsPage() {
       if (context?.projectId) {
         queryClient.removeQueries({ queryKey: ["projects", "detail", String(context.projectId)] });
       }
+      setProjectToDelete(null);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", "list"] });
@@ -546,6 +559,7 @@ export default function ProjectsPage() {
     },
     onSuccess: () => {
       toast.success("Transaction removed.");
+      setTransactionToDelete(null);
     },
     onSettled: (_data, _error, variables, context) => {
       const projectId = variables?.projectId ?? context?.projectId ?? selectedProjectId;
@@ -565,8 +579,8 @@ export default function ProjectsPage() {
   };
 
   const handleDeleteProject = (project) => {
-    if (!project?.id) return;
-    deleteProjectMutation.mutate({ projectId: project.id, projectName: project.name });
+    if (!project?.id || deleteProjectMutation.isPending) return;
+    setProjectToDelete(project);
   };
 
   const handleEditProject = (project) => {
@@ -588,8 +602,12 @@ export default function ProjectsPage() {
   };
 
   const handleDeleteTransaction = (transaction) => {
-    if (!selectedProjectId || !transaction?.id) return;
-    deleteTransactionMutation.mutate({ projectId: selectedProjectId, transactionId: transaction.id });
+    if (!selectedProjectId || !transaction?.id || deleteTransactionMutation.isPending) return;
+    setTransactionToDelete({
+      projectId: selectedProjectId,
+      projectName: selectedProject?.name,
+      transaction,
+    });
   };
 
   return (
@@ -637,6 +655,86 @@ export default function ProjectsPage() {
           />
         </div>
       </Card>
+
+      <AlertDialog
+        open={Boolean(projectToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteProjectMutation.isPending) {
+            setProjectToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Are you sure you want to delete the project "${projectToDelete?.name || "this project"}"? This will permanently remove all associated transactions.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteProjectMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteProjectMutation.isPending || !projectToDelete?.id}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!projectToDelete?.id || deleteProjectMutation.isPending) return;
+                deleteProjectMutation.mutate({
+                  projectId: projectToDelete.id,
+                  projectName: projectToDelete.name,
+                });
+              }}
+            >
+              {deleteProjectMutation.isPending &&
+              deleteProjectMutation.variables?.projectId === projectToDelete?.id
+                ? "Removing..."
+                : "Delete project"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(transactionToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteTransactionMutation.isPending) {
+            setTransactionToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Are you sure you want to delete this transaction${
+                transactionToDelete?.transaction?.description
+                  ? ` "${transactionToDelete.transaction.description}"`
+                  : ""
+              }? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTransactionMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                deleteTransactionMutation.isPending || !transactionToDelete?.transaction?.id
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                if (!transactionToDelete?.transaction?.id || deleteTransactionMutation.isPending) return;
+                deleteTransactionMutation.mutate({
+                  projectId: transactionToDelete.projectId,
+                  transactionId: transactionToDelete.transaction.id,
+                });
+              }}
+            >
+              {deleteTransactionMutation.isPending &&
+              deleteTransactionMutation.variables?.transactionId === transactionToDelete?.transaction?.id
+                ? "Removing..."
+                : "Delete transaction"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AddProjectDialog
         open={projectDialogState.open}
