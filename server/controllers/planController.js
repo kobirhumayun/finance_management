@@ -5,8 +5,7 @@ const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Invoice = require('../models/Invoice');
 const {
-    coercePlanLimitsInput,
-    prunePlanLimits,
+    sanitizePlanLimitsInput,
     mergePlanLimits,
     applyPlanLimitDefaults,
 } = require('../services/planLimits');
@@ -58,7 +57,10 @@ const addPlan = async (req, res) => {
         };
 
         if (limits !== undefined) {
-            payload.limits = prunePlanLimits(limits);
+            const sanitizedLimits = sanitizePlanLimitsInput(limits);
+            if (sanitizedLimits !== undefined) {
+                payload.limits = sanitizedLimits;
+            }
         }
 
         const newPlan = new Plan(payload);
@@ -149,11 +151,13 @@ const updatePlan = async (req, res) => {
         // --- End Conflict Check ---
 
         if (Object.prototype.hasOwnProperty.call(updateData, 'limits')) {
-            if (updateData.limits === undefined) {
+            const sanitizedLimits = sanitizePlanLimitsInput(updateData.limits);
+            if (sanitizedLimits === undefined) {
                 delete updateData.limits;
+            } else if (updateData.limits === null) {
+                updateData.limits = {};
             } else {
-                const mergedLimits = mergePlanLimits(planToUpdate.limits, updateData.limits);
-                updateData.limits = prunePlanLimits(mergedLimits);
+                updateData.limits = mergePlanLimits(planToUpdate.limits, sanitizedLimits);
             }
         }
 
@@ -543,16 +547,7 @@ const getSubscriptionDetails = async (req, res) => {
         let planPayload = null;
         if (user.planId) {
             const rawPlan = user.planId.toObject();
-            let sanitizedLimits = {};
-            try {
-                const coercedLimits = coercePlanLimitsInput(rawPlan.limits);
-                if (coercedLimits !== undefined) {
-                    sanitizedLimits = prunePlanLimits(coercedLimits);
-                }
-            } catch (error) {
-                sanitizedLimits = {};
-            }
-            rawPlan.limits = applyPlanLimitDefaults(sanitizedLimits);
+            rawPlan.limits = applyPlanLimitDefaults(rawPlan.limits);
             planPayload = rawPlan;
         }
 

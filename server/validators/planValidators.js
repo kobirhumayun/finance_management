@@ -10,7 +10,7 @@ const {
     isLength,
 } = require('./commonValidators');
 const Plan = require('../models/Plan');
-const { coercePlanLimitsInput } = require('../services/planLimits');
+const { sanitizePlanLimitsInput } = require('../services/planLimits');
 
 const BILLING_CYCLES = Plan.schema.path('billingCycle').enumValues;
 
@@ -19,7 +19,7 @@ const normalizeLimitsField = () =>
         .optional()
         .custom((value, { req }) => {
             try {
-                const sanitized = coercePlanLimitsInput(value);
+                const sanitized = sanitizePlanLimitsInput(value);
                 if (sanitized === undefined) {
                     delete req.body.limits;
                 } else {

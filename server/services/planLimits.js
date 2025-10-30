@@ -9,7 +9,7 @@ const DEFAULT_PLAN_LIMITS = Object.freeze({
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-const parseOptionalNonNegativeInteger = (value, fieldName) => {
+const parseOptionalInteger = (value, fieldName) => {
     if (value === undefined) {
         return undefined;
     }
@@ -18,13 +18,28 @@ const parseOptionalNonNegativeInteger = (value, fieldName) => {
         return null;
     }
 
-    if (typeof value === 'string' && value.trim() === '') {
-        return null;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '') {
+            return null;
+        }
+        const numeric = Number(trimmed);
+        if (!Number.isFinite(numeric) || numeric < 0) {
+            throw new Error(`${fieldName} must be a non-negative number.`);
+        }
+        return Math.floor(numeric);
+    }
+
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value) || value < 0) {
+            throw new Error(`${fieldName} must be a non-negative number.`);
+        }
+        return Math.floor(value);
     }
 
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric < 0) {
-        throw new Error(`${fieldName} must be a non-negative integer.`);
+        throw new Error(`${fieldName} must be a non-negative number.`);
     }
 
     return Math.floor(numeric);
@@ -45,10 +60,10 @@ const parseOptionalBoolean = (value, fieldName) => {
 
     if (typeof value === 'string') {
         const normalized = value.trim().toLowerCase();
-        if (["true", "1", "yes", "y"].includes(normalized)) {
+        if (['true', '1', 'yes', 'y'].includes(normalized)) {
             return true;
         }
-        if (["false", "0", "no", "n"].includes(normalized)) {
+        if (['false', '0', 'no', 'n'].includes(normalized)) {
             return false;
         }
     }
@@ -56,7 +71,7 @@ const parseOptionalBoolean = (value, fieldName) => {
     throw new Error(`${fieldName} must be a boolean value.`);
 };
 
-const coercePlanLimitsInput = (raw) => {
+const sanitizePlanLimitsInput = (raw) => {
     if (raw === undefined) {
         return undefined;
     }
@@ -69,227 +84,109 @@ const coercePlanLimitsInput = (raw) => {
         throw new Error('limits must be an object.');
     }
 
-    const result = {};
+    const sanitized = {};
 
     if (Object.prototype.hasOwnProperty.call(raw, 'projects')) {
         const projects = raw.projects;
         if (projects === null) {
-            result.projects = { maxActive: null };
-        } else {
-            if (!isPlainObject(projects)) {
-                throw new Error('limits.projects must be an object.');
-            }
+            sanitized.projects = { maxActive: null };
+        } else if (isPlainObject(projects)) {
             const maxActiveInput = Object.prototype.hasOwnProperty.call(projects, 'maxActive')
                 ? projects.maxActive
                 : projects.maxProjects;
-            const maxActive = parseOptionalNonNegativeInteger(maxActiveInput, 'limits.projects.maxActive');
+            const maxActive = parseOptionalInteger(maxActiveInput, 'limits.projects.maxActive');
             if (maxActive !== undefined) {
-                result.projects = { maxActive };
+                sanitized.projects = { maxActive };
             }
+        } else {
+            throw new Error('limits.projects must be an object.');
         }
     }
 
     if (Object.prototype.hasOwnProperty.call(raw, 'transactions')) {
         const transactions = raw.transactions;
         if (transactions === null) {
-            result.transactions = { perProject: null };
-        } else {
-            if (!isPlainObject(transactions)) {
-                throw new Error('limits.transactions must be an object.');
-            }
-            const perProject = parseOptionalNonNegativeInteger(
-                transactions.perProject,
-                'limits.transactions.perProject',
-            );
+            sanitized.transactions = { perProject: null };
+        } else if (isPlainObject(transactions)) {
+            const perProject = parseOptionalInteger(transactions.perProject, 'limits.transactions.perProject');
             if (perProject !== undefined) {
-                result.transactions = { perProject };
+                sanitized.transactions = { perProject };
             }
+        } else {
+            throw new Error('limits.transactions must be an object.');
         }
     }
 
     if (Object.prototype.hasOwnProperty.call(raw, 'summary')) {
         const summary = raw.summary;
         if (summary === null) {
-            result.summary = { allowFilters: null, allowPagination: null };
-        } else {
-            if (!isPlainObject(summary)) {
-                throw new Error('limits.summary must be an object.');
-            }
+            sanitized.summary = {};
+        } else if (isPlainObject(summary)) {
             const allowFilters = parseOptionalBoolean(summary.allowFilters, 'limits.summary.allowFilters');
             const allowPagination = parseOptionalBoolean(summary.allowPagination, 'limits.summary.allowPagination');
-            const summaryResult = {};
+            const summaryValues = {};
             if (allowFilters !== undefined) {
-                summaryResult.allowFilters = allowFilters;
+                summaryValues.allowFilters = allowFilters;
             }
             if (allowPagination !== undefined) {
-                summaryResult.allowPagination = allowPagination;
+                summaryValues.allowPagination = allowPagination;
             }
-            if (Object.keys(summaryResult).length > 0) {
-                result.summary = summaryResult;
+            if (Object.keys(summaryValues).length > 0) {
+                sanitized.summary = summaryValues;
             }
+        } else {
+            throw new Error('limits.summary must be an object.');
         }
     }
 
-    return result;
+    if (sanitized.projects && Object.keys(sanitized.projects).length === 0) {
+        delete sanitized.projects;
+    }
+    if (sanitized.transactions && Object.keys(sanitized.transactions).length === 0) {
+        delete sanitized.transactions;
+    }
+    if (sanitized.summary && Object.keys(sanitized.summary).length === 0) {
+        delete sanitized.summary;
+    }
+
+    return sanitized;
 };
 
-const prunePlanLimits = (limits) => {
-    if (!isPlainObject(limits)) {
-        return {};
+const mergePlanLimits = (current = {}, updates = {}) => {
+    const base = sanitizePlanLimitsInput(current) ?? {};
+    const next = sanitizePlanLimitsInput(updates);
+
+    if (next === undefined) {
+        return base;
     }
 
-    const pruned = {};
+    const merged = { ...base };
 
-    if (isPlainObject(limits.projects) && Object.prototype.hasOwnProperty.call(limits.projects, 'maxActive')) {
-        pruned.projects = { maxActive: limits.projects.maxActive };
-    }
-
-    if (isPlainObject(limits.transactions) && Object.prototype.hasOwnProperty.call(limits.transactions, 'perProject')) {
-        pruned.transactions = { perProject: limits.transactions.perProject };
-    }
-
-    if (isPlainObject(limits.summary)) {
-        const summary = {};
-        if (Object.prototype.hasOwnProperty.call(limits.summary, 'allowFilters')) {
-            summary.allowFilters = limits.summary.allowFilters;
+    ['projects', 'transactions', 'summary'].forEach((section) => {
+        if (Object.prototype.hasOwnProperty.call(next, section)) {
+            const value = next[section];
+            if (!value || Object.keys(value).length === 0) {
+                delete merged[section];
+            } else {
+                merged[section] = value;
+            }
         }
-        if (Object.prototype.hasOwnProperty.call(limits.summary, 'allowPagination')) {
-            summary.allowPagination = limits.summary.allowPagination;
-        }
-        if (Object.keys(summary).length > 0) {
-            pruned.summary = summary;
-        }
-    }
+    });
 
-    return pruned;
+    return merged;
 };
 
-const mergePlanLimits = (currentLimits = {}, updates = {}) => {
-    const base = isPlainObject(currentLimits) ? { ...currentLimits } : {};
-    const result = {};
-
-    if (isPlainObject(base.projects)) {
-        result.projects = { ...base.projects };
-    }
-    if (isPlainObject(base.transactions)) {
-        result.transactions = { ...base.transactions };
-    }
-    if (isPlainObject(base.summary)) {
-        result.summary = { ...base.summary };
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'projects')) {
-        const updateProjects = updates.projects;
-        if (updateProjects === null) {
-            delete result.projects;
-        } else if (isPlainObject(updateProjects)) {
-            result.projects = result.projects || {};
-            if (Object.prototype.hasOwnProperty.call(updateProjects, 'maxActive')) {
-                const value = updateProjects.maxActive;
-                if (value === undefined) {
-                    // Ignore undefined values to keep existing data intact.
-                } else {
-                    result.projects.maxActive = value;
-                }
-            }
-        }
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'transactions')) {
-        const updateTransactions = updates.transactions;
-        if (updateTransactions === null) {
-            delete result.transactions;
-        } else if (isPlainObject(updateTransactions)) {
-            result.transactions = result.transactions || {};
-            if (Object.prototype.hasOwnProperty.call(updateTransactions, 'perProject')) {
-                const value = updateTransactions.perProject;
-                if (value === undefined) {
-                    // Ignore undefined values.
-                } else {
-                    result.transactions.perProject = value;
-                }
-            }
-        }
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'summary')) {
-        const updateSummary = updates.summary;
-        if (updateSummary === null) {
-            delete result.summary;
-        } else if (isPlainObject(updateSummary)) {
-            result.summary = result.summary || {};
-            if (Object.prototype.hasOwnProperty.call(updateSummary, 'allowFilters')) {
-                const value = updateSummary.allowFilters;
-                if (value === undefined) {
-                    // Ignore undefined values.
-                } else {
-                    result.summary.allowFilters = value;
-                }
-            }
-            if (Object.prototype.hasOwnProperty.call(updateSummary, 'allowPagination')) {
-                const value = updateSummary.allowPagination;
-                if (value === undefined) {
-                    // Ignore undefined values.
-                } else {
-                    result.summary.allowPagination = value;
-                }
-            }
-        }
-    }
-
-    if (result.projects && Object.keys(result.projects).length === 0) {
-        delete result.projects;
-    }
-    if (result.transactions && Object.keys(result.transactions).length === 0) {
-        delete result.transactions;
-    }
-    if (result.summary && Object.keys(result.summary).length === 0) {
-        delete result.summary;
-    }
-
-    return result;
-};
-
-const applyPlanLimitDefaults = (limits = {}) => {
-    const projects = isPlainObject(limits.projects) ? limits.projects : {};
-    const transactions = isPlainObject(limits.transactions) ? limits.transactions : {};
-    const summary = isPlainObject(limits.summary) ? limits.summary : {};
-
-    const maxActiveRaw = projects.maxActive;
-    const maxActive = maxActiveRaw === null
-        ? null
-        : (Number.isInteger(maxActiveRaw) && maxActiveRaw >= 0 ? maxActiveRaw : undefined);
-
-    const perProjectRaw = transactions.perProject;
-    const perProject = perProjectRaw === null
-        ? null
-        : (Number.isInteger(perProjectRaw) && perProjectRaw >= 0 ? perProjectRaw : undefined);
-
-    const allowFilters = typeof summary.allowFilters === 'boolean'
-        ? summary.allowFilters
-        : DEFAULT_PLAN_LIMITS.summary.allowFilters;
-
-    const allowPagination = typeof summary.allowPagination === 'boolean'
-        ? summary.allowPagination
-        : DEFAULT_PLAN_LIMITS.summary.allowPagination;
+const applyPlanLimitDefaults = (limits) => {
+    const sanitized = sanitizePlanLimitsInput(limits) ?? {};
 
     return {
-        projects: { maxActive: maxActive !== undefined ? maxActive : DEFAULT_PLAN_LIMITS.projects.maxActive },
-        transactions: { perProject: perProject !== undefined ? perProject : DEFAULT_PLAN_LIMITS.transactions.perProject },
-        summary: { allowFilters, allowPagination },
+        projects: { maxActive: sanitized.projects?.maxActive ?? DEFAULT_PLAN_LIMITS.projects.maxActive },
+        transactions: { perProject: sanitized.transactions?.perProject ?? DEFAULT_PLAN_LIMITS.transactions.perProject },
+        summary: {
+            allowFilters: sanitized.summary?.allowFilters ?? DEFAULT_PLAN_LIMITS.summary.allowFilters,
+            allowPagination: sanitized.summary?.allowPagination ?? DEFAULT_PLAN_LIMITS.summary.allowPagination,
+        },
     };
-};
-
-const safeCoerceStoredLimits = (limits) => {
-    try {
-        const coerced = coercePlanLimitsInput(limits);
-        if (coerced === undefined) {
-            return {};
-        }
-        return prunePlanLimits(coerced);
-    } catch (error) {
-        return {};
-    }
 };
 
 const getPlanLimitsForUser = async ({ userId, planSlug } = {}) => {
@@ -317,27 +214,22 @@ const getPlanLimitsForUser = async ({ userId, planSlug } = {}) => {
     }
 
     if (!planRecord && normalizedSlug !== 'free') {
-        const fallback = await Plan.findOne({ slug: 'free' })
+        planRecord = await Plan.findOne({ slug: 'free' })
             .select({ slug: 1, limits: 1 })
             .lean();
-        if (fallback) {
-            planRecord = fallback;
-        }
     }
 
-    const sanitizedLimits = safeCoerceStoredLimits(planRecord?.limits);
-    const limitsWithDefaults = applyPlanLimitDefaults(sanitizedLimits);
+    const limits = applyPlanLimitDefaults(planRecord?.limits);
 
     return {
-        slug: planRecord?.slug || normalizedSlug || 'free',
-        limits: limitsWithDefaults,
+        slug: planRecord?.slug ?? normalizedSlug ?? 'free',
+        limits,
     };
 };
 
 module.exports = {
     DEFAULT_PLAN_LIMITS,
-    coercePlanLimitsInput,
-    prunePlanLimits,
+    sanitizePlanLimitsInput,
     mergePlanLimits,
     applyPlanLimitDefaults,
     getPlanLimitsForUser,
