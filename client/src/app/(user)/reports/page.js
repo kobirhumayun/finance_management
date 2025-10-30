@@ -150,13 +150,13 @@ export default function ReportsPage() {
       key: "income",
       label: "Total Income",
       value: formatCurrency(summaryData.income),
-      description: `${formatNumber(summaryCounts.income)} income transactions`,
+      description: `${formatNumber(summaryCounts.income, { minimumFractionDigits: 0 })} income transactions`,
     },
     {
       key: "expense",
       label: "Total Expense",
       value: formatCurrency(summaryData.expense),
-      description: `${formatNumber(summaryCounts.expense)} expense transactions`,
+      description: `${formatNumber(summaryCounts.expense, { minimumFractionDigits: 0 })} expense transactions`,
     },
     {
       key: "balance",
