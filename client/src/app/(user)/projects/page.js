@@ -564,8 +564,28 @@ export default function ProjectsPage() {
     }
   };
 
+  const confirmProjectDeletion = (project) => {
+    if (!project?.id) return false;
+    const projectLabel = project?.name?.trim() ? project.name : "this project";
+    const message = `Are you sure you want to delete the project "${projectLabel}"? This will remove all related data.`;
+    if (typeof window === "undefined") {
+      return true;
+    }
+    return window.confirm(message);
+  };
+
+  const confirmTransactionDeletion = (transaction) => {
+    if (!transaction?.id) return false;
+    const message = "Are you sure you want to delete this transaction? This action cannot be undone.";
+    if (typeof window === "undefined") {
+      return true;
+    }
+    return window.confirm(message);
+  };
+
   const handleDeleteProject = (project) => {
     if (!project?.id) return;
+    if (!confirmProjectDeletion(project)) return;
     deleteProjectMutation.mutate({ projectId: project.id, projectName: project.name });
   };
 
@@ -589,6 +609,7 @@ export default function ProjectsPage() {
 
   const handleDeleteTransaction = (transaction) => {
     if (!selectedProjectId || !transaction?.id) return;
+    if (!confirmTransactionDeletion(transaction)) return;
     deleteTransactionMutation.mutate({ projectId: selectedProjectId, transactionId: transaction.id });
   };
 

@@ -189,6 +189,16 @@ export default function PlanManagementPage() {
   const plansForTable = Array.isArray(plans) ? plans : [];
   const isFormSubmitting = createPlanMutation.isPending || updatePlanMutation.isPending;
   const deletingSlug = deletePlanMutation.variables?.slug;
+
+  const confirmPlanDeletion = (plan) => {
+    if (!plan?.slug) return false;
+    const planLabel = plan?.name || plan.slug;
+    const message = `Are you sure you want to delete the plan "${planLabel}"? This action cannot be undone.`;
+    if (typeof window === "undefined") {
+      return true;
+    }
+    return window.confirm(message);
+  };
   const showEmptyState = !isLoading && !isError && plansForTable.length === 0;
   const errorMessage = isError ? getErrorMessage(error, "Failed to load plans.") : null;
 
@@ -248,7 +258,11 @@ export default function PlanManagementPage() {
                         size="sm"
                         variant="destructive"
                         disabled={deletePlanMutation.isPending && deletingSlug === plan.slug}
-                        onClick={() => deletePlanMutation.mutate({ slug: plan.slug, name: plan.name })}
+                        onClick={() => {
+                          if (confirmPlanDeletion(plan)) {
+                            deletePlanMutation.mutate({ slug: plan.slug, name: plan.name });
+                          }
+                        }}
                       >
                         {deletePlanMutation.isPending && deletingSlug === plan.slug ? "Removing..." : "Delete"}
                       </Button>
