@@ -281,6 +281,7 @@ export async function fetchSummaryFilters({ signal } = {}) {
     projects: normalizeProjects(response?.projects),
     transactionTypes: normalizeTransactionTypes(response?.transactionTypes),
     subcategories: normalizeSubcategories(response?.subcategories),
+    dateRange: normalizeAvailableDateRange(response?.dateRange),
   };
 }
 

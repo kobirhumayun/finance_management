@@ -16,6 +16,20 @@ import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 const PAGE_SIZE = 20;
 
+const toDateInputString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getStartOfCurrentYear = () => {
+  const now = new Date();
+  return toDateInputString(new Date(now.getFullYear(), 0, 1));
+};
+
+const getTodayDate = () => toDateInputString(new Date());
+
 function focusDropdownSearch(input, selection) {
   if (!input) {
     return () => {};
@@ -53,8 +67,8 @@ export default function SummaryPage() {
   const [projectFilter, setProjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [subcategoryFilter, setSubcategoryFilter] = useState("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(() => getStartOfCurrentYear());
+  const [to, setTo] = useState(() => getTodayDate());
   const [projectSearch, setProjectSearch] = useState("");
   const [subcategorySearch, setSubcategorySearch] = useState("");
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
@@ -242,6 +256,59 @@ export default function SummaryPage() {
     );
   }, [subcategoryMenuOpen, subcategorySearch]);
   const typeOptions = filtersData?.transactionTypes ?? [];
+  const availableDateRange = filtersData?.dateRange ?? { earliest: null, latest: null };
+
+  useEffect(() => {
+    const earliest = availableDateRange.earliest ?? "";
+    const latest = availableDateRange.latest ?? "";
+
+    if (!earliest && !latest) {
+      return;
+    }
+
+    let nextFrom = from || getStartOfCurrentYear();
+    let nextTo = to || getTodayDate();
+
+    if (earliest) {
+      if (!nextFrom || nextFrom < earliest) {
+        nextFrom = earliest;
+      }
+      if (!nextTo || nextTo < earliest) {
+        nextTo = earliest;
+      }
+    }
+
+    if (latest) {
+      if (!nextFrom || nextFrom > latest) {
+        nextFrom = latest;
+      }
+      if (!nextTo || nextTo > latest) {
+        nextTo = latest;
+      }
+    }
+
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      if (latest) {
+        nextFrom = latest;
+        nextTo = latest;
+      } else if (earliest) {
+        nextFrom = earliest;
+        nextTo = earliest;
+      } else {
+        const today = getTodayDate();
+        nextFrom = today;
+        nextTo = today;
+      }
+    }
+
+    if (nextFrom !== from) {
+      setFrom(nextFrom);
+    }
+
+    if (nextTo !== to) {
+      setTo(nextTo);
+    }
+  }, [availableDateRange.earliest, availableDateRange.latest, from, to]);
 
   return (
     <div className="space-y-8">
