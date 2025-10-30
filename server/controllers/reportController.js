@@ -1,5 +1,6 @@
 const Project = require('../models/Project');
 const Transaction = require('../models/Transaction');
+const { getPlanLimitsForUser } = require('../services/planLimits');
 
 const {
     clampLimit,
@@ -330,10 +331,18 @@ const getSummary = async (req, res, next) => {
             subcategory,
         } = req.query;
 
+        const { limits: planLimits } = await getPlanLimitsForUser({
+            userId,
+            planSlug: req.user?.plan,
+        });
+
+        const allowFilters = planLimits.summary?.allowFilters !== false;
+        const allowPagination = planLimits.summary?.allowPagination !== false;
+
         const userIdentifier = toObjectIdOrNull(userId) ?? userId;
         const filters = [{ user_id: userIdentifier }];
 
-        if (projectId) {
+        if (allowFilters && projectId) {
             const projectFilter = toObjectIdOrNull(projectId);
             if (!projectFilter) {
                 return res.status(400).json({ message: 'Invalid project identifier provided.' });
@@ -341,7 +350,7 @@ const getSummary = async (req, res, next) => {
             filters.push({ project_id: projectFilter });
         }
 
-        if (type) {
+        if (allowFilters && type) {
             const storageType = toStorageType(type);
             if (!storageType) {
                 return res.status(400).json({ message: 'Invalid transaction type filter provided.' });
@@ -349,7 +358,7 @@ const getSummary = async (req, res, next) => {
             filters.push({ type: storageType });
         }
 
-        if (search) {
+        if (allowFilters && search) {
             const expression = new RegExp(escapeRegex(search.trim()), 'i');
             filters.push({
                 $or: [
@@ -359,7 +368,7 @@ const getSummary = async (req, res, next) => {
             });
         }
 
-        if (subcategory) {
+        if (allowFilters && subcategory) {
             const trimmed = subcategory.trim();
             if (trimmed.length === 0) {
                 return res.status(400).json({ message: 'Subcategory filter cannot be empty.' });
@@ -367,7 +376,7 @@ const getSummary = async (req, res, next) => {
             filters.push({ subcategory: trimmed });
         }
 
-        if (startDate || endDate) {
+        if (allowFilters && (startDate || endDate)) {
             const dateFilter = {};
             if (startDate) {
                 const parsedStart = parseTransactionDate(startDate);
@@ -391,12 +400,12 @@ const getSummary = async (req, res, next) => {
             filters.push({ transaction_date: dateFilter });
         }
 
-        const limit = clampLimit(limitParam, { defaultValue: 20 });
+        const limit = clampLimit(allowPagination ? limitParam : undefined, { defaultValue: 20 });
         const sortDirection = sort === 'oldest' ? 1 : -1;
 
         const queryFilters = [...filters];
 
-        if (cursor) {
+        if (allowPagination && cursor) {
             const cursorTransaction = await Transaction.findOne({
                 _id: cursor,
                 user_id: userIdentifier,
@@ -413,13 +422,14 @@ const getSummary = async (req, res, next) => {
 
         const query = queryFilters.length > 1 ? { $and: queryFilters } : queryFilters[0];
 
+        const fetchLimit = allowPagination ? limit + 1 : limit;
         const transactions = await Transaction.find(query)
             .sort({ transaction_date: sortDirection, _id: sortDirection })
-            .limit(limit + 1)
+            .limit(fetchLimit)
             .populate({ path: 'project_id', select: 'name' })
             .lean();
 
-        const hasNextPage = transactions.length > limit;
+        const hasNextPage = allowPagination && transactions.length > limit;
         const trimmedTransactions = hasNextPage ? transactions.slice(0, -1) : transactions;
         const nextCursor = hasNextPage
             ? trimmedTransactions[trimmedTransactions.length - 1]?._id?.toString() ?? null
@@ -452,6 +462,8 @@ const getSummary = async (req, res, next) => {
             },
             { income: 0, expense: 0, counts: { income: 0, expense: 0 } },
         );
+
+        summary.counts.total = summary.counts.income + summary.counts.expense;
 
         const balance = summary.income - summary.expense;
 
@@ -527,7 +539,7 @@ const getSummary = async (req, res, next) => {
         const counts = {
             income: summary.counts.income,
             expense: summary.counts.expense,
-            total: summary.counts.income + summary.counts.expense,
+            total: summary.counts.total,
         };
 
         const formattedTransactions = trimmedTransactions.map((transaction) => {
@@ -563,6 +575,10 @@ const getSummary = async (req, res, next) => {
             aggregates: {
                 byProject: projectBreakdown,
             },
+            capabilities: {
+                filters: allowFilters,
+                pagination: allowPagination,
+            },
         });
     } catch (error) {
         next(error);
@@ -572,6 +588,23 @@ const getSummary = async (req, res, next) => {
 const getSummaryFilters = async (req, res, next) => {
     try {
         const userId = req.user?._id;
+        const { limits: planLimits } = await getPlanLimitsForUser({
+            userId,
+            planSlug: req.user?.plan,
+        });
+
+        const allowFilters = planLimits.summary?.allowFilters !== false;
+
+        if (!allowFilters) {
+            return res.status(200).json({
+                capabilities: { filters: false },
+                projects: [],
+                transactionTypes: [],
+                subcategories: [],
+                dateRange: { earliest: null, latest: null },
+            });
+        }
+
         const userIdentifier = toObjectIdOrNull(userId) ?? userId;
 
         const [projects, rawSubcategories, rangeAggregation] = await Promise.all([
@@ -621,6 +654,7 @@ const getSummaryFilters = async (req, res, next) => {
                 earliest,
                 latest,
             },
+            capabilities: { filters: true },
         });
     } catch (error) {
         next(error);

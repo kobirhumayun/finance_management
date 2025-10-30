@@ -62,6 +62,11 @@ const normalizeSummary = (summary) => {
   };
 };
 
+const normalizeSummaryCapabilities = (capabilities) => ({
+  filters: capabilities?.filters !== false,
+  pagination: capabilities?.pagination !== false,
+});
+
 const normalizeAggregateByProject = (aggregate) => {
   if (!aggregate || typeof aggregate !== "object") {
     return null;
@@ -282,6 +287,7 @@ export async function fetchSummaryFilters({ signal } = {}) {
     transactionTypes: normalizeTransactionTypes(response?.transactionTypes),
     subcategories: normalizeSubcategories(response?.subcategories),
     dateRange: normalizeAvailableDateRange(response?.dateRange),
+    capabilities: normalizeSummaryCapabilities(response?.capabilities),
   };
 }
 
@@ -319,5 +325,7 @@ export async function fetchSummaryReport({
       : [],
   };
 
-  return { transactions, summary, pageInfo, totalCount, aggregates };
+  const capabilities = normalizeSummaryCapabilities(response?.capabilities);
+
+  return { transactions, summary, pageInfo, totalCount, aggregates, capabilities };
 }

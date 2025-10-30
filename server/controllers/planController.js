@@ -4,6 +4,11 @@ const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Invoice = require('../models/Invoice');
+const {
+    sanitizePlanLimitsInput,
+    mergePlanLimits,
+    applyPlanLimitDefaults,
+} = require('../services/planLimits');
 let { createOrderWithPayment } = require('../utils/order');
 const defaultCreateOrderWithPayment = createOrderWithPayment;
 
@@ -22,11 +27,8 @@ const addPlan = async (req, res) => {
         price,
         billingCycle,
         features, // Optional, defaults in schema
-        // currency, // Optional, defaults in schema
-        // limits,   // Optional, defaults in schema
+        limits,
         isPublic, // Optional, defaults in schema
-        // displayOrder, // Optional, defaults in schema
-        // stripePriceId // Optional
     } = req.body;
 
     // Basic validation for required fields (Schema also validates, but good for early exit)
@@ -44,19 +46,24 @@ const addPlan = async (req, res) => {
         }
 
         // Create new plan instance
-        const newPlan = new Plan({
+        const payload = {
             name,
             slug: slug.toLowerCase().trim(), // Ensure slug is lowercase and trimmed
             description,
             price,
             billingCycle,
             features, // Let schema default handle if undefined
-            // currency, // Let schema default handle if undefined
-            // limits,   // Let schema default handle if undefined
             isPublic, // Let schema default handle if undefined
-            // displayOrder, // Let schema default handle if undefined
-            // stripePriceId
-        });
+        };
+
+        if (limits !== undefined) {
+            const sanitizedLimits = sanitizePlanLimitsInput(limits);
+            if (sanitizedLimits !== undefined) {
+                payload.limits = sanitizedLimits;
+            }
+        }
+
+        const newPlan = new Plan(payload);
 
         // Save the new plan to the database
         const savedPlan = await newPlan.save();
@@ -142,6 +149,17 @@ const updatePlan = async (req, res) => {
             }
         }
         // --- End Conflict Check ---
+
+        if (Object.prototype.hasOwnProperty.call(updateData, 'limits')) {
+            const sanitizedLimits = sanitizePlanLimitsInput(updateData.limits);
+            if (sanitizedLimits === undefined) {
+                delete updateData.limits;
+            } else if (updateData.limits === null) {
+                updateData.limits = {};
+            } else {
+                updateData.limits = mergePlanLimits(planToUpdate.limits, sanitizedLimits);
+            }
+        }
 
         // Find the plan by the original target slug and update it with the new data
         // { new: true } returns the updated document
@@ -526,8 +544,15 @@ const getSubscriptionDetails = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        let planPayload = null;
+        if (user.planId) {
+            const rawPlan = user.planId.toObject();
+            rawPlan.limits = applyPlanLimitDefaults(rawPlan.limits);
+            planPayload = rawPlan;
+        }
+
         res.status(200).json({
-            plan: user.planId,
+            plan: planPayload,
             status: user.subscriptionStatus,
             startDate: user.subscriptionStartDate,
             endDate: user.subscriptionEndDate,
