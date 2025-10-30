@@ -16,6 +16,20 @@ import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 const PAGE_SIZE = 20;
 
+const toDateInputString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getStartOfCurrentYear = () => {
+  const now = new Date();
+  return toDateInputString(new Date(now.getFullYear(), 0, 1));
+};
+
+const getTodayDate = () => toDateInputString(new Date());
+
 function focusDropdownSearch(input, selection) {
   if (!input) {
     return () => {};
@@ -53,8 +67,8 @@ export default function SummaryPage() {
   const [projectFilter, setProjectFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [subcategoryFilter, setSubcategoryFilter] = useState("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(() => getStartOfCurrentYear());
+  const [to, setTo] = useState(() => getTodayDate());
   const [projectSearch, setProjectSearch] = useState("");
   const [subcategorySearch, setSubcategorySearch] = useState("");
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
@@ -242,6 +256,59 @@ export default function SummaryPage() {
     );
   }, [subcategoryMenuOpen, subcategorySearch]);
   const typeOptions = filtersData?.transactionTypes ?? [];
+  const availableDateRange = filtersData?.dateRange ?? { earliest: null, latest: null };
+
+  useEffect(() => {
+    const earliest = availableDateRange.earliest ?? "";
+    const latest = availableDateRange.latest ?? "";
+
+    if (!earliest && !latest) {
+      return;
+    }
+
+    let nextFrom = from || getStartOfCurrentYear();
+    let nextTo = to || getTodayDate();
+
+    if (earliest) {
+      if (!nextFrom || nextFrom < earliest) {
+        nextFrom = earliest;
+      }
+      if (!nextTo || nextTo < earliest) {
+        nextTo = earliest;
+      }
+    }
+
+    if (latest) {
+      if (!nextFrom || nextFrom > latest) {
+        nextFrom = latest;
+      }
+      if (!nextTo || nextTo > latest) {
+        nextTo = latest;
+      }
+    }
+
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      if (latest) {
+        nextFrom = latest;
+        nextTo = latest;
+      } else if (earliest) {
+        nextFrom = earliest;
+        nextTo = earliest;
+      } else {
+        const today = getTodayDate();
+        nextFrom = today;
+        nextTo = today;
+      }
+    }
+
+    if (nextFrom !== from) {
+      setFrom(nextFrom);
+    }
+
+    if (nextTo !== to) {
+      setTo(nextTo);
+    }
+  }, [availableDateRange.earliest, availableDateRange.latest, from, to]);
 
   return (
     <div className="space-y-8">
@@ -417,11 +484,25 @@ export default function SummaryPage() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="summary-from">From</Label>
-            <Input id="summary-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+            <Input
+              id="summary-from"
+              type="date"
+              value={from}
+              min={availableDateRange.earliest || undefined}
+              max={availableDateRange.latest || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="summary-to">To</Label>
-            <Input id="summary-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+            <Input
+              id="summary-to"
+              type="date"
+              value={to}
+              min={availableDateRange.earliest || undefined}
+              max={availableDateRange.latest || undefined}
+              onChange={(event) => setTo(event.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -434,21 +515,21 @@ export default function SummaryPage() {
             <p className="text-sm text-muted-foreground">Income</p>
             <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.income)}</p>
             <p className="text-xs text-muted-foreground">
-              {formatNumber(summaryCounts.income)} income transactions
+              {formatNumber(summaryCounts.income, { minimumFractionDigits: 0 })} income transactions
             </p>
           </div>
           <div className="space-y-1 rounded-lg border p-4">
             <p className="text-sm text-muted-foreground">Expenses</p>
             <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.expense)}</p>
             <p className="text-xs text-muted-foreground">
-              {formatNumber(summaryCounts.expense)} expense transactions
+              {formatNumber(summaryCounts.expense, { minimumFractionDigits: 0 })} expense transactions
             </p>
           </div>
           <div className="space-y-1 rounded-lg border p-4 lg:col-span-1">
             <p className="text-sm text-muted-foreground">Net balance</p>
             <p className="text-2xl font-semibold">{formatCurrency(summaryTotals.balance)}</p>
             <p className="text-xs text-muted-foreground">
-              {formatNumber(summaryCounts.total)} total transactions
+              {formatNumber(summaryCounts.total, { minimumFractionDigits: 0 })} total transactions
             </p>
           </div>
         </CardContent>
@@ -460,7 +541,7 @@ export default function SummaryPage() {
             <p className="text-sm text-muted-foreground">
               {isInitialLoading
                 ? "Loading transactions..."
-                : `Showing ${formatNumber(transactions.length)} of ${formatNumber(totalCount)} transactions`}
+                : `Showing ${formatNumber(transactions.length, { minimumFractionDigits: 0 })} of ${formatNumber(totalCount, { minimumFractionDigits: 0 })} transactions`}
             </p>
           </div>
         </CardHeader>

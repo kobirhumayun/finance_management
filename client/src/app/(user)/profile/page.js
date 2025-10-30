@@ -572,11 +572,15 @@ export default function ProfilePage() {
           <CardContent className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-lg border bg-background p-4">
               <p className="text-xs uppercase text-muted-foreground">Total orders</p>
-              <p className="text-2xl font-semibold">{formatNumber(ordersSummary.totalOrders, { fallback: "0" })}</p>
+              <p className="text-2xl font-semibold">
+                {formatNumber(ordersSummary.totalOrders, { fallback: "0", minimumFractionDigits: 0 })}
+              </p>
             </div>
             <div className="rounded-lg border bg-background p-4">
               <p className="text-xs uppercase text-muted-foreground">Active</p>
-              <p className="text-2xl font-semibold">{formatNumber(ordersSummary.activeOrders, { fallback: "0" })}</p>
+              <p className="text-2xl font-semibold">
+                {formatNumber(ordersSummary.activeOrders, { fallback: "0", minimumFractionDigits: 0 })}
+              </p>
             </div>
             <div className="rounded-lg border bg-background p-4">
               <p className="text-xs uppercase text-muted-foreground">Lifetime spend</p>

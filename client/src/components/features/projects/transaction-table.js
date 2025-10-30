@@ -49,11 +49,11 @@ export default function TransactionTable({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="transaction-search" className="text-xs uppercase tracking-wide text-muted-foreground">
-            Search
+            Search transactions
           </Label>
           <Input
             id="transaction-search"
-            placeholder="Search by description"
+            placeholder="Search by description or subcategory"
             value={searchValue}
             onChange={handleSearchChange}
           />

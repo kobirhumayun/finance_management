@@ -574,12 +574,24 @@ const getSummaryFilters = async (req, res, next) => {
         const userId = req.user?._id;
         const userIdentifier = toObjectIdOrNull(userId) ?? userId;
 
-        const projects = await Project.find({ user_id: userIdentifier })
-            .select({ name: 1 })
-            .sort({ name: 1 })
-            .lean();
+        const [projects, rawSubcategories, rangeAggregation] = await Promise.all([
+            Project.find({ user_id: userIdentifier })
+                .select({ name: 1 })
+                .sort({ name: 1 })
+                .lean(),
+            Transaction.distinct('subcategory', { user_id: userIdentifier }),
+            Transaction.aggregate([
+                { $match: { user_id: userIdentifier } },
+                {
+                    $group: {
+                        _id: null,
+                        earliest: { $min: '$transaction_date' },
+                        latest: { $max: '$transaction_date' },
+                    },
+                },
+            ]),
+        ]);
 
-        const rawSubcategories = await Transaction.distinct('subcategory', { user_id: userIdentifier });
         const normalizedSubcategories = Array.from(
             new Set(
                 rawSubcategories
@@ -588,6 +600,10 @@ const getSummaryFilters = async (req, res, next) => {
                     .filter((value) => value.length > 0),
             ),
         ).sort((a, b) => a.localeCompare(b));
+
+        const rangeResult = rangeAggregation[0] || {};
+        const earliest = rangeResult.earliest ? toResponseDate(rangeResult.earliest) : null;
+        const latest = rangeResult.latest ? toResponseDate(rangeResult.latest) : null;
 
         res.status(200).json({
             projects: projects.map((project) => ({
@@ -601,6 +617,10 @@ const getSummaryFilters = async (req, res, next) => {
                 { label: 'Expense', value: 'expense' },
             ],
             subcategories: normalizedSubcategories.map((name) => ({ label: name, value: name })),
+            dateRange: {
+                earliest,
+                latest,
+            },
         });
     } catch (error) {
         next(error);
