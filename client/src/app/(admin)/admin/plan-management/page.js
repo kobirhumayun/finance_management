@@ -141,6 +141,12 @@ export default function PlanManagementPage() {
   };
 
   const openEdit = (plan) => {
+    const planLimits = plan?.limits ?? {};
+    const toLimitInput = (value) => {
+      if (value === undefined || value === null) return "";
+      return String(value);
+    };
+
     setEditingPlan({
       targetSlug: plan.slug,
       defaults: {
@@ -151,6 +157,14 @@ export default function PlanManagementPage() {
         description: plan.description ?? "",
         features: Array.isArray(plan.features) ? plan.features.join("\n") : "",
         isPublic: Boolean(plan.isPublic),
+        limits: {
+          projects: { maxActive: toLimitInput(planLimits?.projects?.maxActive) },
+          transactions: { perProject: toLimitInput(planLimits?.transactions?.perProject) },
+          summary: {
+            allowFilters: planLimits?.summary?.allowFilters ?? true,
+            allowPagination: planLimits?.summary?.allowPagination ?? true,
+          },
+        },
       },
     });
     setDialogOpen(true);

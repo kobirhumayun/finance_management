@@ -11,6 +11,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 
+const limitNumberSchema = z
+  .string()
+  .refine(
+    (value) => {
+      const trimmed = value.trim();
+      if (trimmed.length === 0) return true;
+      const numeric = Number(trimmed);
+      return Number.isFinite(numeric) && numeric >= 0;
+    },
+    { message: "Enter a non-negative number or leave blank." }
+  );
+
 const schema = z.object({
   name: z.string().min(2, "Name is required"),
   slug: z
@@ -25,9 +37,21 @@ const schema = z.object({
   description: z.string().min(5, "Provide a short description"),
   features: z.string().min(3, "List at least one feature"),
   isPublic: z.boolean(),
+  limits: z.object({
+    projects: z.object({
+      maxActive: limitNumberSchema,
+    }),
+    transactions: z.object({
+      perProject: limitNumberSchema,
+    }),
+    summary: z.object({
+      allowFilters: z.boolean(),
+      allowPagination: z.boolean(),
+    }),
+  }),
 });
 
-const defaultFormValues = {
+const createDefaultFormValues = () => ({
   name: "",
   slug: "",
   price: "",
@@ -35,39 +59,120 @@ const defaultFormValues = {
   description: "",
   features: "",
   isPublic: false,
+  limits: {
+    projects: { maxActive: "" },
+    transactions: { perProject: "1000" },
+    summary: { allowFilters: true, allowPagination: true },
+  },
+});
+
+const prepareDefaultValues = (values) => {
+  const base = createDefaultFormValues();
+
+  if (!values) {
+    return base;
+  }
+
+  const normalizeNumberInput = (value, fallback) => {
+    if (value === undefined) return fallback;
+    if (value === null) return "";
+    return String(value);
+  };
+
+  return {
+    ...base,
+    name: values.name ?? base.name,
+    slug: values.slug ?? base.slug,
+    price: values.price != null ? String(values.price) : base.price,
+    billingCycle: values.billingCycle ?? base.billingCycle,
+    description: values.description ?? base.description,
+    features: values.features ?? base.features,
+    isPublic: values.isPublic ?? base.isPublic,
+    limits: {
+      projects: {
+        maxActive: normalizeNumberInput(values.limits?.projects?.maxActive, base.limits.projects.maxActive),
+      },
+      transactions: {
+        perProject: normalizeNumberInput(
+          values.limits?.transactions?.perProject,
+          base.limits.transactions.perProject
+        ),
+      },
+      summary: {
+        allowFilters: values.limits?.summary?.allowFilters ?? base.limits.summary.allowFilters,
+        allowPagination: values.limits?.summary?.allowPagination ?? base.limits.summary.allowPagination,
+      },
+    },
+  };
 };
 
 // Form fields shared between create and update plan flows.
 export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitting }) {
   const form = useForm({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues ? { ...defaultFormValues, ...defaultValues } : defaultFormValues,
+    defaultValues: prepareDefaultValues(defaultValues),
   });
 
   useEffect(() => {
     if (defaultValues) {
-      form.reset({ ...defaultFormValues, ...defaultValues, isPublic: defaultValues.isPublic ?? false });
+      form.reset(prepareDefaultValues(defaultValues));
     } else {
-      form.reset(defaultFormValues);
+      form.reset(prepareDefaultValues());
     }
   }, [defaultValues, form]);
 
   const handleSubmit = (values) => {
+    const { limits, ...baseValues } = values;
     const parsedFeatures = values.features
       .split(/[,\n]/)
       .map((feature) => feature.trim())
       .filter(Boolean);
     const price = Number(values.price);
+
+    const parseLimitNumber = (input) => {
+      const raw = typeof input === "string" ? input : String(input ?? "");
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) {
+        return null;
+      }
+      const numeric = Number(trimmed);
+      if (!Number.isFinite(numeric)) {
+        return null;
+      }
+      return Math.max(0, Math.floor(numeric));
+    };
+
+    const normalizedLimits = {
+      summary: {
+        allowFilters: Boolean(limits?.summary?.allowFilters),
+        allowPagination: Boolean(limits?.summary?.allowPagination),
+      },
+    };
+
+    if (limits?.projects) {
+      normalizedLimits.projects = {
+        maxActive: parseLimitNumber(limits.projects.maxActive ?? ""),
+      };
+    }
+
+    if (limits?.transactions) {
+      normalizedLimits.transactions = {
+        perProject: parseLimitNumber(limits.transactions.perProject ?? ""),
+      };
+    }
+
     const payload = {
-      ...values,
-      name: values.name.trim(),
-      slug: values.slug.trim().toLowerCase(),
-      billingCycle: values.billingCycle.trim(),
-      description: values.description.trim(),
+      ...baseValues,
+      name: baseValues.name.trim(),
+      slug: baseValues.slug.trim().toLowerCase(),
+      billingCycle: baseValues.billingCycle.trim(),
+      description: baseValues.description.trim(),
       price,
       features: parsedFeatures,
-      isPublic: Boolean(values.isPublic),
+      isPublic: Boolean(baseValues.isPublic),
+      limits: normalizedLimits,
     };
+
     onSubmit?.(payload);
   };
 
@@ -147,6 +252,88 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
           </div>
         )}
       />
+      <div className="space-y-4 rounded-md border p-4">
+        <div>
+          <h3 className="text-sm font-semibold">Plan limits</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure per-plan quotas and feature access. Leave numeric fields blank for unlimited.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="limits-projects-max-active">Max active projects</Label>
+          <Input
+            id="limits-projects-max-active"
+            type="number"
+            min="0"
+            placeholder="Unlimited"
+            disabled={isSubmitting}
+            {...form.register("limits.projects.maxActive")}
+          />
+          {form.formState.errors?.limits?.projects?.maxActive && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.limits.projects.maxActive.message}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">Leave blank for unlimited projects.</p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="limits-transactions-per-project">Transactions per project</Label>
+          <Input
+            id="limits-transactions-per-project"
+            type="number"
+            min="0"
+            placeholder="1000"
+            disabled={isSubmitting}
+            {...form.register("limits.transactions.perProject")}
+          />
+          {form.formState.errors?.limits?.transactions?.perProject && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.limits.transactions.perProject.message}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">Leave blank for unlimited transactions per project.</p>
+        </div>
+        <Controller
+          control={form.control}
+          name="limits.summary.allowFilters"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3 rounded-md border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="limits-summary-allow-filters">Enable summary filters</Label>
+                <p className="text-sm text-muted-foreground">
+                  When disabled, users on this plan cannot filter summary data.
+                </p>
+              </div>
+              <Switch
+                id="limits-summary-allow-filters"
+                disabled={isSubmitting}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </div>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="limits.summary.allowPagination"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3 rounded-md border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="limits-summary-allow-pagination">Allow summary pagination</Label>
+                <p className="text-sm text-muted-foreground">
+                  Toggle off to restrict the summary view to a single page of results.
+                </p>
+              </div>
+              <Switch
+                id="limits-summary-allow-pagination"
+                disabled={isSubmitting}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </div>
+          )}
+        />
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancel

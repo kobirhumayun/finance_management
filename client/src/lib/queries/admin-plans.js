@@ -17,9 +17,43 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const normalizePlanLimits = (rawLimits) => {
+  const limits = rawLimits && typeof rawLimits === "object" && !Array.isArray(rawLimits) ? rawLimits : {};
+  const projects = limits.projects && typeof limits.projects === "object" ? limits.projects : {};
+  const transactions =
+    limits.transactions && typeof limits.transactions === "object" ? limits.transactions : {};
+  const summary = limits.summary && typeof limits.summary === "object" ? limits.summary : {};
+
+  const toLimitNumber = (value, fallback) => {
+    if (value === null) return null;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      return fallback;
+    }
+    return Math.floor(numeric);
+  };
+
+  return {
+    projects: {
+      maxActive: projects.maxActive !== undefined ? toLimitNumber(projects.maxActive, null) : null,
+    },
+    transactions: {
+      perProject:
+        transactions.perProject !== undefined
+          ? toLimitNumber(transactions.perProject, 1000)
+          : 1000,
+    },
+    summary: {
+      allowFilters: typeof summary.allowFilters === "boolean" ? summary.allowFilters : true,
+      allowPagination: typeof summary.allowPagination === "boolean" ? summary.allowPagination : true,
+    },
+  };
+};
+
 export const normalizeAdminPlan = (plan) => {
   if (!plan) return null;
-  const fallbackId = typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : null;
+  const fallbackId =
+    typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : null;
   const id = plan?._id?.$oid ?? plan?._id ?? plan?.id ?? plan?.slug ?? fallbackId ?? `plan-${Date.now()}`;
   const features = Array.isArray(plan?.features)
     ? plan.features.filter((item) => typeof item === "string" && item.trim().length > 0)
@@ -38,6 +72,7 @@ export const normalizeAdminPlan = (plan) => {
     displayOrder: plan?.displayOrder ?? null,
     createdAt: extractDate(plan?.createdAt),
     updatedAt: extractDate(plan?.updatedAt),
+    limits: normalizePlanLimits(plan?.limits),
   };
 };
 
