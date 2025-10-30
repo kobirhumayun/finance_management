@@ -219,7 +219,7 @@ export default function ReportsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Financial Reports"
-        description="Visualize income, expenses, and cash flow trends using interactive charts."
+        description="Visualize income, expenses, cash flow, and category trends with interactive reports."
       />
 
       {(filtersErrorMessage || chartsErrorMessage) && (
