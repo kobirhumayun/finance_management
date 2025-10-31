@@ -7,6 +7,8 @@ const REPORT_FILTERS_ENDPOINT = `${REPORTS_BASE}/filters`;
 const CHARTS_ENDPOINT = `${REPORTS_BASE}/charts`;
 const SUMMARY_ENDPOINT = `${REPORTS_BASE}/summary`;
 const SUMMARY_FILTERS_ENDPOINT = `${SUMMARY_ENDPOINT}/filters`;
+export const SUMMARY_PDF_ENDPOINT = `${REPORTS_BASE}/summary.pdf`;
+export const SUMMARY_XLSX_ENDPOINT = `${REPORTS_BASE}/summary.xlsx`;
 
 const buildQueryString = (params = {}) => {
   const searchParams = new URLSearchParams();
@@ -18,6 +20,22 @@ const buildQueryString = (params = {}) => {
 
   const query = searchParams.toString();
   return query ? `?${query}` : "";
+};
+
+export const buildSummaryFiltersQueryString = (params = {}) =>
+  buildQueryString({
+    projectId: params.projectId,
+    type: params.type,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    subcategory: params.subcategory,
+    sort: params.sort,
+  });
+
+export const getSummaryExportPath = (format = "pdf", params = {}) => {
+  const endpoint = format === "xlsx" ? SUMMARY_XLSX_ENDPOINT : SUMMARY_PDF_ENDPOINT;
+  const queryString = buildSummaryFiltersQueryString(params);
+  return `${endpoint}${queryString}`;
 };
 
 const normalizeTransaction = (transaction) => {
