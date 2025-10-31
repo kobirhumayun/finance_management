@@ -826,7 +826,6 @@ const getSummaryXlsx = async (req, res, next) => {
         transactionsSheet.columns = [
             { header: 'Date', key: 'date', width: 14 },
             { header: 'Project Name', key: 'projectName', width: 32 },
-            { header: 'Project ID', key: 'projectId', width: 24 },
             { header: 'Type', key: 'type', width: 12 },
             { header: 'Subcategory', key: 'subcategory', width: 24 },
             { header: 'Amount', key: 'amount', width: 14 },
@@ -846,7 +845,6 @@ const getSummaryXlsx = async (req, res, next) => {
                 .addRow({
                     date: mapped.date,
                     projectName: mapped.projectName || '',
-                    projectId: mapped.projectId,
                     type: mapped.type,
                     subcategory: mapped.subcategory || '',
                     amount: toSafeNumber(mapped.amount),
