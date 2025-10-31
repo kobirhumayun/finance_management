@@ -1,6 +1,9 @@
 const { describe, test, before, after, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');
+const path = require('node:path');
+
+const normalize = (value) => value?.split(path.sep).join('/');
 
 const originalModuleLoad = Module._load;
 
@@ -98,7 +101,7 @@ before(() => {
             };
         }
         if (request.endsWith('/services/planLimits')) {
-            if (parent?.filename?.includes('/controllers/reportController')) {
+            if (normalize(parent?.filename)?.includes('/controllers/reportController')) {
                 return {
                     getPlanLimitsForUser: async () => ({
                         limits: {
@@ -113,8 +116,8 @@ before(() => {
         }
         if (
             request.endsWith('/services/playwrightPool') &&
-            (parent?.filename?.includes('/controllers/reportController') ||
-                parent?.filename?.includes('reportSummaryExports.test.js'))
+            (normalize(parent?.filename)?.includes('/controllers/reportController') ||
+                normalize(parent?.filename)?.includes('reportSummaryExports.test.js'))
         ) {
             return playwrightPoolModuleStub;
         }
