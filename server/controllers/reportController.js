@@ -794,10 +794,9 @@ const getSummaryXlsx = async (req, res, next) => {
         summarySheet.addRow(['Total Income', toSafeNumber(summaryTotals.income)]).commit();
         summarySheet.addRow(['Total Expense', toSafeNumber(summaryTotals.expense)]).commit();
         summarySheet.addRow(['Balance', toSafeNumber(balance)]).commit();
-        summarySheet.addRow([]).commit();
-        summarySheet.addRow(['Income Count', counts.income]).commit();
-        summarySheet.addRow(['Expense Count', counts.expense]).commit();
-        summarySheet.addRow(['Total Count', counts.total]).commit();
+        summarySheet.addRow(['Income Transactions', counts.income]).commit();
+        summarySheet.addRow(['Expense Transactions', counts.expense]).commit();
+        summarySheet.addRow(['Total Transactions', counts.total]).commit();
         await summarySheet.commit();
 
         const projectSheet = workbook.addWorksheet('By Project');
