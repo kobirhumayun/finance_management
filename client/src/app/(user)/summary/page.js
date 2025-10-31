@@ -4,15 +4,34 @@
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 import PageHeader from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { qk } from "@/lib/query-keys";
-import { fetchSummaryFilters, fetchSummaryReport } from "@/lib/queries/reports";
+import {
+  buildSummaryFiltersQueryString,
+  fetchSummaryFilters,
+  fetchSummaryReport,
+  SUMMARY_PDF_ENDPOINT,
+  SUMMARY_XLSX_ENDPOINT,
+} from "@/lib/queries/reports";
 import { myPlanQueryOptions } from "@/lib/queries/plans";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 
@@ -143,6 +162,19 @@ export default function SummaryPage() {
     enabled: !isDateRangeInvalid,
     staleTime: 30_000,
   });
+
+  const summaryExportQueryString = useMemo(
+    () => buildSummaryFiltersQueryString(filtersKey),
+    [filtersKey],
+  );
+  const pdfExportHref = useMemo(
+    () => `/api/proxy${SUMMARY_PDF_ENDPOINT}${summaryExportQueryString}`,
+    [summaryExportQueryString],
+  );
+  const xlsxExportHref = useMemo(
+    () => `/api/proxy${SUMMARY_XLSX_ENDPOINT}${summaryExportQueryString}`,
+    [summaryExportQueryString],
+  );
 
   const transactions = useMemo(() => {
     const pages = summaryQuery.data?.pages ?? [];
@@ -667,8 +699,8 @@ export default function SummaryPage() {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="space-y-1 sm:flex sm:items-center sm:justify-between sm:space-y-0">
-          <div>
+        <CardHeader className="space-y-3 sm:flex sm:items-center sm:justify-between sm:space-y-0">
+          <div className="space-y-1">
             <CardTitle>Transaction Records</CardTitle>
             <p className="text-sm text-muted-foreground">
               {isInitialLoading
@@ -676,6 +708,31 @@ export default function SummaryPage() {
                 : `Showing ${formatNumber(transactions.length, { minimumFractionDigits: 0 })} of ${formatNumber(totalCount, { minimumFractionDigits: 0 })} transactions`}
             </p>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={isDateRangeInvalid}
+              >
+                <Download className="size-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem asChild>
+                <a href={pdfExportHref} download="summary.pdf">
+                  Download PDF
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={xlsxExportHref} download="summary.xlsx">
+                  Download Excel
+                </a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardHeader>
         <CardContent>
           {isDateRangeInvalid ? (

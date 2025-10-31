@@ -27,6 +27,20 @@ router.get(
     reportController.getSummary,
 );
 
+router.get(
+    '/summary.pdf',
+    summaryListValidationRules(),
+    handleValidationErrors,
+    reportController.getSummaryPdf,
+);
+
+router.get(
+    '/summary.xlsx',
+    summaryListValidationRules(),
+    handleValidationErrors,
+    reportController.getSummaryXlsx,
+);
+
 router.get('/summary/filters', reportController.getSummaryFilters);
 
 module.exports = router;

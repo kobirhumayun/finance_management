@@ -14,6 +14,7 @@ const adminUserRoutes = require('./routes/adminUsers');
 const projectRoutes = require('./routes/project');
 const reportRoutes = require('./routes/report');
 const { initializeEnforcer } = require('./services/casbin');
+const { initializePlaywright } = require('./services/playwrightPool');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./middleware/errorHandler');
@@ -74,6 +75,8 @@ const startServer = async () => {
         await connectDB();
         await initializeEnforcer();
         console.log('Authorization enforcer initialized');
+        await initializePlaywright();
+        console.log('Playwright pool initialized');
         scheduleSubscriptionExpiryCheck();
 
         // 2. Start Listening for Requests
