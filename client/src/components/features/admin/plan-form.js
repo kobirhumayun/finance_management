@@ -47,6 +47,7 @@ const schema = z.object({
     summary: z.object({
       allowFilters: z.boolean(),
       allowPagination: z.boolean(),
+      allowExport: z.boolean(),
     }),
   }),
 });
@@ -62,7 +63,7 @@ const createDefaultFormValues = () => ({
   limits: {
     projects: { maxActive: "" },
     transactions: { perProject: "1000" },
-    summary: { allowFilters: true, allowPagination: true },
+    summary: { allowFilters: true, allowPagination: true, allowExport: true },
   },
 });
 
@@ -101,6 +102,7 @@ const prepareDefaultValues = (values) => {
       summary: {
         allowFilters: values.limits?.summary?.allowFilters ?? base.limits.summary.allowFilters,
         allowPagination: values.limits?.summary?.allowPagination ?? base.limits.summary.allowPagination,
+        allowExport: values.limits?.summary?.allowExport ?? base.limits.summary.allowExport,
       },
     },
   };
@@ -146,6 +148,7 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
       summary: {
         allowFilters: Boolean(limits?.summary?.allowFilters),
         allowPagination: Boolean(limits?.summary?.allowPagination),
+        allowExport: Boolean(limits?.summary?.allowExport),
       },
     };
 
@@ -326,6 +329,26 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
               </div>
               <Switch
                 id="limits-summary-allow-pagination"
+                disabled={isSubmitting}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </div>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="limits.summary.allowExport"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3 rounded-md border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="limits-summary-allow-export">Allow summary exports</Label>
+                <p className="text-sm text-muted-foreground">
+                  Disable to prevent users on this plan from exporting summary data.
+                </p>
+              </div>
+              <Switch
+                id="limits-summary-allow-export"
                 disabled={isSubmitting}
                 checked={field.value}
                 onCheckedChange={field.onChange}
