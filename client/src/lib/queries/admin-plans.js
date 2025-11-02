@@ -46,6 +46,7 @@ const normalizePlanLimits = (rawLimits) => {
     summary: {
       allowFilters: typeof summary.allowFilters === "boolean" ? summary.allowFilters : true,
       allowPagination: typeof summary.allowPagination === "boolean" ? summary.allowPagination : true,
+      allowExport: typeof summary.allowExport === "boolean" ? summary.allowExport : true,
     },
   };
 };
