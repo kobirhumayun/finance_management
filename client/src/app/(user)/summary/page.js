@@ -742,7 +742,12 @@ export default function SummaryPage() {
             </DropdownMenu>
           ) : (
             <div className="flex flex-col items-start gap-2 sm:items-end sm:text-right">
-              <Button variant="outline" size="sm" className="gap-2" disabled>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 disabled:pointer-events-auto"
+                disabled
+              >
                 <Download className="size-4" />
                 {exportsBlockedByServer ? "Export unavailable" : "Export"}
               </Button>
