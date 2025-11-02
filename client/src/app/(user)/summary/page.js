@@ -455,7 +455,7 @@ export default function SummaryPage() {
           {!filtersEnabled && (
             <div className="md:col-span-2 lg:col-span-4 xl:col-span-5">
               <div className="flex flex-col gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary">
-                <p>Filtering is available on Professional and Enterprise plans.</p>
+                <p>Your current plans do not include access to filtering features.</p>
                 <Button asChild size="sm" variant="outline" className="w-fit">
                   <Link href="/pricing">See plans</Link>
                 </Button>
@@ -755,7 +755,7 @@ export default function SummaryPage() {
               </Button>
               {exportsBlockedByPlan ? (
                 <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary sm:items-end sm:text-right">
-                  <p>Exporting is available on Professional and Enterprise plans.</p>
+                  <p>Your current plans do not include access to export features.</p>
                   <Button asChild size="sm" variant="outline">
                     <Link href="/pricing">See plans</Link>
                   </Button>
