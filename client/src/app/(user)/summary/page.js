@@ -202,7 +202,8 @@ export default function SummaryPage() {
   const filtersEnabled = planFiltersAllowed && (filtersCapabilityFromServer ?? true) && (latestCapabilities?.filters ?? true);
   const serverExportsEnabled = (exportsCapabilityFromServer ?? true) && (latestCapabilities?.export ?? true);
   const exportsEnabled = planExportsAllowed && serverExportsEnabled;
-  const showExportDisabledButton = planExportsAllowed && !serverExportsEnabled;
+  const exportsBlockedByPlan = !planExportsAllowed;
+  const exportsBlockedByServer = planExportsAllowed && !serverExportsEnabled;
   const paginationEnabled = planPaginationAllowed && (latestCapabilities?.pagination ?? true);
 
   const projectOptions = useMemo(() => {
@@ -739,17 +740,22 @@ export default function SummaryPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : showExportDisabledButton ? (
-            <Button variant="outline" size="sm" className="gap-2" disabled>
-              <Download className="size-4" />
-              Export unavailable
-            </Button>
           ) : (
-            <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary sm:items-end sm:text-right">
-              <p>Exporting is available on Professional and Enterprise plans.</p>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/pricing">See plans</Link>
+            <div className="flex flex-col items-start gap-2 sm:items-end sm:text-right">
+              <Button variant="outline" size="sm" className="gap-2" disabled>
+                <Download className="size-4" />
+                {exportsBlockedByServer ? "Export unavailable" : "Export"}
               </Button>
+              {exportsBlockedByPlan ? (
+                <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary sm:items-end sm:text-right">
+                  <p>Exporting is available on Professional and Enterprise plans.</p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/pricing">See plans</Link>
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Exporting is temporarily unavailable. Please try again later.</p>
+              )}
             </div>
           )}
         </CardHeader>
