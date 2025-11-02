@@ -660,6 +660,7 @@ export default function SummaryPage() {
               max={availableDateRange.latest || undefined}
               onChange={(event) => setFrom(event.target.value)}
               disabled={!filtersEnabled}
+              className="disabled:pointer-events-auto"
             />
           </div>
           <div className="grid gap-2">
@@ -672,6 +673,7 @@ export default function SummaryPage() {
               max={availableDateRange.latest || undefined}
               onChange={(event) => setTo(event.target.value)}
               disabled={!filtersEnabled}
+              className="disabled:pointer-events-auto"
             />
           </div>
         </CardContent>
