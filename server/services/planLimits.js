@@ -4,7 +4,7 @@ const User = require('../models/User');
 const DEFAULT_PLAN_LIMITS = Object.freeze({
     projects: { maxActive: null },
     transactions: { perProject: 1000 },
-    summary: { allowFilters: true, allowPagination: true },
+    summary: { allowFilters: true, allowPagination: true, allowExport: true },
 });
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -124,12 +124,16 @@ const sanitizePlanLimitsInput = (raw) => {
         } else if (isPlainObject(summary)) {
             const allowFilters = parseOptionalBoolean(summary.allowFilters, 'limits.summary.allowFilters');
             const allowPagination = parseOptionalBoolean(summary.allowPagination, 'limits.summary.allowPagination');
+            const allowExport = parseOptionalBoolean(summary.allowExport, 'limits.summary.allowExport');
             const summaryValues = {};
             if (allowFilters !== undefined) {
                 summaryValues.allowFilters = allowFilters;
             }
             if (allowPagination !== undefined) {
                 summaryValues.allowPagination = allowPagination;
+            }
+            if (allowExport !== undefined) {
+                summaryValues.allowExport = allowExport;
             }
             if (Object.keys(summaryValues).length > 0) {
                 sanitized.summary = summaryValues;
@@ -185,6 +189,7 @@ const applyPlanLimitDefaults = (limits) => {
         summary: {
             allowFilters: sanitized.summary?.allowFilters ?? DEFAULT_PLAN_LIMITS.summary.allowFilters,
             allowPagination: sanitized.summary?.allowPagination ?? DEFAULT_PLAN_LIMITS.summary.allowPagination,
+            allowExport: sanitized.summary?.allowExport ?? DEFAULT_PLAN_LIMITS.summary.allowExport,
         },
     };
 };

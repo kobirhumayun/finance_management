@@ -634,6 +634,7 @@ const getSummary = async (req, res, next) => {
 
         const allowFilters = planLimits.summary?.allowFilters !== false;
         const allowPagination = planLimits.summary?.allowPagination !== false;
+        const allowExport = planLimits.summary?.allowExport !== false;
 
         const queryConfig = await buildSummaryQuery({
             req,
@@ -687,6 +688,7 @@ const getSummary = async (req, res, next) => {
             capabilities: {
                 filters: allowFilters,
                 pagination: allowPagination,
+                export: allowExport,
             },
         });
     } catch (error) {
@@ -705,6 +707,11 @@ const getSummaryPdf = async (req, res, next) => {
 
         const allowFilters = planLimits.summary?.allowFilters !== false;
         const allowPagination = planLimits.summary?.allowPagination !== false;
+        const allowExport = planLimits.summary?.allowExport !== false;
+
+        if (!allowExport) {
+            return res.status(403).json({ message: 'Summary exports are not available for your plan.' });
+        }
 
         const queryConfig = await buildSummaryQuery({
             req,
@@ -762,6 +769,11 @@ const getSummaryXlsx = async (req, res, next) => {
 
         const allowFilters = planLimits.summary?.allowFilters !== false;
         const allowPagination = planLimits.summary?.allowPagination !== false;
+        const allowExport = planLimits.summary?.allowExport !== false;
+
+        if (!allowExport) {
+            return res.status(403).json({ message: 'Summary exports are not available for your plan.' });
+        }
 
         const queryConfig = await buildSummaryQuery({
             req,
@@ -872,10 +884,11 @@ const getSummaryFilters = async (req, res, next) => {
         });
 
         const allowFilters = planLimits.summary?.allowFilters !== false;
+        const allowExport = planLimits.summary?.allowExport !== false;
 
         if (!allowFilters) {
             return res.status(200).json({
-                capabilities: { filters: false },
+                capabilities: { filters: false, export: allowExport },
                 projects: [],
                 transactionTypes: [],
                 subcategories: [],
@@ -932,7 +945,7 @@ const getSummaryFilters = async (req, res, next) => {
                 earliest,
                 latest,
             },
-            capabilities: { filters: true },
+            capabilities: { filters: true, export: allowExport },
         });
     } catch (error) {
         next(error);

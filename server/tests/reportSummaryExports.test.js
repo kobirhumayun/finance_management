@@ -9,6 +9,16 @@ const originalModuleLoad = Module._load;
 
 const createdWorkbooks = [];
 
+const planLimitsDelegate = {
+    limits: {
+        summary: {
+            allowFilters: true,
+            allowPagination: true,
+            allowExport: true,
+        },
+    },
+};
+
 const playwrightPoolDelegate = {
     handler: async () => {
         throw new Error('Playwright pool stub not configured.');
@@ -104,12 +114,7 @@ before(() => {
             if (normalize(parent?.filename)?.includes('/controllers/reportController')) {
                 return {
                     getPlanLimitsForUser: async () => ({
-                        limits: {
-                            summary: {
-                                allowFilters: true,
-                                allowPagination: true,
-                            },
-                        },
+                        limits: JSON.parse(JSON.stringify(planLimitsDelegate.limits)),
                     }),
                 };
             }
@@ -153,6 +158,13 @@ describe('report summary exports', () => {
         playwrightPoolDelegate.handler = async () => {
             throw new Error('Playwright pool stub not configured.');
         };
+        planLimitsDelegate.limits = {
+            summary: {
+                allowFilters: true,
+                allowPagination: true,
+                allowExport: true,
+            },
+        };
     });
 
     afterEach(() => {
@@ -179,6 +191,12 @@ describe('report summary exports', () => {
         };
         res.status = (code) => {
             res.statusCode = code;
+            return res;
+        };
+        res.json = (payload) => {
+            res.payload = payload;
+            res.ended = true;
+            res.writableEnded = true;
             return res;
         };
         res.end = (payload) => {
@@ -419,5 +437,38 @@ describe('report summary exports', () => {
         assert.ok(projectSheet.rows.find((row) => row.values.project === 'Marketing'));
         assert.equal(transactionsSheet.name, 'Transactions');
         assert.equal(transactionsSheet.rows.length, sampleTransactions.length);
+    });
+
+    test('summary exports return 403 when plan disallows exporting', async () => {
+        planLimitsDelegate.limits = {
+            summary: {
+                allowFilters: true,
+                allowPagination: true,
+                allowExport: false,
+            },
+        };
+
+        const req = {
+            query: {},
+            user: { _id: 'user-789', plan: 'starter' },
+        };
+
+        const pdfRes = createResponseDouble();
+        await reportController.getSummaryPdf(req, pdfRes, (error) => {
+            throw error;
+        });
+        assert.equal(pdfRes.statusCode, 403);
+        assert.deepEqual(pdfRes.payload, {
+            message: 'Summary exports are not available for your plan.',
+        });
+
+        const xlsxRes = createResponseDouble();
+        await reportController.getSummaryXlsx(req, xlsxRes, (error) => {
+            throw error;
+        });
+        assert.equal(xlsxRes.statusCode, 403);
+        assert.deepEqual(xlsxRes.payload, {
+            message: 'Summary exports are not available for your plan.',
+        });
     });
 });

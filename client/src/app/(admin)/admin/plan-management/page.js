@@ -175,6 +175,7 @@ export default function PlanManagementPage() {
           summary: {
             allowFilters: planLimits?.summary?.allowFilters ?? true,
             allowPagination: planLimits?.summary?.allowPagination ?? true,
+            allowExport: planLimits?.summary?.allowExport ?? true,
           },
         },
       },

@@ -42,28 +42,38 @@ describe('planLimits service sanitization utilities', { concurrency: false }, ()
         const sanitized = sanitizePlanLimitsInput({
             projects: { maxActive: ' 10 ' },
             transactions: { perProject: '200 ' },
-            summary: { allowFilters: 'false', allowPagination: 'yes' },
+            summary: { allowFilters: 'false', allowPagination: 'yes', allowExport: '0' },
         });
 
         assert.deepEqual(sanitized, {
             projects: { maxActive: 10 },
             transactions: { perProject: 200 },
-            summary: { allowFilters: false, allowPagination: true },
+            summary: { allowFilters: false, allowPagination: true, allowExport: false },
         });
     });
 
     test('mergePlanLimits applies updates without mutating the original object', () => {
-        const current = { projects: { maxActive: 5 }, summary: { allowFilters: false } };
-        const updates = { projects: { maxActive: 15 }, transactions: { perProject: 500 } };
+        const current = {
+            projects: { maxActive: 5 },
+            summary: { allowFilters: false, allowExport: false },
+        };
+        const updates = {
+            projects: { maxActive: 15 },
+            transactions: { perProject: 500 },
+            summary: { allowExport: true },
+        };
 
         const merged = mergePlanLimits(current, updates);
 
         assert.deepEqual(merged, {
             projects: { maxActive: 15 },
-            summary: { allowFilters: false },
+            summary: { allowExport: true },
             transactions: { perProject: 500 },
         });
-        assert.deepEqual(current, { projects: { maxActive: 5 }, summary: { allowFilters: false } });
+        assert.deepEqual(current, {
+            projects: { maxActive: 5 },
+            summary: { allowFilters: false, allowExport: false },
+        });
     });
 
     test('applyPlanLimitDefaults fills in missing values from defaults', () => {
@@ -75,7 +85,7 @@ describe('planLimits service sanitization utilities', { concurrency: false }, ()
         assert.deepEqual(applied, {
             projects: { maxActive: 25 },
             transactions: { perProject: 1000 },
-            summary: { allowFilters: false, allowPagination: true },
+            summary: { allowFilters: false, allowPagination: true, allowExport: true },
         });
     });
 });
@@ -93,7 +103,11 @@ describe('planLimits service getPlanLimitsForUser', { concurrency: false }, () =
         assert.equal(result.slug, 'pro');
         assert.deepEqual(result.limits.projects, { maxActive: 50 });
         assert.deepEqual(result.limits.transactions, { perProject: 1000 });
-        assert.deepEqual(result.limits.summary, { allowFilters: true, allowPagination: true });
+        assert.deepEqual(result.limits.summary, {
+            allowFilters: true,
+            allowPagination: true,
+            allowExport: true,
+        });
     });
 
     test('falls back to the free plan when the requested plan does not exist', async () => {
@@ -115,7 +129,10 @@ describe('planLimits service getPlanLimitsForUser', { concurrency: false }, () =
     });
 
     test('derives limits from the user document when a plan slug is not provided', async () => {
-        const userPlan = { slug: 'enterprise', limits: { summary: { allowPagination: false } } };
+        const userPlan = {
+            slug: 'enterprise',
+            limits: { summary: { allowPagination: false, allowExport: false } },
+        };
 
         Plan.findOne = () => createQueryResult(null);
         User.findById = () => ({
@@ -130,7 +147,11 @@ describe('planLimits service getPlanLimitsForUser', { concurrency: false }, () =
         const result = await getPlanLimitsForUser({ userId: '507f1f77bcf86cd799439011' });
 
         assert.equal(result.slug, 'enterprise');
-        assert.deepEqual(result.limits.summary, { allowFilters: true, allowPagination: false });
+        assert.deepEqual(result.limits.summary, {
+            allowFilters: true,
+            allowPagination: false,
+            allowExport: false,
+        });
         assert.deepEqual(result.limits.transactions, { perProject: 1000 });
     });
 });

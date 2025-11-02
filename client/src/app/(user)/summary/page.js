@@ -86,6 +86,7 @@ export default function SummaryPage() {
   const planSummaryLimits = planLimits.summary ?? {};
   const planFiltersAllowed = planSummaryLimits.allowFilters !== false;
   const planPaginationAllowed = planSummaryLimits.allowPagination !== false;
+  const planExportsAllowed = planSummaryLimits.allowExport !== false;
 
   const filtersQuery = useQuery({
     queryKey: qk.reports.summaryFilters(),
@@ -197,7 +198,12 @@ export default function SummaryPage() {
   const totalCount = summaryPages.length ? summaryPages[0]?.totalCount ?? 0 : 0;
 
   const filtersCapabilityFromServer = filtersData?.capabilities?.filters;
+  const exportsCapabilityFromServer = filtersData?.capabilities?.export;
   const filtersEnabled = planFiltersAllowed && (filtersCapabilityFromServer ?? true) && (latestCapabilities?.filters ?? true);
+  const serverExportsEnabled = (exportsCapabilityFromServer ?? true) && (latestCapabilities?.export ?? true);
+  const exportsEnabled = planExportsAllowed && serverExportsEnabled;
+  const exportsBlockedByPlan = !planExportsAllowed;
+  const exportsBlockedByServer = planExportsAllowed && !serverExportsEnabled;
   const paginationEnabled = planPaginationAllowed && (latestCapabilities?.pagination ?? true);
 
   const projectOptions = useMemo(() => {
@@ -449,7 +455,7 @@ export default function SummaryPage() {
           {!filtersEnabled && (
             <div className="md:col-span-2 lg:col-span-4 xl:col-span-5">
               <div className="flex flex-col gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary">
-                <p>Filtering is available on Professional and Enterprise plans.</p>
+                <p>Your current plans do not include access to filtering features.</p>
                 <Button asChild size="sm" variant="outline" className="w-fit">
                   <Link href="/pricing">See plans</Link>
                 </Button>
@@ -654,6 +660,7 @@ export default function SummaryPage() {
               max={availableDateRange.latest || undefined}
               onChange={(event) => setFrom(event.target.value)}
               disabled={!filtersEnabled}
+              className="disabled:pointer-events-auto"
             />
           </div>
           <div className="grid gap-2">
@@ -666,6 +673,7 @@ export default function SummaryPage() {
               max={availableDateRange.latest || undefined}
               onChange={(event) => setTo(event.target.value)}
               disabled={!filtersEnabled}
+              className="disabled:pointer-events-auto"
             />
           </div>
         </CardContent>
@@ -708,31 +716,55 @@ export default function SummaryPage() {
                 : `Showing ${formatNumber(transactions.length, { minimumFractionDigits: 0 })} of ${formatNumber(totalCount, { minimumFractionDigits: 0 })} transactions`}
             </p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          {exportsEnabled ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isDateRangeInvalid}
+                >
+                  <Download className="size-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <a href={pdfExportHref} download="summary.pdf">
+                    Download PDF
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={xlsxExportHref} download="summary.xlsx">
+                    Download Excel
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex flex-col items-start gap-2 sm:items-end sm:text-right">
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
-                disabled={isDateRangeInvalid}
+                className="gap-2 disabled:pointer-events-auto"
+                disabled
               >
                 <Download className="size-4" />
-                Export
+                {exportsBlockedByServer ? "Export unavailable" : "Export"}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem asChild>
-                <a href={pdfExportHref} download="summary.pdf">
-                  Download PDF
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={xlsxExportHref} download="summary.xlsx">
-                  Download Excel
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              {exportsBlockedByPlan ? (
+                <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary sm:items-end sm:text-right">
+                  <p>Your current plans do not include access to export features.</p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/pricing">See plans</Link>
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Exporting is temporarily unavailable. Please try again later.</p>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {isDateRangeInvalid ? (
