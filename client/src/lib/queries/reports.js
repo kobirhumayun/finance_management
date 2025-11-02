@@ -83,6 +83,7 @@ const normalizeSummary = (summary) => {
 const normalizeSummaryCapabilities = (capabilities) => ({
   filters: capabilities?.filters !== false,
   pagination: capabilities?.pagination !== false,
+  export: capabilities?.export !== false,
 });
 
 const normalizeAggregateByProject = (aggregate) => {

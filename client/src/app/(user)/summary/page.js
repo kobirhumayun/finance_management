@@ -86,6 +86,7 @@ export default function SummaryPage() {
   const planSummaryLimits = planLimits.summary ?? {};
   const planFiltersAllowed = planSummaryLimits.allowFilters !== false;
   const planPaginationAllowed = planSummaryLimits.allowPagination !== false;
+  const planExportsAllowed = planSummaryLimits.allowExport !== false;
 
   const filtersQuery = useQuery({
     queryKey: qk.reports.summaryFilters(),
@@ -197,7 +198,11 @@ export default function SummaryPage() {
   const totalCount = summaryPages.length ? summaryPages[0]?.totalCount ?? 0 : 0;
 
   const filtersCapabilityFromServer = filtersData?.capabilities?.filters;
+  const exportsCapabilityFromServer = filtersData?.capabilities?.export;
   const filtersEnabled = planFiltersAllowed && (filtersCapabilityFromServer ?? true) && (latestCapabilities?.filters ?? true);
+  const serverExportsEnabled = (exportsCapabilityFromServer ?? true) && (latestCapabilities?.export ?? true);
+  const exportsEnabled = planExportsAllowed && serverExportsEnabled;
+  const showExportDisabledButton = planExportsAllowed && !serverExportsEnabled;
   const paginationEnabled = planPaginationAllowed && (latestCapabilities?.pagination ?? true);
 
   const projectOptions = useMemo(() => {
@@ -708,31 +713,45 @@ export default function SummaryPage() {
                 : `Showing ${formatNumber(transactions.length, { minimumFractionDigits: 0 })} of ${formatNumber(totalCount, { minimumFractionDigits: 0 })} transactions`}
             </p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                disabled={isDateRangeInvalid}
-              >
-                <Download className="size-4" />
-                Export
+          {exportsEnabled ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isDateRangeInvalid}
+                >
+                  <Download className="size-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <a href={pdfExportHref} download="summary.pdf">
+                    Download PDF
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={xlsxExportHref} download="summary.xlsx">
+                    Download Excel
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : showExportDisabledButton ? (
+            <Button variant="outline" size="sm" className="gap-2" disabled>
+              <Download className="size-4" />
+              Export unavailable
+            </Button>
+          ) : (
+            <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary sm:items-end sm:text-right">
+              <p>Exporting is available on Professional and Enterprise plans.</p>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/pricing">See plans</Link>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem asChild>
-                <a href={pdfExportHref} download="summary.pdf">
-                  Download PDF
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={xlsxExportHref} download="summary.xlsx">
-                  Download Excel
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {isDateRangeInvalid ? (
