@@ -89,7 +89,7 @@ const buildSummaryQuery = async ({
     if (allowFilters && (startDate || endDate)) {
         const dateFilter = {};
         let startBoundary = null;
-        let endBoundaryExclusive = null;
+        let endBoundary = null;
 
         if (startDate) {
             const parsedStart = parseTransactionDate(startDate);
@@ -104,14 +104,28 @@ const buildSummaryQuery = async ({
             if (!parsedEnd) {
                 throw new SummaryQueryError(400, 'Invalid endDate provided.');
             }
-            const exclusiveEnd = new Date(parsedEnd.getTime());
-            exclusiveEnd.setUTCHours(0, 0, 0, 0);
-            exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
-            endBoundaryExclusive = exclusiveEnd;
-            dateFilter.$lt = exclusiveEnd;
+            const trimmedEndDate = typeof endDate === 'string' ? endDate.trim() : '';
+            const timeMatch = trimmedEndDate.match(/T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?/);
+            const hasExplicitTime = Boolean(
+                timeMatch &&
+                    (Number.parseInt(timeMatch[1], 10) !== 0 ||
+                        Number.parseInt(timeMatch[2], 10) !== 0 ||
+                        Number.parseInt(timeMatch[3] ?? '0', 10) !== 0 ||
+                        Number.parseInt(timeMatch[4] ?? '0', 10) !== 0),
+            );
+
+            if (hasExplicitTime) {
+                endBoundary = parsedEnd;
+                dateFilter.$lte = parsedEnd;
+            } else {
+                const exclusiveEnd = new Date(parsedEnd.getTime());
+                exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
+                endBoundary = exclusiveEnd;
+                dateFilter.$lt = exclusiveEnd;
+            }
         }
 
-        if (startBoundary && endBoundaryExclusive && startBoundary >= endBoundaryExclusive) {
+        if (startBoundary && endBoundary && startBoundary >= endBoundary) {
             throw new SummaryQueryError(400, 'startDate cannot be later than endDate.');
         }
 
