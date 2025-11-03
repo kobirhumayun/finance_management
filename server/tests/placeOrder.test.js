@@ -76,7 +76,7 @@ describe('planController placeOrder', () => {
                 currency: 'usd',
                 paymentGateway: 'manual',
                 paymentMethodDetails: 'manual',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -111,7 +111,7 @@ describe('planController placeOrder', () => {
                 currency: 'eur',
                 paymentGateway: 'Manual',
                 paymentMethodDetails: paymentDetails,
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -142,7 +142,7 @@ describe('planController placeOrder', () => {
                 currency: 'usd',
                 paymentGateway: 'mystery-gateway',
                 paymentMethodDetails: 'details',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -156,6 +156,41 @@ describe('planController placeOrder', () => {
         assert.equal(res.statusCode, 400, 'Expected 400 response for unsupported payment gateway.');
         assert.match(res.jsonPayload?.error ?? '', /unsupported payment gateway/i, 'Expected unsupported gateway error message.');
         assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped for unsupported gateways.');
+    });
+
+    test('rejects invalid payment purposes before creating order/payment records', async () => {
+        const planObjectId = '507f191e810c19729de860fa';
+        let findByIdCallCount = 0;
+        Plan.findById = async () => {
+            findByIdCallCount += 1;
+            return {
+                _id: planObjectId,
+                price: 50,
+                currency: 'USD',
+            };
+        };
+
+        const req = {
+            body: {
+                amount: 50,
+                currency: 'usd',
+                paymentGateway: 'manual',
+                paymentMethodDetails: 'details',
+                purpose: 'not-a-real-purpose',
+                planId: planObjectId,
+            },
+            user: {
+                _id: '507f191e810c19729de860fb',
+            },
+        };
+        const res = createResponseDouble();
+
+        await placeOrder(req, res);
+
+        assert.equal(res.statusCode, 400, 'Expected 400 response for invalid payment purpose.');
+        assert.match(res.jsonPayload?.message ?? '', /invalid payment purpose/i, 'Expected invalid purpose message.');
+        assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped for invalid purposes.');
+        assert.equal(findByIdCallCount, 0, 'Expected plan lookup to be skipped for invalid purposes.');
     });
 
     test('rejects orders when currency does not match plan currency', async () => {
@@ -172,7 +207,7 @@ describe('planController placeOrder', () => {
                 currency: 'eur',
                 paymentGateway: 'manual',
                 paymentMethodDetails: 'details',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -204,7 +239,7 @@ describe('planController placeOrder', () => {
                 currency: 'usd',
                 paymentGateway: 'manual',
                 paymentMethodDetails: 'details',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
