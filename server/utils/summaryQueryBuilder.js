@@ -114,12 +114,12 @@ const buildSummaryQuery = async ({
     const sortDirection = sort === 'oldest' ? 1 : -1;
     const sortSpec = { transaction_date: sortDirection, _id: sortDirection };
 
-    const limit = clampLimit(allowPagination ? limitParam : undefined, { defaultValue: 20 });
+    const limit = allowPagination ? clampLimit(limitParam, { defaultValue: 20 }) : 0;
     const pagination = {
         enabled: allowPagination,
         limit,
         cursor: null,
-        fetchLimit: allowPagination ? limit + 1 : limit,
+        fetchLimit: allowPagination ? limit + 1 : 0,
         cursorQuery: null,
     };
 

@@ -645,9 +645,12 @@ const getSummary = async (req, res, next) => {
 
         const listFilter = applyPaginationFilter(queryConfig.filter, queryConfig.pagination);
 
-        const transactions = await Transaction.find(listFilter)
-            .sort(queryConfig.sort)
-            .limit(queryConfig.pagination.fetchLimit)
+        const listQuery = Transaction.find(listFilter).sort(queryConfig.sort);
+        if (queryConfig.pagination.fetchLimit > 0) {
+            listQuery.limit(queryConfig.pagination.fetchLimit);
+        }
+
+        const transactions = await listQuery
             .populate({ path: 'project_id', select: 'name' })
             .lean();
 
