@@ -9,12 +9,20 @@ const {
 
 const originalFindById = Plan.findById;
 
-const createResponseDouble = () => {
+const createResponseDouble = (options = {}) => {
     const res = {};
+    const throwOnStatus = options.throwOnStatus ?? null;
     res.statusCode = null;
     res.jsonPayload = null;
     res.status = (code) => {
         res.statusCode = code;
+        if (throwOnStatus) {
+            const key = String(code);
+            if (Object.prototype.hasOwnProperty.call(throwOnStatus, key)) {
+                const errorToThrow = throwOnStatus[key];
+                throw errorToThrow instanceof Error ? errorToThrow : new Error(String(errorToThrow));
+            }
+        }
         return res;
     };
     res.json = (payload) => {
@@ -68,7 +76,7 @@ describe('planController placeOrder', () => {
                 currency: 'usd',
                 paymentGateway: 'manual',
                 paymentMethodDetails: 'manual',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -103,7 +111,7 @@ describe('planController placeOrder', () => {
                 currency: 'eur',
                 paymentGateway: 'Manual',
                 paymentMethodDetails: paymentDetails,
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -134,7 +142,7 @@ describe('planController placeOrder', () => {
                 currency: 'usd',
                 paymentGateway: 'mystery-gateway',
                 paymentMethodDetails: 'details',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -148,6 +156,41 @@ describe('planController placeOrder', () => {
         assert.equal(res.statusCode, 400, 'Expected 400 response for unsupported payment gateway.');
         assert.match(res.jsonPayload?.error ?? '', /unsupported payment gateway/i, 'Expected unsupported gateway error message.');
         assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped for unsupported gateways.');
+    });
+
+    test('rejects invalid payment purposes before creating order/payment records', async () => {
+        const planObjectId = '507f191e810c19729de860fa';
+        let findByIdCallCount = 0;
+        Plan.findById = async () => {
+            findByIdCallCount += 1;
+            return {
+                _id: planObjectId,
+                price: 50,
+                currency: 'USD',
+            };
+        };
+
+        const req = {
+            body: {
+                amount: 50,
+                currency: 'usd',
+                paymentGateway: 'manual',
+                paymentMethodDetails: 'details',
+                purpose: 'not-a-real-purpose',
+                planId: planObjectId,
+            },
+            user: {
+                _id: '507f191e810c19729de860fb',
+            },
+        };
+        const res = createResponseDouble();
+
+        await placeOrder(req, res);
+
+        assert.equal(res.statusCode, 400, 'Expected 400 response for invalid payment purpose.');
+        assert.match(res.jsonPayload?.message ?? '', /invalid payment purpose/i, 'Expected invalid purpose message.');
+        assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped for invalid purposes.');
+        assert.equal(findByIdCallCount, 0, 'Expected plan lookup to be skipped for invalid purposes.');
     });
 
     test('rejects orders when currency does not match plan currency', async () => {
@@ -164,7 +207,7 @@ describe('planController placeOrder', () => {
                 currency: 'eur',
                 paymentGateway: 'manual',
                 paymentMethodDetails: 'details',
-                purpose: 'subscription',
+                purpose: 'subscription_initial',
                 planId: planObjectId,
             },
             user: {
@@ -178,5 +221,39 @@ describe('planController placeOrder', () => {
         assert.equal(res.statusCode, 400, 'Expected 400 response when currency mismatches plan currency.');
         assert.match(res.jsonPayload?.message ?? '', /currency/i, 'Expected error message to reference currency mismatch.');
         assert.equal(createOrderCallCount, 0, 'Expected order/payment creation to be skipped when currency mismatches.');
+    });
+
+    test('surfaces payment handler rejections as HTTP errors', async () => {
+        const planObjectId = '507f191e810c19729de860f2';
+        Plan.findById = async () => ({
+            _id: planObjectId,
+            price: 40,
+            currency: 'USD',
+        });
+
+        const rejectionError = new Error('Payment gateway unavailable');
+
+        const req = {
+            body: {
+                amount: 40,
+                currency: 'usd',
+                paymentGateway: 'manual',
+                paymentMethodDetails: 'details',
+                purpose: 'subscription_initial',
+                planId: planObjectId,
+            },
+            user: {
+                _id: '507f191e810c19729de860f3',
+            },
+        };
+
+        const res = createResponseDouble({
+            throwOnStatus: { 201: rejectionError },
+        });
+
+        await placeOrder(req, res);
+
+        assert.equal(res.statusCode, 500, 'Expected controller to respond with 500 when payment handler rejects.');
+        assert.equal(res.jsonPayload?.message, rejectionError.message, 'Expected rejection message to be surfaced in response.');
     });
 });

@@ -10,6 +10,7 @@ const {
     applyPlanLimitDefaults,
 } = require('../services/planLimits');
 let { createOrderWithPayment } = require('../utils/order');
+const allowedPaymentPurposes = Payment.schema.path('purpose').enumValues;
 const defaultCreateOrderWithPayment = createOrderWithPayment;
 
 /**
@@ -928,6 +929,12 @@ const placeOrder = async (req, res) => {
 
         const normalizedRequestCurrency = currency.trim().toUpperCase();
 
+        if (!allowedPaymentPurposes.includes(purpose)) {
+            return res.status(400).json({
+                message: `Invalid payment purpose. Allowed purposes: ${allowedPaymentPurposes.join(', ')}`,
+            });
+        }
+
         // Validate ObjectIds if provided
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ message: 'Invalid User ID format.' });
@@ -999,7 +1006,7 @@ const placeOrder = async (req, res) => {
 
         const { order, payment } = await createOrderWithPayment(orderData, paymentData);
 
-        paymentFunction(req, res, order, payment)
+        return await paymentFunction(req, res, order, payment);
 
     } catch (error) {
         // The error thrown from the service will be caught here.
