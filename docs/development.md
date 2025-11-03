@@ -1,13 +1,13 @@
 # Development Workflow
 
-This document captures the day-to-day tasks required to work on the Finance Management application. It complements the environment variable references in `client/.env.example` and `server/.env.example`.
+This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment variable examples in `client/.env.example` and `server/.env.example` when configuring your workspace.
 
 ## 1. Prerequisites
 
 - Node.js 18+
 - npm 9+
 - MongoDB 5.x running locally on `mongodb://localhost:27017`
-- (Optional) Redis 6.x when you want to exercise the production-style auth session coordination from the frontend
+- (Optional) Redis 6.x when you want to exercise production-like auth session coordination from the frontend
 
 After cloning the repository, install dependencies for each workspace:
 
@@ -59,24 +59,26 @@ Next.js runs on `http://localhost:3000` by default. The development server proxi
 - **Frontend linting**: The client enforces rules defined in [`client/eslint.config.mjs`](../client/eslint.config.mjs). Run `npm run lint` inside `client/` before submitting changes.
 - **API style**: Follow existing patterns in the Express controllers (see [`server/controllers`](../server/controllers))—validate input with `express-validator`, rely on services under [`server/services`](../server/services), and keep response payloads camelCased.
 - **Module resolution**: The frontend uses aliases defined in [`client/jsconfig.json`](../client/jsconfig.json). Import components using the configured paths (e.g. `@/components/Button`).
+- **Server linting**: The backend uses ESLint rules defined in [`server/.eslintrc.cjs`](../server/.eslintrc.cjs). Run `npm run lint` inside `server/` when changing API code.
+- **Formatting**: Both workspaces share a Prettier configuration located at [`package.json`](../package.json). Execute `npm run format` from the repository root to apply consistent formatting.
 
 ## 6. Testing
 
 | Workspace | Command | Notes |
 | --- | --- | --- |
-| Backend | `npm test` (from `server/`) | Uses Node's built-in test runner with supporting helpers under `server/tests`. |
+| Backend | `npm test` (from `server/`) | Uses Node's built-in test runner with helpers under `server/tests`. |
 | Frontend | `npm test` (from `client/`) | Runs Node's test runner alongside React Testing Library helpers. |
-| Lint | `npm run lint` (from `client/`) | Ensures the Next.js workspace follows its lint rules. |
+| Lint | `npm run lint` (from `client/` or `server/`) | Ensures ESLint rules pass in the relevant workspace. |
+| Type checks | `npm run typecheck` (from `client/`) | Validates the Next.js TypeScript types. |
 
 Automate these commands in CI by invoking the workspace scripts explicitly: `npm run --prefix server test`, `npm run --prefix client test`, etc.
 
-## 7. Working with subscription plans
+## 7. Git workflow tips
 
-- Server-side plan logic lives in [`server/models/Plan.js`](../server/models/Plan.js) and [`server/services/planLimits.js`](../server/services/planLimits.js).
-- Background jobs that downgrade expired users are implemented in [`server/jobs/subscriptionJobs.js`](../server/jobs/subscriptionJobs.js).
-- Frontend components query the current plan through [`client/src/lib/queries/plans.js`](../client/src/lib/queries/plans.js) and consume the data in the `/app/(user)/my-plan` and `/app/(user)/summary` routes.
-
-When you introduce or rename plan tiers, ensure the Plan model enumerations and any UI copy describing plan names stay in sync. The [`docs/plan-limits.md`](./plan-limits.md) reference describes the structure persisted in MongoDB.
+- Create feature branches off `main` for each change. Use descriptive names such as `feature/report-export`.
+- Keep commits focused and include a summary of the motivation in the commit message body when necessary.
+- Open a pull request when the branch is ready and ensure CI passes before requesting review.
+- When addressing review feedback, prefer follow-up commits over force pushes so reviewers can track incremental changes.
 
 ## 8. Troubleshooting tips
 
