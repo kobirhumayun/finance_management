@@ -66,14 +66,14 @@ export default function DashboardPage() {
         <SummaryCard
           title="Total Income"
           value={showSummaryPlaceholder ? "--" : formatCurrency(income)}
-          description="Month to date"
+          description="Current month"
           icon={Banknote}
           trend={formatTrend(comparisons.income, { fallbackDirection: "up" })}
         />
         <SummaryCard
           title="Total Expenses"
           value={showSummaryPlaceholder ? "--" : formatCurrency(expenses)}
-          description="Month to date"
+          description="Current month"
           icon={CreditCard}
           trend={formatTrend(comparisons.expense, { fallbackDirection: "down" })}
         />
