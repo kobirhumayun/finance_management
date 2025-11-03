@@ -16,7 +16,7 @@ const toISODate = (date) => {
 const getCurrentMonthRange = (reference = new Date()) => {
   const now = reference instanceof Date ? reference : new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   return { start: toISODate(start), end: toISODate(end) };
 };
