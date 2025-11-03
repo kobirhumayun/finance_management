@@ -999,7 +999,7 @@ const placeOrder = async (req, res) => {
 
         const { order, payment } = await createOrderWithPayment(orderData, paymentData);
 
-        paymentFunction(req, res, order, payment)
+        return await paymentFunction(req, res, order, payment);
 
     } catch (error) {
         // The error thrown from the service will be caught here.
