@@ -88,11 +88,15 @@ const buildSummaryQuery = async ({
 
     if (allowFilters && (startDate || endDate)) {
         const dateFilter = {};
+        let startBoundary = null;
+        let endBoundaryExclusive = null;
+
         if (startDate) {
             const parsedStart = parseTransactionDate(startDate);
             if (!parsedStart) {
                 throw new SummaryQueryError(400, 'Invalid startDate provided.');
             }
+            startBoundary = parsedStart;
             dateFilter.$gte = parsedStart;
         }
         if (endDate) {
@@ -100,10 +104,14 @@ const buildSummaryQuery = async ({
             if (!parsedEnd) {
                 throw new SummaryQueryError(400, 'Invalid endDate provided.');
             }
-            dateFilter.$lte = parsedEnd;
+            const exclusiveEnd = new Date(parsedEnd.getTime());
+            exclusiveEnd.setUTCHours(0, 0, 0, 0);
+            exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
+            endBoundaryExclusive = exclusiveEnd;
+            dateFilter.$lt = exclusiveEnd;
         }
 
-        if (dateFilter.$gte && dateFilter.$lte && dateFilter.$gte > dateFilter.$lte) {
+        if (startBoundary && endBoundaryExclusive && startBoundary >= endBoundaryExclusive) {
             throw new SummaryQueryError(400, 'startDate cannot be later than endDate.');
         }
 

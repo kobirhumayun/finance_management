@@ -318,4 +318,176 @@ describe('report summary controller', () => {
             counts: { income: 15, expense: 6, total: 21 },
         });
     });
+
+    test('includes boundary transactions when filtering by start and end dates', async () => {
+        setPlanLimits({ allowFilters: true, allowPagination: true, allowExport: true });
+
+        const userId = 'user-1';
+        const monthEndDate = new Date('2024-05-31T23:45:00.000Z');
+        const currentDayDate = new Date('2024-06-01T15:30:00.000Z');
+        const expectedStart = new Date('2024-05-01T00:00:00.000Z');
+        const expectedExclusiveEnd = new Date('2024-06-02T00:00:00.000Z');
+
+        const seededTransactions = [
+            {
+                _id: 'txn-month-end',
+                user_id: userId,
+                project_id: { _id: 'proj-1', name: 'Project One' },
+                transaction_date: monthEndDate,
+                type: 'cash_out',
+                amount: 200,
+                subcategory: 'Operations',
+                description: 'Month-end expense',
+                createdAt: monthEndDate,
+                updatedAt: monthEndDate,
+            },
+            {
+                _id: 'txn-current-day',
+                user_id: userId,
+                project_id: { _id: 'proj-2', name: 'Project Two' },
+                transaction_date: currentDayDate,
+                type: 'cash_in',
+                amount: 500,
+                subcategory: 'Sales',
+                description: 'Current day income',
+                createdAt: currentDayDate,
+                updatedAt: currentDayDate,
+            },
+        ];
+
+        const matchesFilter = (filter, transaction) => {
+            if (!filter) {
+                return true;
+            }
+
+            if (filter.$and) {
+                return filter.$and.every((clause) => matchesFilter(clause, transaction));
+            }
+
+            if (filter.user_id) {
+                return transaction.user_id === filter.user_id;
+            }
+
+            if (filter.transaction_date) {
+                const { $gte, $lte, $lt } = filter.transaction_date;
+                if ($gte && transaction.transaction_date < $gte) {
+                    return false;
+                }
+                if ($lte && transaction.transaction_date > $lte) {
+                    return false;
+                }
+                if ($lt && transaction.transaction_date >= $lt) {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+
+        const filterTransactions = (filter) =>
+            seededTransactions.filter((transaction) => matchesFilter(filter, transaction));
+
+        transactionFindDelegate.handler = (filter) => {
+            const filtered = filterTransactions(filter)
+                .slice()
+                .sort((a, b) => {
+                    const timeDifference = b.transaction_date.getTime() - a.transaction_date.getTime();
+                    if (timeDifference !== 0) {
+                        return timeDifference;
+                    }
+                    return b._id.localeCompare(a._id);
+                });
+            lastQuery = createQuery(filtered);
+            return lastQuery;
+        };
+
+        aggregateResponses = [
+            (pipeline) => {
+                const matchStage = pipeline.find((stage) => stage.$match)?.$match ?? {};
+                const filtered = filterTransactions(matchStage);
+                const groupedByType = filtered.reduce((accumulator, transaction) => {
+                    if (!accumulator[transaction.type]) {
+                        accumulator[transaction.type] = { total: 0, count: 0 };
+                    }
+                    accumulator[transaction.type].total += transaction.amount;
+                    accumulator[transaction.type].count += 1;
+                    return accumulator;
+                }, {});
+                return Object.entries(groupedByType).map(([type, values]) => ({
+                    _id: type,
+                    total: values.total,
+                    count: values.count,
+                }));
+            },
+            (pipeline) => {
+                const matchStage = pipeline.find((stage) => stage.$match)?.$match ?? {};
+                const filtered = filterTransactions(matchStage);
+                const groupedByProject = filtered.reduce((accumulator, transaction) => {
+                    const projectId = transaction.project_id?._id ?? '';
+                    if (!accumulator[projectId]) {
+                        accumulator[projectId] = { income: 0, expense: 0, transactionCount: 0 };
+                    }
+                    if (transaction.type === 'cash_in') {
+                        accumulator[projectId].income += transaction.amount;
+                    } else if (transaction.type === 'cash_out') {
+                        accumulator[projectId].expense += transaction.amount;
+                    }
+                    accumulator[projectId].transactionCount += 1;
+                    return accumulator;
+                }, {});
+                return Object.entries(groupedByProject).map(([projectId, values]) => ({
+                    _id: projectId,
+                    income: values.income,
+                    expense: values.expense,
+                    transactionCount: values.transactionCount,
+                }));
+            },
+        ];
+
+        projectFindDelegate.handler = async () => [
+            { _id: 'proj-1', name: 'Project One' },
+            { _id: 'proj-2', name: 'Project Two' },
+        ];
+
+        const req = createRequest({
+            userId,
+            query: {
+                startDate: '2024-05-01',
+                endDate: '2024-06-01',
+            },
+        });
+        const res = createResponse();
+
+        await reportController.getSummary(req, res, (error) => {
+            if (error) throw error;
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.ok(res.jsonPayload, 'response payload should be present');
+        assert.equal(res.jsonPayload.transactions.length, 2);
+        const returnedIds = new Set(res.jsonPayload.transactions.map((transaction) => transaction.id));
+        assert.deepEqual(returnedIds, new Set(['txn-month-end', 'txn-current-day']));
+
+        assert.deepEqual(res.jsonPayload.summary, {
+            income: 500,
+            expense: 200,
+            balance: 300,
+            counts: { income: 1, expense: 1, total: 2 },
+        });
+
+        const dateClause =
+            capturedFilter.$and?.find((clause) => clause.transaction_date)?.transaction_date ?? {};
+        assert.ok(dateClause.$lt, 'Expected the filter to use an exclusive upper bound for the end date.');
+        assert.equal(dateClause.$gte.toISOString(), expectedStart.toISOString());
+        assert.equal(dateClause.$lt.toISOString(), expectedExclusiveEnd.toISOString());
+
+        const aggregateMatchStage = aggregateCalls[0]?.find((stage) => stage.$match)?.$match ?? {};
+        const aggregateDateClause =
+            aggregateMatchStage.$and?.find((clause) => clause.transaction_date)?.transaction_date ?? {};
+        assert.ok(
+            aggregateDateClause.$lt,
+            'Expected the aggregate pipeline to apply the exclusive end date boundary.',
+        );
+        assert.equal(aggregateDateClause.$lt.toISOString(), expectedExclusiveEnd.toISOString());
+    });
 });
