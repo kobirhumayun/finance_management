@@ -1,41 +1,123 @@
 # Deployment Guide
 
-## Email transport configuration
+This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services rely on environment variables that are documented in their respective `.env.example` files. This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
 
-The server email service now uses a configurable transport factory that supports both SMTP credentials and API-key-based providers. Configure the transport by defining the following environment variables in your deployment:
+## 1. Provision dependencies
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `EMAIL_PROVIDER` | Yes | Name of the email provider. Use `smtp` for traditional SMTP servers or a provider identifier (e.g. `sendgrid`) when authenticating with an API key. |
-| `EMAIL_HOST` | SMTP only | Hostname of the SMTP or API gateway. Optional for API-based providers that expose a service integration. |
-| `EMAIL_PORT` | SMTP only | Port number for the SMTP/API gateway. Optional for API-based providers when the SDK manages the connection. |
-| `EMAIL_USER` | SMTP, optional for API | Username for SMTP authentication. Also used as the API username when `EMAIL_API_USER` is not provided. |
-| `EMAIL_PASS` | SMTP only | Password for SMTP authentication. |
-| `EMAIL_API_KEY` | API providers | API key or token used by non-SMTP providers. |
-| `EMAIL_API_USER` | API providers | Optional override for the username used with the API key (defaults to `EMAIL_USER` or `apikey`). |
-| `EMAIL_SERVICE` | Optional | Overrides the Nodemailer `service` value for API providers. |
-| `EMAIL_FROM` | Yes | Default sender email address used when dispatching messages. |
-| `EMAIL_SECURE` | Optional | Set to `true` to force a secure (TLS) connection. |
-| `EMAIL_REQUIRE_TLS` | Optional | Set to `true` to require TLS even if the server does not advertise STARTTLS. |
-| `EMAIL_TLS_REJECT_UNAUTHORIZED` | Optional | Set to `false` to allow self-signed certificates (defaults to rejecting unauthorized certificates). |
-| `EMAIL_TLS_MIN_VERSION` | Optional | Minimum TLS version to use when connecting. |
-| `EMAIL_TLS_CIPHERS` | Optional | Comma-delimited list of TLS ciphers. |
+Before you deploy, make sure the following shared services are available:
 
-### Migrating from the legacy Gmail configuration
+- **MongoDB** 5.x or newer.
+- **Redis** 6.x or newer (used by the frontend for coordinating token refresh state).
+- **Email provider** that supports either SMTP credentials or an API key compatible with Nodemailer.
+- **Process manager** such as PM2, Docker, or a platform-as-a-service environment capable of running Node.js 18+.
 
-Previous deployments relied on Gmail-specific credentials (`EMAIL_USER`/`EMAIL_PASS`) defined directly in `emailService.js`. To migrate:
+## 2. Configure environment variables
 
-1. Add `EMAIL_PROVIDER=smtp` to your environment.
-2. Specify the SMTP host and port that Gmail (or your new provider) exposes, for example `EMAIL_HOST=smtp.gmail.com` and `EMAIL_PORT=465`.
-3. Keep the existing `EMAIL_USER`, `EMAIL_PASS`, and `EMAIL_FROM` values.
-4. For providers that require TLS tweaks (self-signed certs, minimum TLS version), provide the optional TLS variables listed above.
+Copy the sample files to the locations your deployment platform expects and fill in the secrets:
 
-To integrate with an API-key-based provider (e.g. SendGrid):
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
 
-1. Set `EMAIL_PROVIDER=sendgrid` (or the provider identifier your Nodemailer integration expects).
-2. Provide the API token via `EMAIL_API_KEY` and optionally set `EMAIL_API_USER` if the provider requires a specific username (default is `apikey`).
-3. Remove any unused SMTP password (`EMAIL_PASS`) if it is no longer necessary.
-4. Configure `EMAIL_FROM` to the verified sender identity in your provider.
-5. Add any provider-specific host or port values if required.
+Populate the copies with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values.
 
-Apply these changes to your environment configuration files (`.env`, Docker secrets, CI/CD variables, etc.) before deploying the updated server.
+### Server settings
+
+| Variable | Description |
+| --- | --- |
+| `PORT` | Port that the API server should listen on. |
+| `MONGO_URI` | MongoDB connection string pointing at the production database. |
+| `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` | Random, long secrets for signing JWTs. |
+| `ACCESS_TOKEN_EXPIRY` / `REFRESH_TOKEN_EXPIRY` | Token lifetimes expressed in [zeit/ms](https://github.com/vercel/ms) notation (e.g. `15m`, `7d`). |
+| `EMAIL_PROVIDER` | Choose `smtp` for username/password transports or the identifier of a Nodemailer transport (e.g. `sendgrid`). |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` | SMTP fields that are required when `EMAIL_PROVIDER=smtp`. |
+| `EMAIL_API_KEY`, `EMAIL_API_USER`, `EMAIL_SERVICE` | API-key credentials when `EMAIL_PROVIDER` is not SMTP. |
+| `EMAIL_SECURE`, `EMAIL_REQUIRE_TLS`, `EMAIL_TLS_*` | Optional TLS tuning flags for hardened mail servers. |
+| `DEFAULT_PASSWORD_RESET_REDIRECT` | HTTPS URL users should land on after resetting a password. |
+| `SUBSCRIPTION_JOB_LOCK_TTL_MS` | Milliseconds the recurring subscription job should hold the MongoDB advisory lock. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins for browser requests. |
+
+### Frontend settings
+
+| Variable | Description |
+| --- | --- |
+| `AUTH_BACKEND_URL` | Base URL of the deployed backend API. |
+| `AUTH_REFRESH_PATH` | Path on the backend that issues refreshed tokens. Usually `/api/users/refresh-token`. |
+| `NEXTAUTH_SECRET` | Cryptographically strong secret used by NextAuth to sign cookies and tokens. |
+| `AUTH_KEY_SALT` | Optional salt for extra hashing of identifiers. Defaults to `NEXTAUTH_SECRET` if omitted. |
+| `REDIS_URL` | Connection string for the Redis instance coordinating token refreshes. |
+| `AUTH_REDIS_PREFIX` | Prefix applied to keys written in Redis. Set a unique value per environment. |
+| `REGISTER_TIMEOUT_MS`, `PROXY_TIMEOUT_MS`, `PASSWORD_RESET_TIMEOUT_MS` | Millisecond timeouts applied to the respective API routes. |
+| `NEXT_PUBLIC_PASSWORD_RESET_REDIRECT_URL` | HTTPS URL exposed to the browser for password reset flows. Must include protocol. |
+
+### Secret management tips
+
+- Generate secrets using a password manager or a secure random generator (`openssl rand -hex 32`).
+- Never commit `.env` files to source control.
+- When deploying to cloud platforms, define the variables using the platform's secret management feature.
+
+## 3. Build artifacts
+
+Install dependencies and build each workspace on a clean CI runner or deployment machine:
+
+```bash
+cd server
+npm install --production
+npm run build
+
+cd ../client
+npm ci
+npm run build
+```
+
+If you deploy with Docker or PM2, prefer `npm ci` to ensure the lockfile is respected.
+
+## 4. Run the services
+
+### Using PM2
+
+```bash
+# From the repository root
+pm2 start server/ecosystem.config.js
+pm2 start client/ecosystem.config.js
+```
+
+### Using Docker Compose (example)
+
+```yaml
+services:
+  api:
+    build: ./server
+    env_file: ./server/.env
+    ports:
+      - "5000:5000"
+  web:
+    build: ./client
+    env_file: ./client/.env
+    environment:
+      - PORT=3000
+    ports:
+      - "3000:3000"
+```
+
+Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
+
+## 5. Post-deployment checklist
+
+- [ ] Confirm that the API can connect to MongoDB and Redis without errors.
+- [ ] Verify that password reset and OTP emails are delivered successfully.
+- [ ] Check that frontend pages load using the production API and refresh tokens as expected.
+- [ ] Monitor logs during the first run of the subscription expiration job for locking conflicts.
+- [ ] Update environment secrets periodically and rotate credentials when personnel changes occur.
+
+## 6. Troubleshooting
+
+| Symptom | Possible fix |
+| --- | --- |
+| `MongoNetworkError` on boot | Ensure the `MONGO_URI` host is reachable from the server and that the IP is allow-listed. |
+| Authentication cookies not persisting | Confirm `NEXTAUTH_SECRET` is identical across all frontend instances and that the deployment is served over HTTPS. |
+| OTP emails fail with TLS errors | Set `EMAIL_REQUIRE_TLS=false` temporarily or adjust `EMAIL_TLS_MIN_VERSION`/`EMAIL_TLS_CIPHERS` to match your provider. |
+| Subscription job runs multiple times | Ensure `SUBSCRIPTION_JOB_LOCK_TTL_MS` exceeds the longest job duration and that each runner uses a unique `JOB_INSTANCE_ID`. |
+
+With the environment configured and the services monitored, the application is ready for production traffic.
