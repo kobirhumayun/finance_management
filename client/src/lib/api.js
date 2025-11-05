@@ -53,7 +53,7 @@ export async function apiRequest(input, init = {}) {
 
   if (isServer()) {
     const base = getBackendBaseUrl();
-    const { auth } = await import("@/auth.server");
+    const { auth } = await import("@/auth");
     const session = await auth();                  // pulls fresh access token
     const bearer = session?.accessToken || null;
     return fetch(buildAbs(input, base), {

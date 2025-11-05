@@ -91,7 +91,7 @@ function copyResponseHeaders(from, to) {
 async function resolveAuthFn() {
   if (activeConfig.auth) return activeConfig.auth;
   if (!cachedDefaultAuth) {
-    ({ auth: cachedDefaultAuth } = await import("@/auth.server"));
+    ({ auth: cachedDefaultAuth } = await import("@/auth"));
   }
   return cachedDefaultAuth;
 }

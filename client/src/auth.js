@@ -3,7 +3,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { jwtDecode } from "jwt-decode";
 import { randomUUID, createHmac } from "crypto";
-import { getRedis } from "@/lib/redis.server";
+import { getRedis } from "@/lib/redis";
 import { withBackendPath } from "@/lib/backend";
 
 const DEFAULT_TIMEOUT_MS = 8000;
