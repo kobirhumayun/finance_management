@@ -52,22 +52,22 @@ FROM base AS deps
 
 COPY package*.json ./
 RUN npm ci --omit=dev \
-    && npx playwright install chromium
+    && npx playwright install chromium \
+    && npm cache clean --force
 
 FROM base AS production
 
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /ms-playwright /ms-playwright
-COPY . .
-RUN chown -R node:node /app /ms-playwright
+COPY --chown=node:node package*.json ./
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=deps --chown=node:node /ms-playwright /ms-playwright
+COPY --chown=node:node . .
 
 USER node
 
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=40s \
-  CMD curl -fsS http://127.0.0.1:5000/ || exit 1
+  CMD curl -fsS http://127.0.0.1:5000/healthz || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]

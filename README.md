@@ -43,6 +43,10 @@ This repository packages the Finance Management API into a self-contained Docker
   ```bash
   docker compose logs -f finance-management-db
   ```
+- Manually verify the application health endpoint from another container on `edge_net`:
+  ```bash
+  docker compose exec finance-management-web curl -fsS http://127.0.0.1:5000/healthz
+  ```
 
 ## Persistence
 - MongoDB data is stored in the named volume `finance-management-mongo-data`. Back up this volume regularly (e.g., `docker run --rm -v finance-management-mongo-data:/data busybox tar czf - /data > mongo-backup.tgz`).
