@@ -6,6 +6,10 @@ import process from 'node:process';
 
 process.env.NODE_ENV ??= 'production';
 
+if (process.env.NEXT_TURBOPACK_USE_WORKER === undefined) {
+  process.env.NEXT_TURBOPACK_USE_WORKER = '0';
+}
+
 const rawArgs = process.argv.slice(2);
 const forceWebpackFlag = '--force-webpack';
 const disableTurbopackFlag = '--no-turbopack';

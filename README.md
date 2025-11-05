@@ -24,6 +24,7 @@ This repository packages the Finance Management Next.js front end and Express AP
    docker compose up -d
    ```
    The central Nginx instance will proxy inbound requests on `finance.example.com` to the `finance-management-web` container on port 3000 via `edge_net`. All `/api/*` calls are handled by the Next.js server, which forwards them to the internal API container over the private network.
+   > **Turbopack note:** The frontend build script disables the Turbopack worker process inside containers to avoid a known worker crash when building in Docker. If you explicitly need worker mode, set `NEXT_TURBOPACK_USE_WORKER=1` before running `npm run build`.
 3. Run one-off tasks when required:
    ```bash
    docker compose run --rm finance-management-api npm run migrate
