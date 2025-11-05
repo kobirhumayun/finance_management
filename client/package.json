@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node ./scripts/dev.mjs",
-    "build": "node ./scripts/build.mjs",
-    "start": "next start",
+    "dev": "NODE_ENV=development node ./scripts/dev.mjs",
+    "build": "NODE_ENV=production node ./scripts/build.mjs",
+    "build:dev": "NODE_ENV=development node ./scripts/build.mjs",
+    "start": "NODE_ENV=production next start",
     "lint": "eslint",
     "test": "node --test"
   },
