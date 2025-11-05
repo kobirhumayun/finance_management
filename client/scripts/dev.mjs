@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 
-process.env.NODE_ENV ??= 'production';
+process.env.NODE_ENV = 'development';
 process.env.NEXT_FORCE_WEBPACK = '1';
 delete process.env.NEXT_USE_TURBOPACK;
 delete process.env.NEXT_TURBOPACK_USE_WORKER;
@@ -22,7 +22,7 @@ const nextBin = resolve(
   'next',
 );
 
-const result = spawnSync(process.execPath, [nextBin, 'build', ...rawArgs], {
+const result = spawnSync(process.execPath, [nextBin, 'dev', ...rawArgs], {
   stdio: 'inherit',
   env: process.env,
 });
