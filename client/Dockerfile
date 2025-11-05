@@ -3,7 +3,8 @@
 FROM node:24-bookworm-slim AS base
 
 ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1
+    NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS=1
 
 WORKDIR /app
 
@@ -24,7 +25,9 @@ FROM base AS builder
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build && npm prune --omit=dev
+RUN npm run build \
+  && npm prune --omit=dev \
+  && npm cache clean --force
 
 FROM base AS production
 

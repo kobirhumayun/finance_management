@@ -1,7 +1,7 @@
 # Finance Management Docker Deployment
 
 ## Overview
-This repository packages the Finance Management Next.js front end and Express API into a Docker Compose stack that keeps internal dependencies isolated on the private `finance-management_net` while exposing only the `finance-management-web` container to the shared `edge_net`. A centrally managed Nginx reverse proxy (deployed elsewhere on the VPS) owns `edge_net`, publishes ports 80/443, and forwards hostname-based traffic to this application without any host ports opened by the app stack itself.
+This repository packages the Finance Management Next.js front end and Express API into a Docker Compose stack that keeps internal dependencies isolated on the private `finance-management_net` while exposing only the `finance-management-web` container to the shared `edge_net`. A centrally managed Nginx reverse proxy (deployed elsewhere on the VPS) owns `edge_net`, publishes ports 80/443, and forwards hostname-based traffic to this application without any host ports opened by the app stack itself. The API, MongoDB, and Redis stay on the private network; the web tier proxies API traffic internally so nothing except the browser-facing Next.js server needs to be reachable from the edge.
 
 ## Prerequisites
 - A VPS (or bare-metal host) already running the shared edge Nginx deployment that creates and manages the external `edge_net` network and publishes TCP ports 80 and 443.
@@ -23,7 +23,7 @@ This repository packages the Finance Management Next.js front end and Express AP
    ```bash
    docker compose up -d
    ```
-   The central Nginx instance will proxy inbound requests on `finance.example.com` to the `finance-management-web` container on port 3000 via `edge_net`.
+   The central Nginx instance will proxy inbound requests on `finance.example.com` to the `finance-management-web` container on port 3000 via `edge_net`. All `/api/*` calls are handled by the Next.js server, which forwards them to the internal API container over the private network.
 3. Run one-off tasks when required:
    ```bash
    docker compose run --rm finance-management-api npm run migrate
@@ -55,7 +55,7 @@ This repository packages the Finance Management Next.js front end and Express AP
   ```bash
   docker run --rm -v finance-management-mongo-data:/data busybox tar czf - /data > mongo-backup.tgz
   ```
-- Redis stores ephemeral session data in `finance-management-redis-data`. Snapshot it only if you need to retain session state across restores.
+- Redis stores session locks and tokens in `finance-management-redis-data`. Back up this volume if retaining session continuity across restarts is important; otherwise it can be treated as disposable cache data.
 
 ## Security
 - No service in this stack publishes host ports; only the shared edge Nginx service faces the public internet.
@@ -97,28 +97,25 @@ networks:
 
 `nginx/conf.d/finance.conf`
 ```nginx
-upstream finance-management_upstream {
+upstream finance-management_web {
   server finance-management-web:3000;
 }
-upstream finance-management_api {
-  server finance-management-api:5000;
-}
+
 server {
   listen 80;
   server_name finance.example.com;
+
   # ACME HTTP-01 challenge (adjust path if using certbot)
   location /.well-known/acme-challenge/ { root /var/www/html; }
-  location /api/ {
-    proxy_pass http://finance-management_api;
-    proxy_set_header Host $host;
-    include /etc/nginx/proxy_params;
-  }
+
   location / {
-    proxy_pass http://finance-management_upstream;
+    proxy_pass http://finance-management_web;
     include /etc/nginx/proxy_params;
   }
 }
 ```
+
+> **Why no direct `/api` upstream?** The Next.js application exposes an `/api/proxy/*` route that forwards authenticated API requests to the Express backend over the private `finance-management_net`. External traffic therefore only hits the web tier, keeping the API fully isolated from the edge network.
 
 `nginx/proxy_params`
 ```nginx

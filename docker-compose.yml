@@ -123,8 +123,6 @@ services:
 
   finance-management-redis:
     image: redis:7.4-alpine
-    container_name: finance-management-redis
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: unless-stopped
     deploy:
       resources:
