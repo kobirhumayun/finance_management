@@ -2,7 +2,7 @@ import {
   PHASE_DEVELOPMENT_SERVER,
   PHASE_PRODUCTION_BUILD,
   PHASE_PRODUCTION_SERVER,
-} from 'next/constants';
+} from 'next/constants.js';
 
 /**
  * @param {string} phase
