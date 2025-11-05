@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:24-bookworm-slim AS base
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      dumb-init \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS deps
+
+COPY package*.json ./
+RUN npm ci
+
+FROM base AS builder
+
+COPY package*.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+FROM base AS production
+
+ENV PORT=3000
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
+COPY --from=builder /app/components.json ./components.json
+COPY --from=builder /app/jsconfig.json ./jsconfig.json
+
+USER node
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=40s \
+  CMD curl -fsS http://127.0.0.1:3000/ || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "start"]
