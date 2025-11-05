@@ -50,6 +50,10 @@ app.use(morgan('dev'));
 app.get('/', (req, res) => {
     res.send('Backend is running!');
 });
+
+app.get('/healthz', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/plans', planRoutes);
