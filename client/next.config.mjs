@@ -30,14 +30,6 @@ const createConfig = (phase) => {
         };
       }
 
-      if (dev || isDevPhase) {
-        config.devtool = 'eval-source-map';
-        config.optimization = {
-          ...config.optimization,
-          minimize: false,
-        };
-      }
-
       if (!dev && (isProdBuild || isProdServer)) {
         config.devtool = false;
         config.optimization = {
