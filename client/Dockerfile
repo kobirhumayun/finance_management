@@ -2,8 +2,7 @@
 
 FROM node:24-bookworm-slim AS base
 
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
+ENV NEXT_TELEMETRY_DISABLED=1 \
     NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS=1 \
     NEXT_FORCE_WEBPACK=1 \
     NEXT_USE_TURBOPACK=0 \
@@ -28,17 +27,30 @@ FROM base AS builder
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build \
-  && npm prune --omit=dev \
+RUN npm run build
+
+FROM base AS prod-deps
+
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm ci --omit=dev \
   && npm cache clean --force
 
 FROM base AS production
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS=1 \
+    NEXT_FORCE_WEBPACK=1 \
+    NEXT_USE_TURBOPACK=0 \
+    NEXT_TURBOPACK_USE_WORKER=0
 
 ENV PORT=3000
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
