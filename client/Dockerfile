@@ -27,8 +27,14 @@ FROM base AS builder
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build \
-  && npm prune --omit=dev \
+RUN npm run build
+
+FROM base AS prod-deps
+
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm ci --omit=dev \
   && npm cache clean --force
 
 FROM base AS production
@@ -44,7 +50,7 @@ ENV PORT=3000
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
