@@ -1,9 +1,21 @@
 // File: src/app/layout.js
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 import { Toaster } from "@/components/ui/sonner";
 import ThemeProvider from "@/components/shared/theme-provider";
 import SessionRefresher from "@/components/shared/session-refresher";
+
+// Configure the Geist fonts used across the entire application.
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 // Application-wide metadata describing the product.
 export const metadata = {
@@ -17,7 +29,7 @@ export const revalidate = 0;
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased">
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <Providers>
           <ThemeProvider>
             <SessionRefresher />

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node ./scripts/dev.mjs",
     "build": "node ./scripts/build.mjs",
-    "start": "next start",
+    "build:dev": "node ./scripts/build.mjs --environment=development",
+    "start": "node ./scripts/start.mjs",
     "lint": "eslint",
     "test": "node --test"
   },
