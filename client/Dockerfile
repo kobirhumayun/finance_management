@@ -17,6 +17,8 @@ RUN apt-get update \
       dumb-init \
     && rm -rf /var/lib/apt/lists/*
 
+RUN npm install -g npm@11.6.2
+
 FROM base AS deps
 
 COPY package*.json ./
@@ -29,12 +31,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM base AS prod-deps
+FROM deps AS prod-deps
 
 ENV NODE_ENV=production
 
-COPY package*.json ./
-RUN npm ci --omit=dev \
+RUN npm prune --omit=dev \
   && npm cache clean --force
 
 FROM base AS production
