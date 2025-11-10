@@ -29,9 +29,23 @@ cd ../client && npm install
 
 ## 3. Running the application
 
-Open two terminals—one for the backend API and one for the frontend app.
+### Option A: Docker Compose dev stack
 
-### Backend API
+The repository ships with a `docker-compose.override.yml` that swaps the production containers for development-friendly ones. The override mounts the source directories, installs dependencies inside the containers, and runs `npm run dev` with hot reloading.
+
+To start every service (frontend, API, MongoDB, and Redis) in one terminal:
+
+```bash
+docker compose up
+```
+
+The web app becomes available at `http://localhost:3000` and the API at `http://localhost:5000`. Environment variables such as `NEXTAUTH_URL` and `AUTH_BACKEND_URL` are preconfigured for local development. Stop the stack with `Ctrl+C` when you are finished.
+
+### Option B: Local Node.js processes
+
+If you prefer to run services directly on your machine, open two terminals—one for the backend API and one for the frontend app.
+
+#### Backend API
 
 ```bash
 cd server
@@ -40,7 +54,7 @@ npm run dev
 
 This command launches Nodemon with hot reloading on `http://localhost:5000`. When adjusting JWT expiry constants or email templates, restart the server to ensure the values are reloaded from the environment.
 
-### Frontend (Next.js)
+#### Frontend (Next.js)
 
 ```bash
 cd client
