@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  nginx:
+    image: nginx:stable
+    container_name: edge-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
+      - ./letsencrypt:/etc/letsencrypt
+      - ./www:/var/www/html
+    restart: unless-stopped
+    networks:
+      - edge_net
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+
+networks:
+  edge_net:
+    name: edge_net
+    driver: bridge
+    external: true
