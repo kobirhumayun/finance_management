@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  finance-management-web:
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${DEVELOPMENT_ENV_DIR:-env/development}/client.env
+    command: ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
+    volumes:
+      - ../client:/app
+      - client-node-modules:/app/node_modules
+    ports:
+      - "3000:3000"
+
+  finance-management-api:
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${DEVELOPMENT_ENV_DIR:-env/development}/database.env
+      - ../${DEVELOPMENT_ENV_DIR:-env/development}/server.env
+    command: ["npm", "run", "dev"]
+    volumes:
+      - ../server:/app
+      - server-node-modules:/app/node_modules
+    ports:
+      - "5000:5000"
+
+  finance-management-db:
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${DEVELOPMENT_ENV_DIR:-env/development}/database.env
+      - ../${DEVELOPMENT_ENV_DIR:-env/development}/mongo.env
+    ports:
+      - "27017:27017"
+
+  finance-management-redis:
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${DEVELOPMENT_ENV_DIR:-env/development}/redis.env
+    ports:
+      - "6379:6379"
+
+volumes:
+  client-node-modules:
+  server-node-modules:

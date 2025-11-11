@@ -1,0 +1,127 @@
+version: "3.9"
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  ulimits:
+    nofile:
+      soft: 4096
+      hard: 8192
+  networks:
+    - finance-management_net
+
+x-http-healthcheck: &http-healthcheck
+  interval: 30s
+  timeout: 5s
+  retries: 5
+  start_period: 40s
+
+services:
+  finance-management-web:
+    <<: *service-defaults
+    image: finance-management-web:latest
+    build:
+      context: ../client
+      target: production
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${WEB_PORT:-3000}
+      AUTH_BACKEND_URL: ${AUTH_BACKEND_URL}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      REDIS_URL: ${REDIS_URL}
+      NEXT_PUBLIC_PASSWORD_RESET_REDIRECT_URL: ${NEXT_PUBLIC_PASSWORD_RESET_REDIRECT_URL}
+      PROXY_TIMEOUT_MS: ${PROXY_TIMEOUT_MS:-15000}
+      PASSWORD_RESET_TIMEOUT_MS: ${PASSWORD_RESET_TIMEOUT_MS:-15000}
+      REGISTER_TIMEOUT_MS: ${REGISTER_TIMEOUT_MS:-15000}
+      AUTH_REFRESH_PATH: ${AUTH_REFRESH_PATH:-/api/users/refresh-token}
+      AUTH_REDIS_PREFIX: ${AUTH_REDIS_PREFIX:-auth:v1}
+      AUTH_KEY_SALT: ${AUTH_KEY_SALT}
+      REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-10000}
+    depends_on:
+      finance-management-api:
+        condition: service_healthy
+      finance-management-redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${WEB_PORT:-3000}/ || exit 1"]
+
+  finance-management-api:
+    <<: *service-defaults
+    image: finance-management-api:latest
+    build:
+      context: ../server
+      target: production
+    environment:
+      MONGO_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@finance-management-db:27017/${MONGO_DATABASE}?authSource=admin
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${API_PORT:-5000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      ACCESS_TOKEN_EXPIRY: ${ACCESS_TOKEN_EXPIRY:-15m}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-10}
+      ADMIN_RECENT_LOGIN_LIMIT: ${ADMIN_RECENT_LOGIN_LIMIT:-5}
+      DEFAULT_PASSWORD_RESET_REDIRECT: ${DEFAULT_PASSWORD_RESET_REDIRECT}
+      SUBSCRIPTION_JOB_LOCK_TTL_MS: ${SUBSCRIPTION_JOB_LOCK_TTL_MS:-900000}
+      JOB_INSTANCE_ID: ${JOB_INSTANCE_ID:-finance-management-worker-1}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      EMAIL_SERVICE: ${EMAIL_SERVICE:-}
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_API_USER: ${EMAIL_API_USER:-}
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+      EMAIL_REQUIRE_TLS: ${EMAIL_REQUIRE_TLS:-true}
+      EMAIL_TLS_REJECT_UNAUTHORIZED: ${EMAIL_TLS_REJECT_UNAUTHORIZED:-true}
+      EMAIL_TLS_MIN_VERSION: ${EMAIL_TLS_MIN_VERSION:-TLSv1.2}
+      EMAIL_TLS_CIPHERS: ${EMAIL_TLS_CIPHERS:-}
+    depends_on:
+      finance-management-db:
+        condition: service_healthy
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${API_PORT:-5000}/healthz || exit 1"]
+
+  finance-management-db:
+    <<: *service-defaults
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - finance-management-mongo-data:/data/db
+    healthcheck:
+      <<: *http-healthcheck
+      timeout: 10s
+      test: ["CMD-SHELL", "mongosh --host 127.0.0.1 --username \"$$MONGO_USERNAME\" --password \"$$MONGO_PASSWORD\" --authenticationDatabase admin --quiet --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
+    profiles:
+      - stack
+
+  finance-management-redis:
+    <<: *service-defaults
+    image: redis:7.4-alpine
+    volumes:
+      - finance-management-redis-data:/data
+    healthcheck:
+      <<: *http-healthcheck
+      start_period: 20s
+      test: ["CMD", "redis-cli", "ping"]
+    profiles:
+      - stack
+
+volumes:
+  finance-management-mongo-data:
+    driver: local
+  finance-management-redis-data:
+    driver: local
+
+networks:
+  finance-management_net:
+    driver: bridge
+    internal: true

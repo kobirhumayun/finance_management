@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services rely on environment variables that are documented in their respective `.env.example` files. This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
+This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services now read their configuration from the layered environment bundles stored under [`env/`](env). The base Compose definition (`compose/base.yml`) is shared between development and production, while overlays (`compose/development.yml`, `compose/production.yml`) inject the appropriate env files and commands for each workflow. This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
 
 ## 1. Provision dependencies
 
@@ -16,11 +16,11 @@ Before you deploy, make sure the following shared services are available:
 Copy the sample files to the locations your deployment platform expects and fill in the secrets:
 
 ```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
+cp env/common.env /secure/path/common.env
+cp -r env/production /secure/path/production
 ```
 
-Populate the copies with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values.
+Populate the copies with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values. When running through Docker Compose, either replace the template files or export `COMMON_ENV_FILE` and `PRODUCTION_ENV_DIR` so the stack reads your private copies.
 
 ### Server settings
 
@@ -85,23 +85,17 @@ pm2 start client/ecosystem.config.js
 
 ### Using Docker Compose (example)
 
-```yaml
-services:
-  api:
-    build: ./server
-    env_file: ./server/.env
-    ports:
-      - "5000:5000"
-  web:
-    build: ./client
-    env_file: ./client/.env
-    environment:
-      - PORT=3000
-    ports:
-      - "3000:3000"
+Use the shared base file with the production overlay to ensure parity with development:
+
+```bash
+docker compose \
+  -f compose/base.yml \
+  -f compose/production.yml \
+  --profile stack \
+  up -d
 ```
 
-Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
+Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer and to mount or reference the copied environment files exposed through the `env_file` directives.
 
 ## 5. Post-deployment checklist
 

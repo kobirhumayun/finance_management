@@ -2,7 +2,7 @@
 
 ## Environment Variables
 
-Create a `.env` file in this directory using [`.env.example`](./.env.example) as a template. Key variables include:
+Create environment variables for the API by copying the templates located under [`env/`](../env). The server pulls its configuration from `env/common.env`, `env/<environment>/database.env`, and `env/<environment>/server.env`. Key variables include:
 
 - `MONGO_URI`: MongoDB connection string.
 - `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET`: Secrets used for signing JWTs.
@@ -12,7 +12,7 @@ Create a `.env` file in this directory using [`.env.example`](./.env.example) as
 - `DEFAULT_PASSWORD_RESET_REDIRECT`: Frontend URL that receives password reset requests.
 - `CORS_ALLOWED_ORIGINS`: Comma-separated list of allowed origins for API calls. When unset, the server allows `http://localhost:3000` for development.
 
-Update the values to match your environment before starting the server.
+Update the values to match your environment before starting the server. When running through Docker Compose, ensure the appropriate env files are referenced in `compose/development.yml` or `compose/production.yml`.
 
 ## Report summary exports
 

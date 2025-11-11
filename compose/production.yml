@@ -1,0 +1,43 @@
+version: "3.9"
+
+x-production-limits: &production-limits
+  deploy:
+    resources:
+      limits:
+        cpus: "0.75"
+        memory: 768M
+        pids: 256
+
+services:
+  finance-management-web:
+    <<: *production-limits
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${PRODUCTION_ENV_DIR:-env/production}/client.env
+    networks:
+      - finance-management_net
+      - edge_net
+
+  finance-management-api:
+    <<: *production-limits
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${PRODUCTION_ENV_DIR:-env/production}/database.env
+      - ../${PRODUCTION_ENV_DIR:-env/production}/server.env
+
+  finance-management-db:
+    <<: *production-limits
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${PRODUCTION_ENV_DIR:-env/production}/database.env
+      - ../${PRODUCTION_ENV_DIR:-env/production}/mongo.env
+
+  finance-management-redis:
+    <<: *production-limits
+    env_file:
+      - ../${COMMON_ENV_FILE:-env/common.env}
+      - ../${PRODUCTION_ENV_DIR:-env/production}/redis.env
+
+networks:
+  edge_net:
+    external: true
