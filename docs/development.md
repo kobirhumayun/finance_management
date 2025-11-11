@@ -33,6 +33,12 @@ cd ../client && npm install
 
 The repository ships with a `docker-compose.override.yml` that swaps the production containers for development-friendly ones. The override mounts the source directories, installs dependencies inside the containers, and runs `npm run dev` with hot reloading.
 
+> **Prerequisite:** The base `docker-compose.yml` expects an external Docker network named `edge_net` (managed by the centralized Nginx gateway in production). Create it once on your machine before starting the stack (it is safe if the command reports the network already exists):
+>
+> ```bash
+> docker network create edge_net
+> ```
+
 To start every service (frontend, API, MongoDB, and Redis) in one terminal:
 
 ```bash
