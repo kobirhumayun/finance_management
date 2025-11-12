@@ -9,21 +9,26 @@ This repository packages the Finance Management Next.js front end and Express AP
 - Docker Engine and Docker Compose Plugin installed on the VPS.
 
 ## Environment Setup
-1. Copy `.env.example` to `.env` in the repository root.
-2. Fill in runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
-3. Keep `.env` private—never commit it to source control.
+1. Copy the bundled templates and adjust them for your environment:
+   ```bash
+   cp env/prod.env.example env/prod.env
+   cp server/.env.compose.example server/.env.compose
+   cp client/.env.compose.example client/.env.compose
+   ```
+2. Fill in runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment. Keep the resulting files private—never commit them to source control.
 
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
-- `finance-management_net` is defined by `docker-compose.yml` and marked `internal: true`, preventing direct inbound connections from the host or other containers outside this network. Docker Compose creates it automatically on the first `up`.
+- `finance-management_net` is defined by `compose.yml` and marked `internal: true`, preventing direct inbound connections from the host or other containers outside this network. Docker Compose creates it automatically on the first `up`.
 
 ## Running
 1. Ensure the shared `edge_net` already exists (`docker network create edge_net` should **not** be run here; the edge stack owns it).
-2. Start the application in detached mode:
+2. Start the application in detached mode using the production settings:
    ```bash
-   docker compose up -d
+   docker compose --env-file env/prod.env -f compose.yml up -d
    ```
    The central Nginx instance will proxy inbound requests on `finance.example.com` to the `finance-management-web` container on port 3000 via `edge_net`. All `/api/*` calls are handled by the Next.js server, which forwards them to the internal API container over the private network.
+   For local development, switch to `env/dev.env` and include `compose.dev.yml --profile local-db` to spin up the optional MongoDB container alongside the stack.
    > **Turbopack note:** The frontend build script disables the Turbopack worker process inside containers to avoid a known worker crash when building in Docker. If you explicitly need worker mode, set `NEXT_TURBOPACK_USE_WORKER=1` before running `npm run build`.
 3. Run one-off tasks when required:
    ```bash
@@ -41,18 +46,21 @@ This repository packages the Finance Management Next.js front end and Express AP
   ```bash
   docker compose logs -f finance-management-web
   docker compose logs -f finance-management-api
-  docker compose logs -f finance-management-db
   docker compose logs -f finance-management-redis
+  # Only when the optional local MongoDB profile is active
+  docker compose logs -f finance-management-db
   ```
 - Manually verify service health from inside the containers:
   ```bash
   docker compose exec finance-management-web curl -fsS http://127.0.0.1:3000/
   docker compose exec finance-management-api curl -fsS http://127.0.0.1:5000/healthz
   docker compose exec finance-management-redis redis-cli ping
+  # Only when the optional local MongoDB profile is active
+  docker compose exec finance-management-db mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'
   ```
 
 ## Persistence
-- MongoDB data persists inside the named volume `finance-management-mongo-data`. Back it up regularly, for example:
+- MongoDB data persists inside the named volume `finance-management-mongo-data` when the `local-db` profile is enabled. Back it up regularly, for example:
   ```bash
   docker run --rm -v finance-management-mongo-data:/data busybox tar czf - /data > mongo-backup.tgz
   ```
@@ -60,7 +68,7 @@ This repository packages the Finance Management Next.js front end and Express AP
 
 ## Security
 - No service in this stack publishes host ports; only the shared edge Nginx service faces the public internet.
-- Secrets remain in `.env` and are injected at runtime via Compose.
+- Secrets remain in the copied environment files (`env/*.env`, `server/.env.compose`, `client/.env.compose`) and are injected at runtime via Compose.
 - API, MongoDB, and Redis run exclusively on the internal `finance-management_net` and are unreachable from other applications or the host.
 
 ## Central Nginx (shared across apps)
@@ -70,7 +78,6 @@ Example edge deployment (maintained outside this repo):
 
 `compose.nginx.yml`
 ```yaml
-version: "3.9"
 services:
   nginx:
     image: nginx:stable

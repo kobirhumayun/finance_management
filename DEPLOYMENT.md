@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services rely on environment variables that are documented in their respective `.env.example` files. This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
+This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services rely on environment variables that are documented in their respective `.env.example` files together with the Docker-specific templates located under [`env/`](env). This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
 
 ## 1. Provision dependencies
 
@@ -13,11 +13,12 @@ Before you deploy, make sure the following shared services are available:
 
 ## 2. Configure environment variables
 
-Copy the sample files to the locations your deployment platform expects and fill in the secrets:
+Copy the sample files to the locations your deployment platform expects and fill in the secrets. When deploying with Docker Compose, configure the shared environment and per-service overrides using the bundled templates:
 
 ```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
+cp env/prod.env.example env/prod.env
+cp server/.env.compose.example server/.env.compose
+cp client/.env.compose.example client/.env.compose
 ```
 
 Populate the copies with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values.
@@ -83,25 +84,19 @@ pm2 start server/ecosystem.config.js
 pm2 start client/ecosystem.config.js
 ```
 
-### Using Docker Compose (example)
+### Using Docker Compose
 
-```yaml
-services:
-  api:
-    build: ./server
-    env_file: ./server/.env
-    ports:
-      - "5000:5000"
-  web:
-    build: ./client
-    env_file: ./client/.env
-    environment:
-      - PORT=3000
-    ports:
-      - "3000:3000"
+The repository now ships a production-focused [`compose.yml`](compose.yml) together with environment overlays. To deploy with Docker Compose, wire up the desired environment file and optional profiles:
+
+```bash
+# Production-like deployment
+docker compose --env-file env/prod.env -f compose.yml up -d
+
+# Local development with the optional MongoDB container
+docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up
 ```
 
-Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
+Adjust the configuration to match your orchestration platform. Use the `local-db` profile only in environments where you want Compose to provision MongoDB; omit it when connecting to an external database. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
 
 ## 5. Post-deployment checklist
 

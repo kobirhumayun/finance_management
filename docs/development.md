@@ -1,6 +1,6 @@
 # Development Workflow
 
-This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment variable examples in `client/.env.example` and `server/.env.example` when configuring your workspace.
+This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment variable examples in `client/.env.example`, `server/.env.example`, and the Docker-specific templates under `env/` when configuring your workspace.
 
 ## 1. Prerequisites
 
@@ -20,12 +20,15 @@ cd ../client && npm install
 
 1. Copy the example files:
    ```bash
+   cp env/dev.env.example env/dev.env
    cp server/.env.example server/.env
+   cp server/.env.compose.example server/.env.compose
    cp client/.env.example client/.env.local
+   cp client/.env.compose.example client/.env.compose
    ```
 2. Update the copied files with development-friendly values. Defaults already point to `localhost` services. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
-3. Ensure MongoDB is running: `mongod --config /usr/local/etc/mongod.conf` (or start the service through your package manager).
-4. (Optional) Start Redis if you want to test token refresh coordination: `redis-server`.
+3. Ensure MongoDB is running locally, either by starting your preferred installation or by activating the Compose-managed instance with `docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up`.
+4. (Optional) Start Redis if you want to test token refresh coordination outside of Docker: `redis-server`.
 
 ## 3. Running the application
 
