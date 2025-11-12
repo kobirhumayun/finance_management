@@ -1,6 +1,6 @@
 # Development Workflow
 
-This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment variable examples in `client/.env.example` and `server/.env.example` when configuring your workspace.
+This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment variable examples in `client/.env.example`, `server/.env.example`, and the shared Compose presets under `env/dev.env.example` when configuring your workspace.
 
 ## 1. Prerequisites
 
@@ -20,16 +20,23 @@ cd ../client && npm install
 
 1. Copy the example files:
    ```bash
+   cp env/dev.env.example env/dev.env
    cp server/.env.example server/.env
    cp client/.env.example client/.env.local
    ```
 2. Update the copied files with development-friendly values. Defaults already point to `localhost` services. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
-3. Ensure MongoDB is running: `mongod --config /usr/local/etc/mongod.conf` (or start the service through your package manager).
-4. (Optional) Start Redis if you want to test token refresh coordination: `redis-server`.
+3. Ensure MongoDB is running. When using Docker Compose, enable the `local-db` profile so the bundled MongoDB container is started automatically.
+4. (Optional) Start Redis if you want to test token refresh coordination when running outside of Docker: `redis-server`.
 
 ## 3. Running the application
 
-Open two terminals—one for the backend API and one for the frontend app.
+Open two terminals—one for the backend API and one for the frontend app. Alternatively, start the full stack with Docker Compose:
+
+```bash
+docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up
+```
+
+Compose reuses the production-style wiring defined in `compose.yml` while opting into the development overrides from `compose.dev.yml`.
 
 ### Backend API
 

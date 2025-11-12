@@ -1,0 +1,44 @@
+services:
+  finance-management-web:
+    deploy:
+      replicas: ${WEB_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+          pids: 256
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  finance-management-api:
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+          pids: 256
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  finance-management-redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 128
+      restart_policy:
+        condition: any
+        delay: 5s
+        window: 120s
+
+  finance-management-db:
+    profiles:
+      - local-db

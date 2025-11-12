@@ -1,11 +1,40 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  ulimits:
+    nofile:
+      soft: 4096
+      hard: 8192
+
+x-app-deploy: &app-deploy
+  resources:
+    limits:
+      cpus: "0.75"
+      memory: 768M
+      pids: 256
+
+x-db-deploy: &db-deploy
+  resources:
+    limits:
+      cpus: "1.0"
+      memory: 1G
+      pids: 256
+
+x-cache-deploy: &cache-deploy
+  resources:
+    limits:
+      cpus: "0.50"
+      memory: 256M
+      pids: 128
+
 services:
   finance-management-web:
+    <<: *service-defaults
+    deploy:
+      <<: *app-deploy
     build:
       context: ./client
       target: production
     image: finance-management-web:latest
-    env_file:
-      - .env
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${WEB_PORT}
@@ -21,22 +50,12 @@ services:
       AUTH_REDIS_PREFIX: ${AUTH_REDIS_PREFIX:-auth:v1}
       AUTH_KEY_SALT: ${AUTH_KEY_SALT}
       REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-10000}
+      BASE_URL: ${BASE_URL:-https://finance.example.com}
     depends_on:
       finance-management-api:
         condition: service_healthy
       finance-management-redis:
         condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.75"
-          memory: 768M
-          pids: 256
-    ulimits:
-      nofile:
-        soft: 4096
-        hard: 8192
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${WEB_PORT}/ || exit 1"]
       interval: 30s
@@ -48,31 +67,41 @@ services:
       - edge_net
 
   finance-management-api:
+    <<: *service-defaults
+    deploy:
+      <<: *app-deploy
     build:
       context: ./server
       target: production
     image: finance-management-api:latest
-    env_file:
-      - .env
     environment:
-      MONGO_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@finance-management-db:27017/${MONGO_DATABASE}?authSource=admin
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${API_PORT}
+      MONGO_URI: ${MONGO_URI}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-    depends_on:
-      finance-management-db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.75"
-          memory: 768M
-          pids: 256
-    ulimits:
-      nofile:
-        soft: 4096
-        hard: 8192
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      ACCESS_TOKEN_EXPIRY: ${ACCESS_TOKEN_EXPIRY:-15m}
+      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-10}
+      ADMIN_RECENT_LOGIN_LIMIT: ${ADMIN_RECENT_LOGIN_LIMIT:-5}
+      DEFAULT_PASSWORD_RESET_REDIRECT: ${DEFAULT_PASSWORD_RESET_REDIRECT}
+      SUBSCRIPTION_JOB_LOCK_TTL_MS: ${SUBSCRIPTION_JOB_LOCK_TTL_MS:-900000}
+      JOB_INSTANCE_ID: ${JOB_INSTANCE_ID:-finance-management-worker}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      EMAIL_SERVICE: ${EMAIL_SERVICE}
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      EMAIL_API_KEY: ${EMAIL_API_KEY}
+      EMAIL_API_USER: ${EMAIL_API_USER}
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+      EMAIL_REQUIRE_TLS: ${EMAIL_REQUIRE_TLS:-true}
+      EMAIL_TLS_REJECT_UNAUTHORIZED: ${EMAIL_TLS_REJECT_UNAUTHORIZED:-true}
+      EMAIL_TLS_MIN_VERSION: ${EMAIL_TLS_MIN_VERSION}
+      EMAIL_TLS_CIPHERS: ${EMAIL_TLS_CIPHERS}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${API_PORT}/healthz || exit 1"]
       interval: 30s
@@ -83,28 +112,23 @@ services:
       - finance-management_net
 
   finance-management-db:
+    <<: *service-defaults
+    deploy:
+      <<: *db-deploy
     image: mongo:8.0
-    env_file:
-      - .env
+    profiles:
+      - local-db
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     volumes:
       - finance-management-mongo-data:/data/db
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 1G
-          pids: 256
-    ulimits:
-      nofile:
-        soft: 4096
-        hard: 8192
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --host 127.0.0.1 --username \"$$MONGO_USERNAME\" --password \"$$MONGO_PASSWORD\" --authenticationDatabase admin --quiet --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --host 127.0.0.1 --username "$${MONGO_USERNAME}" --password "$${MONGO_PASSWORD}" --authenticationDatabase admin --quiet --eval 'db.adminCommand({ ping: 1 })' || exit 1
       interval: 30s
       timeout: 10s
       retries: 5
@@ -113,18 +137,10 @@ services:
       - finance-management_net
 
   finance-management-redis:
-    image: redis:7.4-alpine
-    restart: unless-stopped
+    <<: *service-defaults
     deploy:
-      resources:
-        limits:
-          cpus: "0.50"
-          memory: 256M
-          pids: 128
-    ulimits:
-      nofile:
-        soft: 4096
-        hard: 8192
+      <<: *cache-deploy
+    image: redis:7.4-alpine
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
