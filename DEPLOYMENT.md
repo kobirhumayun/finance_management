@@ -13,14 +13,12 @@ Before you deploy, make sure the following shared services are available:
 
 ## 2. Configure environment variables
 
-Copy the sample files to the locations your deployment platform expects and fill in the secrets:
+Use the curated environment templates in this repository as a starting point:
 
-```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
-```
+- [`env/prod.env`](env/prod.env) drives Docker Compose deployments. Duplicate it, replace placeholders with production-ready values, and pass it to Compose with `--env-file`.
+- [`server/.env.example`](server/.env.example) and [`client/.env.example`](client/.env.example) document the runtime variables required when the API or frontend are hosted without Compose (e.g., platform-as-a-service deployments). Copy them to `.env` files only if you deploy the workspaces independently.
 
-Populate the copies with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values.
+Populate the chosen files with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values.
 
 ### Server settings
 
@@ -54,7 +52,7 @@ Populate the copies with the values that match your infrastructure. The tables b
 ### Secret management tips
 
 - Generate secrets using a password manager or a secure random generator (`openssl rand -hex 32`).
-- Never commit `.env` files to source control.
+- Never commit environment files that contain secrets to source control.
 - When deploying to cloud platforms, define the variables using the platform's secret management feature.
 
 ## 3. Build artifacts
@@ -85,20 +83,14 @@ pm2 start client/ecosystem.config.js
 
 ### Using Docker Compose (example)
 
-```yaml
-services:
-  api:
-    build: ./server
-    env_file: ./server/.env
-    ports:
-      - "5000:5000"
-  web:
-    build: ./client
-    env_file: ./client/.env
-    environment:
-      - PORT=3000
-    ports:
-      - "3000:3000"
+Promote the same Compose definition across environments by layering the appropriate overrides:
+
+```bash
+# Production parity
+docker compose --env-file env/prod.env -f compose.yml up -d
+
+# Developer stack with the bundled MongoDB container
+docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up
 ```
 
 Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.

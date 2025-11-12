@@ -1,0 +1,46 @@
+x-deploy-database: &deploy-database
+  resources:
+    limits:
+      cpus: "1.0"
+      memory: 1G
+      pids: 256
+
+services:
+  finance-management-web:
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${WEB_PORT}}
+
+  finance-management-api:
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      MONGO_URI: ${MONGO_URI:-mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@finance-management-db:27017/${MONGO_DATABASE}?authSource=admin}
+
+  finance-management-db:
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+    image: mongo:8.0
+    profiles:
+      - local-db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    deploy: *deploy-database
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --host 127.0.0.1 --username \"$$MONGO_USERNAME\" --password \"$$MONGO_PASSWORD\" --authenticationDatabase admin --quiet --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - finance-management_net
+    volumes:
+      - finance-management-mongo-data:/data/db
+
+volumes:
+  finance-management-mongo-data:
+    driver: local

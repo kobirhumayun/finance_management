@@ -23,7 +23,7 @@ cd ../client && npm install
    cp server/.env.example server/.env
    cp client/.env.example client/.env.local
    ```
-2. Update the copied files with development-friendly values. Defaults already point to `localhost` services. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
+2. Update the copied files with development-friendly values. Defaults already point to `localhost` services. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`). If you prefer to run the stack via Docker Compose, use [`env/dev.env`](../env/dev.env) instead of individual workspace files and pass it with `docker compose --env-file env/dev.env …`.
 3. Ensure MongoDB is running: `mongod --config /usr/local/etc/mongod.conf` (or start the service through your package manager).
 4. (Optional) Start Redis if you want to test token refresh coordination: `redis-server`.
 
