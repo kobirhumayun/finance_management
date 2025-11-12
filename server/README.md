@@ -14,6 +14,8 @@ Create a `.env` file in this directory using [`.env.example`](./.env.example) as
 
 Update the values to match your environment before starting the server.
 
+When running the backend through Docker Compose, copy one of the templates in [`env/`](../env) (for example `env/dev.env.example`) and pass it to `docker compose` via `--env-file`. The container honours the same variable names defined here.
+
 ## Report summary exports
 
 The summary report supports streaming exports in addition to the JSON API:

@@ -1,0 +1,12 @@
+services:
+  finance-management-web:
+    ports:
+      - "${WEB_PORT:-3000}:${WEB_PORT:-3000}"
+
+  finance-management-api:
+    ports:
+      - "${API_PORT:-5000}:${API_PORT:-5000}"
+
+  finance-management-db:
+    ports:
+      - "27017:27017"

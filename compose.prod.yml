@@ -1,0 +1,9 @@
+services:
+  finance-management-web:
+    networks:
+      - finance-management_net
+      - edge_net
+
+networks:
+  edge_net:
+    external: true

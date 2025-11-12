@@ -1,6 +1,6 @@
 # Development Workflow
 
-This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment variable examples in `client/.env.example` and `server/.env.example` when configuring your workspace.
+This guide outlines the day-to-day practices for contributing to the Finance Management application. Pair this reference with the environment templates in [`env/`](../env) along with the workspace-specific examples in `client/.env.example` and `server/.env.example` when configuring your workspace.
 
 ## 1. Prerequisites
 
@@ -20,16 +20,27 @@ cd ../client && npm install
 
 1. Copy the example files:
    ```bash
+   cp env/dev.env.example env/dev.env
    cp server/.env.example server/.env
    cp client/.env.example client/.env.local
    ```
-2. Update the copied files with development-friendly values. Defaults already point to `localhost` services. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
+2. Update the copied files with development-friendly values. The Compose environment points at the bundled MongoDB service when you start it with `--profile local-db`, while the workspace files continue to target local `localhost` infrastructure. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
 3. Ensure MongoDB is running: `mongod --config /usr/local/etc/mongod.conf` (or start the service through your package manager).
 4. (Optional) Start Redis if you want to test token refresh coordination: `redis-server`.
 
 ## 3. Running the application
 
 Open two terminals—one for the backend API and one for the frontend app.
+
+### Using Docker Compose
+
+To mirror the production deployment locally, copy `env/dev.env.example` to `env/dev.env` and start the stack with the development overlay:
+
+```bash
+docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up
+```
+
+This command exposes the frontend on `http://localhost:3000`, the API on `http://localhost:5000`, and launches the bundled MongoDB container behind the `local-db` profile.
 
 ### Backend API
 
@@ -84,7 +95,7 @@ Automate these commands in CI by invoking the workspace scripts explicitly: `npm
 
 | Symptom | Suggested fix |
 | --- | --- |
-| `MongoNetworkError` during development | Confirm MongoDB is running locally and the URI in `server/.env` is correct. |
+| `MongoNetworkError` during development | Confirm MongoDB is running locally and the URI in `server/.env` or `env/dev.env` is correct depending on your workflow. |
 | Password reset emails fail | Use a service like Mailhog locally by setting `EMAIL_HOST=localhost`, `EMAIL_PORT=1025`, and `EMAIL_SECURE=false`. |
 | Next.js cannot reach the API | Verify that `AUTH_BACKEND_URL` points to the backend dev server and that CORS allows `http://localhost:3000`. |
 | Redis connection refused | Either start Redis locally or leave `REDIS_URL` unset during development to fall back to in-memory session coordination. |

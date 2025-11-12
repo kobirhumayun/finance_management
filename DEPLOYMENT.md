@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services rely on environment variables that are documented in their respective `.env.example` files. This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
+This project ships a Next.js frontend located in [`client/`](client) and an Express-based API server in [`server/`](server). Both services rely on environment variables that are curated in the environment templates under [`env/`](env). This guide walks through the configuration values that must be provided and outlines a repeatable process for promoting the stack to production.
 
 ## 1. Provision dependencies
 
@@ -13,14 +13,13 @@ Before you deploy, make sure the following shared services are available:
 
 ## 2. Configure environment variables
 
-Copy the sample files to the locations your deployment platform expects and fill in the secrets:
+Create an environment file for the target stage and fill in the secrets:
 
 ```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
+cp env/prod.env.example env/prod.env
 ```
 
-Populate the copies with the values that match your infrastructure. The tables below summarize the most important settings. Refer to the sample files for optional values.
+Populate the copy with values that match your infrastructure (database URI, JWT secrets, SMTP credentials, etc.). The tables below summarise the most important settings for each service. When running the workspaces outside Docker, continue to use `server/.env` and `client/.env.local` derived from their respective `*.example` files—the Compose environment files reuse the same keys so values stay aligned.
 
 ### Server settings
 
@@ -54,7 +53,7 @@ Populate the copies with the values that match your infrastructure. The tables b
 ### Secret management tips
 
 - Generate secrets using a password manager or a secure random generator (`openssl rand -hex 32`).
-- Never commit `.env` files to source control.
+- Never commit `env/*.env` files to source control.
 - When deploying to cloud platforms, define the variables using the platform's secret management feature.
 
 ## 3. Build artifacts
@@ -85,23 +84,11 @@ pm2 start client/ecosystem.config.js
 
 ### Using Docker Compose (example)
 
-```yaml
-services:
-  api:
-    build: ./server
-    env_file: ./server/.env
-    ports:
-      - "5000:5000"
-  web:
-    build: ./client
-    env_file: ./client/.env
-    environment:
-      - PORT=3000
-    ports:
-      - "3000:3000"
+```bash
+docker compose --env-file env/prod.env -f compose.yml -f compose.prod.yml up -d
 ```
 
-Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
+Activate the optional MongoDB container in non-production environments with `--profile local-db`. Adjust the configuration to match your orchestration platform and remember to configure HTTPS termination at the load balancer or reverse proxy layer.
 
 ## 5. Post-deployment checklist
 
