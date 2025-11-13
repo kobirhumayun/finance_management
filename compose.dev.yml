@@ -2,9 +2,6 @@ services:
   finance-management-api:
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://${MONGO_USERNAME:-root}:${MONGO_PASSWORD:-example}@finance-management-db:27017/${MONGO_DATABASE:-finance-management}?authSource=admin}
-    depends_on:
-      finance-management-db:
-        condition: service_healthy
 
   finance-management-db:
     profiles: ["local-db"]
