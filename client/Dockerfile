@@ -65,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=40s \
   CMD curl -fsS http://127.0.0.1:3000/ || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["npm", "run", "start"]
+CMD ["node", ".next/standalone/server.js"]
