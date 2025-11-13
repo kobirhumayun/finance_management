@@ -104,6 +104,5 @@ volumes:
 networks:
   finance-management_net:
     driver: bridge
-    internal: true
   edge_net:
     external: true
