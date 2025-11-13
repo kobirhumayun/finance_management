@@ -17,10 +17,9 @@ This repository packages the Finance Management Next.js front end and Express AP
    ```
    Fill in runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment. Keep the resulting files private—never commit them to source control.
 
-   > **Important:** The Docker images always run with `NODE_ENV=production`. If
-   > you previously set `NODE_ENV` in `env/*.env`, remove or update it so the
-   > containers boot correctly. Override `WEB_NODE_ENV` or `API_NODE_ENV` only
-   > when you intentionally need a different runtime mode.
+   > **Tip:** Copy `env/dev.env.example` when developing locally. The
+   > development overlay configures the containers with `NODE_ENV=development`
+   > and hot reloading out of the box, so no manual overrides are required.
 
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
@@ -34,7 +33,16 @@ This repository packages the Finance Management Next.js front end and Express AP
    docker compose --env-file env/prod.env -f compose.yml up -d --build
    ```
    The central Nginx instance will proxy inbound requests on `finance.example.com` to the `finance-management-web` container on port 3000 via `edge_net`. All `/api/*` calls are handled by the Next.js server, which forwards them to the internal API container over the private network.
-  For local development, switch to `env/dev.env` and include `compose.dev.yml --profile local-db` to spin up the optional MongoDB container alongside the stack. The development overlay publishes the web and API services on `http://localhost:3000` and `http://localhost:5000`, so you can load the Next.js UI directly in your browser without an external reverse proxy.
+3. For local development with hot reloading, switch to the dev overlay (no
+   separate build step is necessary):
+   ```bash
+   docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml up --profile local-db
+   ```
+   - Leave off `--profile local-db` when pointing `MONGO_URI` at an external
+     database.
+   - The dev containers mount the source tree, run `npm install` automatically,
+     and start `npm run dev` so code changes are reflected instantly with full
+     styling.
    > **Turbopack note:** The frontend build script disables the Turbopack worker process inside containers to avoid a known worker crash when building in Docker. If you explicitly need worker mode, set `NEXT_TURBOPACK_USE_WORKER=1` before running `npm run build`.
 3. Run one-off tasks when required:
    ```bash

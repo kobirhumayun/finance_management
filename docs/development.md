@@ -32,6 +32,20 @@ cd ../client && npm install
 
 ## 3. Running the application
 
+Choose between the Docker Compose workflow (hot reloading without a manual build step) or local Node.js processes.
+
+### Option A: Docker Compose with hot reloading
+
+```bash
+docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml up --profile local-db
+```
+
+- Drop the `--profile local-db` flag when you want the API to connect to an external MongoDB instance.
+- The containers mount the repository, run `npm install` automatically, and start `npm run dev`, so both the frontend and backend reload changes—including CSS—immediately.
+- Stop the stack with `CTRL+C` or `docker compose down` when finished.
+
+### Option B: Run services directly with Node.js
+
 Open two terminals—one for the backend API and one for the frontend app.
 
 ### Backend API

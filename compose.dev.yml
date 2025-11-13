@@ -1,13 +1,52 @@
 services:
   finance-management-web:
+    build: null
+    image: node:24-bookworm-slim
+    entrypoint: ["sh", "-c"]
+    command: "npm install && npm run dev"
+    working_dir: /app
+    environment:
+      HOSTNAME: 0.0.0.0
+      WEB_NODE_ENV: ${WEB_NODE_ENV:-development}
+      NODE_ENV: ${WEB_NODE_ENV:-development}
+      NEXT_TELEMETRY_DISABLED: 1
+      NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS: 1
+      NEXT_FORCE_WEBPACK: 1
+      NEXT_USE_TURBOPACK: 0
+      NEXT_TURBOPACK_USE_WORKER: 0
     ports:
       - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ./client:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    depends_on:
+      finance-management-api:
+        condition: service_started
+      finance-management-redis:
+        condition: service_started
+    healthcheck: null
 
   finance-management-api:
+    build: null
+    image: node:24-bookworm-slim
+    entrypoint: ["sh", "-c"]
+    command: "npm install && npm run dev"
+    working_dir: /app
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://${MONGO_USERNAME:-root}:${MONGO_PASSWORD:-example}@finance-management-db:27017/${MONGO_DATABASE:-finance-management}?authSource=admin}
+      API_NODE_ENV: ${API_NODE_ENV:-development}
+      NODE_ENV: ${API_NODE_ENV:-development}
     ports:
       - "${API_PORT:-5000}:5000"
+    volumes:
+      - ./server:/app
+      - api_node_modules:/app/node_modules
+      - api_ms_playwright:/ms-playwright
+    depends_on:
+      finance-management-redis:
+        condition: service_started
+    healthcheck: null
 
   finance-management-db:
     profiles: ["local-db"]
@@ -43,4 +82,12 @@ services:
 
 volumes:
   finance-management-mongo-data:
+    driver: local
+  web_node_modules:
+    driver: local
+  web_next:
+    driver: local
+  api_node_modules:
+    driver: local
+  api_ms_playwright:
     driver: local

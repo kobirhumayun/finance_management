@@ -92,15 +92,15 @@ The repository now ships a production-focused [`compose.yml`](compose.yml) toget
 # Production-like deployment
 docker compose --env-file env/prod.env -f compose.yml up -d --build
 
-# Local development with the optional MongoDB container
-docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up --build
+# Local development with the optional MongoDB container (hot reloading, no separate build step)
+docker compose --env-file env/dev.env -f compose.yml -f compose.dev.yml --profile local-db up
 ```
 
 Adjust the configuration to match your orchestration platform. Use the `local-db` profile only in environments where you want Compose to provision MongoDB; omit it when connecting to an external database. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
 
-> **Reminder:** Containers always start with `NODE_ENV=production`. Override
-> `WEB_NODE_ENV` or `API_NODE_ENV` only when you intentionally need a different
-> runtime mode.
+> **Reminder:** Production deployments should keep `NODE_ENV=production`. The
+> development overlay already switches both services to `NODE_ENV=development`
+> so hot reloading works automatically.
 
 ## 5. Post-deployment checklist
 
