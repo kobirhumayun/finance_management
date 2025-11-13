@@ -31,7 +31,7 @@ services:
     env_file:
       - ./client/.env.compose
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${WEB_NODE_ENV:-production}
       PORT: ${WEB_PORT:-3000}
       AUTH_BACKEND_URL: ${AUTH_BACKEND_URL:-http://finance-management-api:5000}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://finance.example.com}
@@ -70,7 +70,7 @@ services:
       - ./server/.env.compose
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://finance-management-db:27017/finance-management}
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${API_NODE_ENV:-production}
       PORT: ${API_PORT:-5000}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       REDIS_URL: ${REDIS_URL:-redis://finance-management-redis:6379}

@@ -15,7 +15,12 @@ This repository packages the Finance Management Next.js front end and Express AP
    cp server/.env.compose.example server/.env.compose
    cp client/.env.compose.example client/.env.compose
    ```
-2. Fill in runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment. Keep the resulting files private—never commit them to source control.
+   Fill in runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment. Keep the resulting files private—never commit them to source control.
+
+   > **Important:** The Docker images always run with `NODE_ENV=production`. If
+   > you previously set `NODE_ENV` in `env/*.env`, remove or update it so the
+   > containers boot correctly. Override `WEB_NODE_ENV` or `API_NODE_ENV` only
+   > when you intentionally need a different runtime mode.
 
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
@@ -23,9 +28,10 @@ This repository packages the Finance Management Next.js front end and Express AP
 
 ## Running
 1. Ensure the shared `edge_net` already exists (`docker network create edge_net` should **not** be run here; the edge stack owns it).
-2. Start the application in detached mode using the production settings:
+2. Start the application in detached mode using the production settings (add
+   `--build` the first time or whenever Dockerfiles change):
    ```bash
-   docker compose --env-file env/prod.env -f compose.yml up -d
+   docker compose --env-file env/prod.env -f compose.yml up -d --build
    ```
    The central Nginx instance will proxy inbound requests on `finance.example.com` to the `finance-management-web` container on port 3000 via `edge_net`. All `/api/*` calls are handled by the Next.js server, which forwards them to the internal API container over the private network.
   For local development, switch to `env/dev.env` and include `compose.dev.yml --profile local-db` to spin up the optional MongoDB container alongside the stack. The development overlay publishes the web and API services on `http://localhost:3000` and `http://localhost:5000`, so you can load the Next.js UI directly in your browser without an external reverse proxy.

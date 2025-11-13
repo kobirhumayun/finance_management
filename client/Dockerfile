@@ -46,7 +46,8 @@ ENV NODE_ENV=production \
     NEXT_USE_TURBOPACK=0 \
     NEXT_TURBOPACK_USE_WORKER=0
 
-ENV PORT=3000
+ENV PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
