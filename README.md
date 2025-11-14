@@ -104,7 +104,8 @@ upstream finance-management_web {
 
 server {
   listen 80;
-  server_name finance.example.com;
+  listen [::]:80;
+  server_name finance.localhost finance.example.com;
 
   # ACME HTTP-01 challenge (adjust path if using certbot)
   location /.well-known/acme-challenge/ { root /var/www/html; }
@@ -116,6 +117,8 @@ server {
 }
 ```
 
+This repository now includes the referenced config (`nginx/conf.d/finance.conf`) and proxy parameter include (`nginx/proxy_params`) so the edge stack can start without additional scaffolding. Update the `server_name` directive and TLS configuration to match your deployment.
+
 > **Why no direct `/api` upstream?** The Next.js application exposes an `/api/proxy/*` route that forwards authenticated API requests to the Express backend over the private `finance-management_net`. External traffic therefore only hits the web tier, keeping the API fully isolated from the edge network.
 
 `nginx/proxy_params`
@@ -124,11 +127,13 @@ proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
-proxy_http_version 1.1;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-Port $server_port;
 proxy_set_header Upgrade $http_upgrade;
 proxy_set_header Connection "upgrade";
-proxy_read_timeout 60s;
-proxy_send_timeout 60s;
+proxy_http_version 1.1;
+proxy_redirect off;
+proxy_cache_bypass $http_upgrade;
 ```
 
 ### TLS Guidance
