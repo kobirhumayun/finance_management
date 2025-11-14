@@ -17,40 +17,36 @@ RUN apt-get update \
       dumb-init \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS deps
+FROM base AS dependencies
 
 COPY package*.json ./
 RUN npm ci
 
-FROM base AS builder
+FROM dependencies AS development
 
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
+ENV NODE_ENV=development
+COPY . .
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "dev"]
+
+FROM dependencies AS builder
+
 COPY . .
 RUN npm run build
 
-FROM base AS prod-deps
+FROM dependencies AS production-dependencies
 
-ENV NODE_ENV=production
-
-COPY package*.json ./
-RUN npm ci --omit=dev \
+RUN npm prune --omit=dev \
   && npm cache clean --force
 
 FROM base AS production
 
 ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
-    NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS=1 \
-    NEXT_FORCE_WEBPACK=1 \
-    NEXT_USE_TURBOPACK=0 \
-    NEXT_TURBOPACK_USE_WORKER=0
-
-ENV PORT=3000
+    PORT=3000
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
