@@ -1,8 +1,11 @@
+const dotenv = require('dotenv');
+
+dotenv.config();
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const dotenv = require('dotenv');
 const { createCorsOriginEvaluator } = require('./config/cors');
 const connectDB = require('./config/database');
 const userRoutes = require('./routes/user');
@@ -19,8 +22,6 @@ const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./middleware/errorHandler');
 const morgan = require('morgan');
-
-dotenv.config();
 const port = process.env.PORT || 5000;
 
 const app = express();
