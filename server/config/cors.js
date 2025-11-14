@@ -1,4 +1,8 @@
-const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3000'];
+const DEFAULT_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://finance.localhost',
+    'https://finance.localhost',
+];
 
 const parseOrigins = (rawOrigins) =>
     rawOrigins
