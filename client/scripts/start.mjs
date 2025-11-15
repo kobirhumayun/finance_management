@@ -10,6 +10,18 @@ delete process.env.NEXT_USE_TURBOPACK;
 delete process.env.NEXT_TURBOPACK_USE_WORKER;
 
 const rawArgs = process.argv.slice(2);
+const hostnameArgPatterns = ['--hostname', '-H'];
+const hasHostnameArg = rawArgs.some(
+  (arg) =>
+    hostnameArgPatterns.includes(arg) ||
+    hostnameArgPatterns.some((pattern) => arg.startsWith(`${pattern}=`)),
+);
+
+process.env.HOST ??= '0.0.0.0';
+
+const normalizedArgs = hasHostnameArg
+  ? rawArgs
+  : ['--hostname', process.env.HOST, ...rawArgs];
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const nextBin = resolve(
@@ -22,7 +34,7 @@ const nextBin = resolve(
   'next',
 );
 
-const result = spawnSync(process.execPath, [nextBin, 'start', ...rawArgs], {
+const result = spawnSync(process.execPath, [nextBin, 'start', ...normalizedArgs], {
   stdio: 'inherit',
   env: process.env,
 });

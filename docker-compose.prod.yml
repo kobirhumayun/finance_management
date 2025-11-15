@@ -1,0 +1,14 @@
+services:
+  finance-management-web:
+    build:
+      target: production
+    environment:
+      NODE_ENV: production
+    command: npm run start
+
+  finance-management-api:
+    build:
+      target: production
+    environment:
+      NODE_ENV: production
+    command: node server.js
