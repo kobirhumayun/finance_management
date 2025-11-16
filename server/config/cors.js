@@ -1,5 +1,18 @@
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3000'];
 
+const normalizeOrigin = (origin) => {
+    if (!origin) {
+        return origin;
+    }
+
+    try {
+        const url = new URL(origin);
+        return `${url.protocol}//${url.hostname}`;
+    } catch (error) {
+        return origin;
+    }
+};
+
 const parseOrigins = (rawOrigins) =>
     rawOrigins
         .split(',')
@@ -22,8 +35,21 @@ const createCorsOriginEvaluator = () => {
     const allowedOrigins = getAllowedOrigins();
     const allowAll = allowedOrigins.includes('*');
 
+    const allowedOriginSet = new Set();
+    allowedOrigins.forEach((origin) => {
+        allowedOriginSet.add(origin);
+        allowedOriginSet.add(normalizeOrigin(origin));
+    });
+
     return (origin, callback) => {
-        if (!origin || allowAll || allowedOrigins.includes(origin)) {
+        const normalizedOrigin = normalizeOrigin(origin);
+
+        if (
+            !origin ||
+            allowAll ||
+            allowedOriginSet.has(origin) ||
+            allowedOriginSet.has(normalizedOrigin)
+        ) {
             return callback(null, true);
         }
 
