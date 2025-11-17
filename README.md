@@ -106,7 +106,6 @@ The edge proxy runs separately from this repository. It should be deployed once 
 
 `compose.nginx.yml`
 ```yaml
-version: "3.9"
 services:
   nginx:
     image: nginx:stable
@@ -129,7 +128,9 @@ services:
       retries: 3
 networks:
   edge_net:
+    name: edge_net
     driver: bridge
+    attachable: true
 ```
 
 `nginx/conf.d/finance.conf`
