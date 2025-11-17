@@ -9,9 +9,14 @@ This repository packages the Finance Management Next.js front end and Express AP
 - Docker Engine and Docker Compose Plugin installed on the VPS.
 
 ## Environment Setup
-1. Copy `.env.example` to `.env` in the repository root.
-2. Fill in runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
-3. Keep `.env` private—never commit it to source control.
+1. Pick the template that matches your workflow and copy it to `.env` in the repository root:
+   - `.env.local.template` &rarr; `.env` for local development or hot reload workflows (e.g., `docker compose --profile localdb up`).
+   - `.env.production.template` &rarr; `.env` for staging/production deployments.
+2. Each template includes two `MONGO_URI` examples under the “Backend configuration” section:
+   - The first line points at the bundled MongoDB container (`finance-management-db`) and should stay uncommented when you want Compose to spin up the local database.
+   - The second line shows an external MongoDB Atlas (or any other cluster) URI. Uncomment that line and comment/remove the local URI when you need to target an outside database; update the hostname, username, and password to match your cluster.
+3. Fill in the remaining runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
+4. Keep `.env` private—never commit it to source control.
 
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
