@@ -12,6 +12,7 @@ This repository packages the Finance Management Next.js front end and Express AP
 1. Pick the template that matches your workflow and copy it to `.env` in the repository root:
    - `.env.local.template` &rarr; `.env` for local development or hot reload workflows (e.g., `docker compose --profile localdb up`).
    - `.env.production.template` &rarr; `.env` for staging/production deployments.
+   - `.env.example` is the canonical checklist of every supported variable; consult it when you need knobs that are not pre-filled in the templates above.
 2. Each template includes two `MONGO_URI` examples under the “Backend configuration” section:
    - The first line points at the bundled MongoDB container (`finance-management-db`) and should stay uncommented when you want Compose to spin up the local database.
    - The second line shows an external MongoDB Atlas (or any other cluster) URI. Uncomment that line and comment/remove the local URI when you need to target an outside database; update the hostname, username, and password to match your cluster.
@@ -23,12 +24,14 @@ Use the combinations below to quickly start the stack in each environment. Every
 
 | Scenario | Compose command |
 | --- | --- |
-| **Dev + LocalDB** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile localdb up` |
-| **Dev + ExternalDB** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up` |
-| **Prod + LocalDB** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile localdb up -d` |
-| **Prod + ExternalDB** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
+| **Dev + LocalDB** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile localdb up --build` |
+| **Dev + ExternalDB** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build` |
+| **Prod + LocalDB** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile localdb up --build -d` |
+| **Prod + ExternalDB** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d` |
 
 > ℹ️ Use `--profile localdb` only when you want Docker Compose to launch the bundled MongoDB service. When pointing at an external database (Atlas, self-hosted cluster, etc.), omit the profile flag and ensure the local database service remains stopped.
+
+> ℹ️ Append `--build` when starting the stack to force Docker to rebuild the images and pick up the latest source or dependency changes before containers boot.
 
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
@@ -84,7 +87,22 @@ Use the combinations below to quickly start the stack in each environment. Every
 ## Central Nginx (shared across apps)
 The edge proxy runs separately from this repository. It should be deployed once on the VPS, own the `edge_net` network, manage TLS certificates, and publish `:80`/`:443`. Each application stack (including this one) connects its public `*-web` service to `edge_net` so the proxy can route traffic by hostname.
 
-Example edge deployment (maintained outside this repo):
+### Step-by-step setup
+1. **Bootstrap the proxy container**
+   ```bash
+   docker compose -f compose.nginx.yml up -d
+   ```
+   This starts the `edge-nginx` service, publishes ports 80/443, mounts the configuration directories, and creates (or joins) the shared `edge_net` bridge network. Every application stack that needs public ingress must attach its web-facing container to `edge_net`.
+2. **Create a server block per application**
+   Copy `nginx/conf.d/finance.conf` and adjust the `upstream` and `server_name` directives for each hostname you plan to proxy. For additional apps, create `nginx/conf.d/<app>.conf` files that mirror this template.
+3. **Issue TLS certificates**
+   Use Certbot or another ACME client that writes certificates under `./letsencrypt`. Uncomment the HTTPS server block in `nginx/conf.d/finance.conf` once the certificate paths exist (see inline comments in that file for exact directives).
+4. **Reload Nginx after any config change**
+   ```bash
+   docker compose -f compose.nginx.yml exec nginx nginx -s reload
+   ```
+
+### Reference files included in this repo
 
 `compose.nginx.yml`
 ```yaml
@@ -116,31 +134,53 @@ networks:
 
 `nginx/conf.d/finance.conf`
 ```nginx
-upstream finance-management_web {
+upstream finance_management_web {
+  # The Docker Compose service name and internal port for the Next.js frontend.
   server finance-management-web:3000;
 }
 
 server {
   listen 80;
   listen [::]:80;
-  server_name finance.localhost finance.example.com;
+  server_name finance.localhost finance.example.com; # Replace with your subdomains.
 
-  # ACME HTTP-01 challenge (adjust path if using certbot)
-  location /.well-known/acme-challenge/ { root /var/www/html; }
+  # Allow ACME HTTP-01 challenges for certificate issuance (Certbot mounts ./www).
+  location /.well-known/acme-challenge/ {
+    root /var/www/html;
+  }
 
   location / {
-    proxy_pass http://finance-management_web;
+    proxy_pass http://finance_management_web;
     include /etc/nginx/proxy_params;
   }
-}
-```
 
-This repository now includes the referenced config (`nginx/conf.d/finance.conf`) and proxy parameter include (`nginx/proxy_params`) so the edge stack can start without additional scaffolding. Update the `server_name` directive and TLS configuration to match your deployment.
+  # Uncomment after TLS certificates exist in ./letsencrypt/live/<domain>/
+  # return 301 https://$host$request_uri;
+}
+
+# Example HTTPS block (commented to serve as a template)
+# server {
+#   listen 443 ssl http2;
+#   listen [::]:443 ssl http2;
+#   server_name finance.example.com; # Match the hostnames from the HTTP block
+#
+#   ssl_certificate     /etc/letsencrypt/live/finance.example.com/fullchain.pem;
+#   ssl_certificate_key /etc/letsencrypt/live/finance.example.com/privkey.pem;
+#   include /etc/letsencrypt/options-ssl-nginx.conf; # Provided by Certbot
+#   ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+#
+#   location / {
+#     proxy_pass http://finance_management_web;
+#     include /etc/nginx/proxy_params;
+#   }
+# }
+```
 
 > **Why no direct `/api` upstream?** The Next.js application exposes an `/api/proxy/*` route that forwards authenticated API requests to the Express backend over the private `finance-management_net`. External traffic therefore only hits the web tier, keeping the API fully isolated from the edge network.
 
 `nginx/proxy_params`
 ```nginx
+# Shared headers for every proxied request. Extend as needed for WebSocket-heavy apps.
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -154,9 +194,10 @@ proxy_redirect off;
 proxy_cache_bypass $http_upgrade;
 ```
 
-### TLS Guidance
-- Issue certificates for `finance.example.com` using Certbot or an ACME client integrated with the edge stack.
-- Redirect HTTP to HTTPS using an additional `server` block or `return 301 https://$host$request_uri;` inside the port 80 block once certificates are issued.
+### TLS & subdomain checklist
+- Issue certificates for every subdomain handled by the edge proxy (e.g., `finance.example.com`).
+- Uncomment and customize the HTTPS block in `nginx/conf.d/finance.conf` once certificates exist.
+- Add additional `server` blocks per subdomain/application and reload Nginx after editing.
 - Ensure the edge Nginx container is the only service joined to `edge_net` aside from application `*-web` containers.
 
-With this layout, the Next.js front end is the only component exposed to the shared edge network, while the API, MongoDB, and Redis remain protected on the private network.
+With this layout, the Next.js front end is the only component exposed to the shared edge network, while the API, MongoDB, and Redis remain protected on the private network. Nginx terminates TLS, routes requests by hostname, and forwards traffic to the appropriate internal service without opening host ports on the app stack.
