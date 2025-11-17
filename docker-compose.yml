@@ -79,6 +79,7 @@ services:
       start_period: 40s
     networks:
       - finance-management_net
+      - finance-management_outbound
 
   finance-management-db:
     image: mongo:8.0
@@ -148,6 +149,9 @@ volumes:
 
 networks:
   finance-management_net:
+    driver: bridge
+    internal: true
+  finance-management_outbound:
     driver: bridge
   edge_net:
     external: true

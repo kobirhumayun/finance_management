@@ -1,7 +1,7 @@
 # Finance Management Docker Deployment
 
 ## Overview
-This repository packages the Finance Management Next.js front end and Express API into a Docker Compose stack that keeps internal dependencies isolated on the private `finance-management_net` while exposing only the `finance-management-web` container to the shared `edge_net`. A centrally managed Nginx reverse proxy (deployed elsewhere on the VPS) owns `edge_net`, publishes ports 80/443, and forwards hostname-based traffic to this application without any host ports opened by the app stack itself. The API, MongoDB, and Redis stay on the private network; the web tier proxies API traffic internally so nothing except the browser-facing Next.js server needs to be reachable from the edge.
+This repository packages the Finance Management Next.js front end and Express API into a Docker Compose stack that keeps internal dependencies isolated on the private `finance-management_net` while exposing only the `finance-management-web` container to the shared `edge_net`. A centrally managed Nginx reverse proxy (deployed elsewhere on the VPS) owns `edge_net`, publishes ports 80/443, and forwards hostname-based traffic to this application without any host ports opened by the app stack itself. The API shares the private network with MongoDB and Redis but now also joins a second outbound-only bridge that it can use to reach remote MongoDB clusters when `MONGO_URI` points off-box; the web tier proxies API traffic internally so nothing except the browser-facing Next.js server needs to be reachable from the edge.
 
 ## Prerequisites
 - A VPS (or bare-metal host) already running the shared edge Nginx deployment that creates and manages the external `edge_net` network and publishes TCP ports 80 and 443.
@@ -32,7 +32,8 @@ Use the combinations below to quickly start the stack in each environment. Every
 
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
-- `finance-management_net` is defined by `docker-compose.yml` and marked `internal: true`, preventing direct inbound connections from the host or other containers outside this network. Docker Compose creates it automatically on the first `up`.
+- `finance-management_net` is defined by `docker-compose.yml`, marked `internal: true`, and hosts the API, MongoDB, Redis, and web containers so data never crosses the Docker host boundary.
+- `finance-management_outbound` is an internal-to-this-stack bridge network that only the API (and optionally the web tier, if ever needed) should use for egress. The API attaches to both networks simultaneously, keeping MongoDB/Redis isolated on the internal network while giving the API a dedicated outbound path to contact managed services such as MongoDB Atlas when `MONGO_URI` references an external host.
 
 ## Running
 1. Ensure the shared `edge_net` already exists (`docker network create edge_net` should **not** be run here; the edge stack owns it).
@@ -78,7 +79,7 @@ Use the combinations below to quickly start the stack in each environment. Every
 ## Security
 - No service in this stack publishes host ports; only the shared edge Nginx service faces the public internet.
 - Secrets remain in `.env` and are injected at runtime via Compose.
-- API, MongoDB, and Redis run exclusively on the internal `finance-management_net` and are unreachable from other applications or the host.
+- MongoDB and Redis remain isolated on the internal `finance-management_net`, while the API bridges that network with the outbound-only `finance-management_outbound` so it can reach remote dependencies without exposing the databases themselves.
 
 ## Central Nginx (shared across apps)
 The edge proxy runs separately from this repository. It should be deployed once on the VPS, own the `edge_net` network, manage TLS certificates, and publish `:80`/`:443`. Each application stack (including this one) connects its public `*-web` service to `edge_net` so the proxy can route traffic by hostname.
