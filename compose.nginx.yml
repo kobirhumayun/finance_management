@@ -15,6 +15,9 @@ services:
       - edge_net
     healthcheck:
       test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 networks:
   edge_net:

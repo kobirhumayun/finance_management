@@ -1,0 +1,30 @@
+services:
+  finance-management-web:
+    build:
+      target: development
+    environment:
+      NODE_ENV: development
+    command: npm run dev
+    volumes:
+      - ./client:/app
+      - client-node_modules:/app/node_modules
+      - client-next:/app/.next
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${WEB_PORT:-3000}/ || exit 1"]
+
+  finance-management-api:
+    build:
+      target: development
+    environment:
+      NODE_ENV: development
+    command: npm run dev
+    volumes:
+      - ./server:/app
+      - server-node_modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${API_PORT:-5000}/healthz || exit 1"]
+
+volumes:
+  client-node_modules:
+  client-next:
+  server-node_modules:
