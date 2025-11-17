@@ -18,6 +18,18 @@ This repository packages the Finance Management Next.js front end and Express AP
 3. Fill in the remaining runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
 4. Keep `.env` private—never commit it to source control.
 
+## Usage Matrix
+Use the combinations below to quickly start the stack in each environment. Every command assumes you are running it from the repo root and have already created the `.env` file described above. Before launching, double-check that the `MONGO_URI` line in `.env` targets the database (local container or external cluster) you expect for that row.
+
+| Scenario | Compose command |
+| --- | --- |
+| **Dev + LocalDB** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile localdb up` |
+| **Dev + ExternalDB** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up` |
+| **Prod + LocalDB** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile localdb up -d` |
+| **Prod + ExternalDB** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
+
+> ℹ️ Use `--profile localdb` only when you want Docker Compose to launch the bundled MongoDB service. When pointing at an external database (Atlas, self-hosted cluster, etc.), omit the profile flag and ensure the local database service remains stopped.
+
 ## Networks
 - `edge_net` is an external bridge network managed by the centralized Nginx deployment. Confirm it exists with `docker network ls` on the VPS before starting this stack.
 - `finance-management_net` is defined by `docker-compose.yml` and marked `internal: true`, preventing direct inbound connections from the host or other containers outside this network. Docker Compose creates it automatically on the first `up`.
