@@ -71,6 +71,8 @@ services:
       nofile:
         soft: 4096
         hard: 8192
+    volumes:
+      - finance-management-uploads:${UPLOADS_ROOT:-/app/uploads}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${API_PORT:-5000}/healthz || exit 1"]
       interval: 30s
@@ -145,6 +147,8 @@ volumes:
   finance-management-mongo-data:
     driver: local
   finance-management-redis-data:
+    driver: local
+  finance-management-uploads:
     driver: local
 
 networks:
