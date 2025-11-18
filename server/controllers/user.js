@@ -2,9 +2,11 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const UsedRefreshToken = require('../models/UsedRefreshToken');
 const Order = require('../models/Order');
+const Project = require('../models/Project');
+const Transaction = require('../models/Transaction');
 const jwt = require('jsonwebtoken');
 const { isValidObjectId } = mongoose;
-const { saveProfileImage, discardDescriptor } = require('../services/imageService');
+const imageService = require('../services/imageService');
 const { streamStoredFile } = require('../utils/storageStreamer');
 
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
@@ -49,9 +51,93 @@ const removeStoredProfileImage = async (descriptor) => {
         return;
     }
     try {
-        await discardDescriptor(descriptor);
+        await imageService.discardDescriptor(descriptor);
     } catch (error) {
         console.error('Failed to delete profile image:', error);
+    }
+};
+
+const cleanupUserAttachments = async (userId) => {
+    if (!userId) {
+        return;
+    }
+
+    try {
+        const [projects, transactions] = await Promise.all([
+            Project.find({ user_id: userId })
+                .select({ attachment: 1 })
+                .lean(),
+            Transaction.find({ user_id: userId })
+                .select({ attachment: 1 })
+                .lean(),
+        ]);
+
+        const attachmentRecords = [];
+
+        (projects || []).forEach((project) => {
+            if (project?.attachment?.path) {
+                attachmentRecords.push({
+                    descriptor: project.attachment,
+                    model: 'project',
+                    documentId: project._id,
+                });
+            }
+        });
+
+        (transactions || []).forEach((transaction) => {
+            if (transaction?.attachment?.path) {
+                attachmentRecords.push({
+                    descriptor: transaction.attachment,
+                    model: 'transaction',
+                    documentId: transaction._id,
+                });
+            }
+        });
+
+        if (!attachmentRecords.length) {
+            return;
+        }
+
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < attachmentRecords.length; i += BATCH_SIZE) {
+            const chunk = attachmentRecords.slice(i, i + BATCH_SIZE);
+            await Promise.all(chunk.map(async ({ descriptor }) => {
+                try {
+                    await imageService.discardDescriptor(descriptor);
+                } catch (error) {
+                    console.error('Failed to delete attachment during account deletion:', error);
+                }
+            }));
+        }
+
+        const projectIds = attachmentRecords
+            .filter((record) => record.model === 'project')
+            .map((record) => record.documentId);
+        const transactionIds = attachmentRecords
+            .filter((record) => record.model === 'transaction')
+            .map((record) => record.documentId);
+
+        const updates = [];
+
+        if (projectIds.length) {
+            updates.push(Project.updateMany(
+                { _id: { $in: projectIds } },
+                { $unset: { attachment: '' } },
+            ));
+        }
+
+        if (transactionIds.length) {
+            updates.push(Transaction.updateMany(
+                { _id: { $in: transactionIds } },
+                { $unset: { attachment: '' } },
+            ));
+        }
+
+        if (updates.length) {
+            await Promise.all(updates);
+        }
+    } catch (error) {
+        console.error('Failed to clean up attachments during account deletion:', error);
     }
 };
 
@@ -581,7 +667,7 @@ const uploadProfilePicture = async (req, res) => {
         }
 
         try {
-            newImage = await saveProfileImage({
+            newImage = await imageService.saveProfileImage({
                 file: req.file,
                 userId,
             });
@@ -850,6 +936,7 @@ const deleteCurrentUserAccount = async (req, res) => {
 
         await user.save();
         await UsedRefreshToken.deleteMany({ userId });
+        await cleanupUserAttachments(userId);
         if (previousImage) {
             await removeStoredProfileImage(previousImage);
         }
