@@ -9,6 +9,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { OrderDetailPopover } from "@/components/features/orders/order-detail-popover";
+import ProfileAvatarUploader from "@/components/features/profile/profile-avatar-uploader";
 import CashFlowChart from "@/components/features/reports/cash-flow-chart";
 import PageHeader from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,8 @@ import {
   selfProfileQueryOptions,
   selfSettingsQueryOptions,
   updateSelfProfile,
+  uploadProfilePicture,
+  deleteProfilePicture,
 } from "@/lib/queries/self";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +75,7 @@ const profileSchema = z.object({
 });
 
 const ORDER_PAGE_SIZE = 10;
+const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 const ORDER_STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -219,6 +223,8 @@ export default function ProfilePage() {
   });
 
   const profile = profileQuery.data;
+  const profilePhotoUrl = profile?.profilePictureUrl;
+  const profilePhotoUpdatedAt = profile?.profileImage?.uploadedAt;
   const settings = settingsQuery.data;
 
   const form = useForm({
@@ -266,6 +272,44 @@ export default function ProfilePage() {
         queryClient.setQueryData(qk.self.profile(), data);
       }
       toast.success("Profile updated successfully.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: qk.self.profile() });
+    },
+  });
+
+  const uploadProfilePictureMutation = useMutation({
+    mutationFn: ({ file }) => uploadProfilePicture({ file }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: qk.self.profile() });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Unable to upload your profile photo."));
+    },
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.setQueryData(qk.self.profile(), data);
+      }
+      toast.success("Profile photo updated.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: qk.self.profile() });
+    },
+  });
+
+  const deleteProfilePictureMutation = useMutation({
+    mutationFn: () => deleteProfilePicture(),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: qk.self.profile() });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Unable to remove your profile photo."));
+    },
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.setQueryData(qk.self.profile(), data);
+      }
+      toast.success("Profile photo removed.");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: qk.self.profile() });
@@ -375,6 +419,31 @@ export default function ProfilePage() {
 
   const monthlySeries = useMemo(() => buildMonthlyOrderSeries(orders), [orders]);
 
+  const handleAvatarSelect = useCallback(
+    (file) => {
+      if (!file) {
+        return;
+      }
+      if (!file.type?.startsWith("image/")) {
+        toast.error("Please choose an image file (PNG, JPG, or WebP).");
+        return;
+      }
+      if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+        toast.error("Profile photos must be 5 MB or smaller.");
+        return;
+      }
+      uploadProfilePictureMutation.mutate({ file });
+    },
+    [uploadProfilePictureMutation]
+  );
+
+  const handleAvatarRemove = useCallback(() => {
+    if (!profilePhotoUrl) {
+      return;
+    }
+    deleteProfilePictureMutation.mutate();
+  }, [deleteProfilePictureMutation, profilePhotoUrl]);
+
   const handleSubmit = form.handleSubmit((values) => {
     updateProfileMutation.mutate(mapProfileValuesToPayload(values));
   });
@@ -403,6 +472,17 @@ export default function ProfilePage() {
                 {getErrorMessage(profileError, "We couldn't load your profile. Try refreshing the page.")}
               </div>
             ) : null}
+            <ProfileAvatarUploader
+              avatarUrl={profilePhotoUrl}
+              displayName={profile?.displayName}
+              username={profile?.username}
+              lastUpdated={profilePhotoUpdatedAt}
+              onSelectFile={handleAvatarSelect}
+              onRemove={handleAvatarRemove}
+              isUploading={uploadProfilePictureMutation.isPending}
+              isRemoving={deleteProfilePictureMutation.isPending}
+              disabled={isProfileLoading}
+            />
             <Form {...form}>
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <div className="grid gap-4 md:grid-cols-2">
