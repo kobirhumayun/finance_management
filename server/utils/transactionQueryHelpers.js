@@ -61,6 +61,24 @@ const extractProjectReference = (project) => {
     return { projectId: '', projectName: null };
 };
 
+const mapAttachment = (attachment) => {
+    if (!attachment || typeof attachment !== 'object') {
+        return null;
+    }
+
+    return {
+        filename: attachment.filename || '',
+        mimeType: attachment.mimeType || '',
+        size: typeof attachment.size === 'number' ? attachment.size : null,
+        width: typeof attachment.width === 'number' ? attachment.width : null,
+        height: typeof attachment.height === 'number' ? attachment.height : null,
+        url: attachment.url || '',
+        uploadedAt: attachment.uploadedAt
+            ? new Date(attachment.uploadedAt).toISOString()
+            : null,
+    };
+};
+
 const mapTransaction = (transaction) => {
     const { projectId, projectName } = extractProjectReference(transaction.project_id);
 
@@ -73,6 +91,7 @@ const mapTransaction = (transaction) => {
         amount: transaction.amount,
         subcategory: transaction.subcategory,
         description: transaction.description || '',
+        attachment: mapAttachment(transaction.attachment),
         createdAt: transaction.createdAt ? transaction.createdAt.toISOString() : null,
         updatedAt: transaction.updatedAt ? transaction.updatedAt.toISOString() : null,
     };

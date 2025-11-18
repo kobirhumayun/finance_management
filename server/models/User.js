@@ -50,6 +50,16 @@ const userSchema = new Schema({
         type: String,
         trim: true
     },
+    profileImage: {
+        filename: { type: String, trim: true },
+        mimeType: { type: String, trim: true },
+        size: { type: Number },
+        width: { type: Number },
+        height: { type: Number },
+        url: { type: String, trim: true },
+        path: { type: String },
+        uploadedAt: { type: Date },
+    },
     planId: {
         type: Schema.Types.ObjectId,
         ref: 'Plan', // Reference to the Plan model

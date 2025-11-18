@@ -35,6 +35,27 @@ const normalizeTransaction = (transaction) => {
     return null;
   }
 
+  const attachment = transaction.attachment && typeof transaction.attachment === "object"
+    ? {
+        filename: transaction.attachment.filename ?? "",
+        mimeType: transaction.attachment.mimeType ?? "",
+        size:
+          typeof transaction.attachment.size === "number"
+            ? transaction.attachment.size
+            : null,
+        width:
+          typeof transaction.attachment.width === "number"
+            ? transaction.attachment.width
+            : null,
+        height:
+          typeof transaction.attachment.height === "number"
+            ? transaction.attachment.height
+            : null,
+        url: transaction.attachment.url ?? "",
+        uploadedAt: transaction.attachment.uploadedAt ?? null,
+      }
+    : null;
+
   return {
     id: transaction.id ?? "",
     projectId: transaction.projectId ?? "",
@@ -43,6 +64,7 @@ const normalizeTransaction = (transaction) => {
     amount: transaction.amount ?? 0,
     subcategory: transaction.subcategory ?? "",
     description: transaction.description ?? "",
+    attachment,
     createdAt: transaction.createdAt ?? null,
     updatedAt: transaction.updatedAt ?? null,
   };
@@ -140,19 +162,51 @@ export async function deleteProject({ projectId }, { signal } = {}) {
   return apiJSON(`${PROJECTS_ENDPOINT}/${projectId}`, { method: "DELETE", signal });
 }
 
-export async function createTransaction({ projectId, ...input }, { signal } = {}) {
+export async function createTransaction({ projectId, attachmentFile, ...input }, { signal } = {}) {
   if (!projectId) {
     throw new Error("projectId is required to create a transaction");
   }
   const body = mapTransactionInput(input);
+  if (attachmentFile) {
+    const formData = new FormData();
+    Object.entries(body).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      formData.append(key, value);
+    });
+    formData.append("attachment", attachmentFile);
+    return apiJSON(`${PROJECTS_ENDPOINT}/${projectId}/transactions`, {
+      method: "POST",
+      body: formData,
+      signal,
+    });
+  }
   return apiJSON(`${PROJECTS_ENDPOINT}/${projectId}/transactions`, { method: "POST", body, signal });
 }
 
-export async function updateTransaction({ projectId, transactionId, ...input }, { signal } = {}) {
+export async function updateTransaction(
+  { projectId, transactionId, attachmentFile, removeAttachment, ...input },
+  { signal } = {}
+) {
   if (!projectId || !transactionId) {
     throw new Error("projectId and transactionId are required to update a transaction");
   }
   const body = mapTransactionInput(input);
+  if (typeof removeAttachment === "boolean") {
+    body.removeAttachment = removeAttachment;
+  }
+  if (attachmentFile) {
+    const formData = new FormData();
+    Object.entries(body).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      formData.append(key, value);
+    });
+    formData.append("attachment", attachmentFile);
+    return apiJSON(`${PROJECTS_ENDPOINT}/${projectId}/transactions/${transactionId}`, {
+      method: "PUT",
+      body: formData,
+      signal,
+    });
+  }
   return apiJSON(`${PROJECTS_ENDPOINT}/${projectId}/transactions/${transactionId}`, {
     method: "PUT",
     body,

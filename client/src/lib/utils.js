@@ -6,3 +6,27 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
+
+export function resolveAssetUrl(pathname) {
+  if (!pathname) return "";
+  const value = String(pathname).trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/api/proxy/")) return value;
+  const normalized = value.startsWith("/") ? value : `/${value}`;
+  return `/api/proxy${normalized}`;
+}
+
+export function formatFileSize(bytes, { fallback = "" } = {}) {
+  const numeric = typeof bytes === "number" ? bytes : Number(bytes);
+  if (!Number.isFinite(numeric) || numeric < 0) return fallback;
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let index = 0;
+  let value = numeric;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  const precision = value >= 10 || index === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[index]}`;
+}

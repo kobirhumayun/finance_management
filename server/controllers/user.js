@@ -4,6 +4,7 @@ const UsedRefreshToken = require('../models/UsedRefreshToken');
 const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
 const { isValidObjectId } = mongoose;
+const { saveProfileImage, discardDescriptor } = require('../services/imageService');
 
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
@@ -32,6 +33,42 @@ const normalizeDecimal = (value) => {
     return value;
 };
 
+const cloneImageDescriptor = (descriptor) => {
+    if (!descriptor) {
+        return null;
+    }
+    if (typeof descriptor.toObject === 'function') {
+        return descriptor.toObject();
+    }
+    return { ...descriptor };
+};
+
+const removeStoredProfileImage = async (descriptor) => {
+    if (!descriptor) {
+        return;
+    }
+    try {
+        await discardDescriptor(descriptor);
+    } catch (error) {
+        console.error('Failed to delete profile image:', error);
+    }
+};
+
+const mapProfileImage = (image) => {
+    if (!image) {
+        return null;
+    }
+    return {
+        filename: image.filename || '',
+        mimeType: image.mimeType || '',
+        size: typeof image.size === 'number' ? image.size : null,
+        width: typeof image.width === 'number' ? image.width : null,
+        height: typeof image.height === 'number' ? image.height : null,
+        url: image.url || '',
+        uploadedAt: image.uploadedAt ? new Date(image.uploadedAt).toISOString() : null,
+    };
+};
+
 const buildProfileResponse = (userDoc) => {
     if (!userDoc) {
         return null;
@@ -56,6 +93,8 @@ const buildProfileResponse = (userDoc) => {
         || [userDoc.firstName, userDoc.lastName].filter(Boolean).join(' ')
         || userDoc.username;
 
+    const profileImage = mapProfileImage(userDoc.profileImage);
+
     return {
         id: userDoc._id,
         username: userDoc.username,
@@ -63,7 +102,8 @@ const buildProfileResponse = (userDoc) => {
         firstName: userDoc.firstName || '',
         lastName: userDoc.lastName || '',
         displayName: computedDisplayName,
-        profilePictureUrl: userDoc.profilePictureUrl || '',
+        profilePictureUrl: profileImage?.url || userDoc.profilePictureUrl || '',
+        profileImage,
         subscription: {
             plan: planDoc,
             status: userDoc.subscriptionStatus,
@@ -467,6 +507,93 @@ const updateCurrentUserProfile = async (req, res) => {
     }
 };
 
+const uploadProfilePicture = async (req, res) => {
+    let newImage = null;
+    let imagePersisted = false;
+    try {
+        const userId = req.user?._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Please select an image to upload.' });
+        }
+
+        try {
+            newImage = await saveProfileImage({
+                file: req.file,
+                userId,
+            });
+        } catch (error) {
+            return res.status(400).json({
+                message: error.message || 'Unable to process the uploaded image.',
+            });
+        }
+
+        const previousImage = cloneImageDescriptor(user.profileImage);
+        user.profileImage = newImage;
+        user.profilePictureUrl = newImage.url;
+        user.markModified('profileImage');
+
+        await user.save();
+        imagePersisted = true;
+
+        if (previousImage) {
+            await removeStoredProfileImage(previousImage);
+        }
+
+        await user.populate('planId', 'name slug billingCycle price currency');
+        const profile = buildProfileResponse(user.toObject());
+
+        return res.status(200).json({
+            message: 'Profile picture updated successfully.',
+            profile,
+        });
+    } catch (error) {
+        if (newImage && !imagePersisted) {
+            await removeStoredProfileImage(newImage);
+        }
+        console.error('Error uploading profile picture:', error);
+        return res.status(500).json({ message: 'Failed to upload profile picture.' });
+    }
+};
+
+const deleteProfilePicture = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const previousImage = cloneImageDescriptor(user.profileImage);
+        user.profileImage = undefined;
+        user.profilePictureUrl = undefined;
+        user.markModified('profileImage');
+
+        await user.save();
+
+        if (previousImage) {
+            await removeStoredProfileImage(previousImage);
+        }
+
+        await user.populate('planId', 'name slug billingCycle price currency');
+        const profile = buildProfileResponse(user.toObject());
+
+        return res.status(200).json({
+            message: 'Profile picture removed successfully.',
+            profile,
+        });
+    } catch (error) {
+        console.error('Error removing profile picture:', error);
+        return res.status(500).json({ message: 'Failed to remove profile picture.' });
+    }
+};
+
 const getCurrentUserSettings = async (req, res) => {
     try {
         const user = await User.findById(req.user?._id)
@@ -602,6 +729,7 @@ const deleteCurrentUserAccount = async (req, res) => {
             return res.status(401).json({ message: 'Current password is incorrect.' });
         }
 
+        const previousImage = cloneImageDescriptor(user.profileImage);
         user.isActive = false;
         user.refreshToken = undefined;
         user.markModified('refreshToken');
@@ -615,9 +743,17 @@ const deleteCurrentUserAccount = async (req, res) => {
 
         user.metadata = metadata;
         user.markModified('metadata');
+        if (user.profileImage) {
+            user.profileImage = undefined;
+            user.profilePictureUrl = '';
+            user.markModified('profileImage');
+        }
 
         await user.save();
         await UsedRefreshToken.deleteMany({ userId });
+        if (previousImage) {
+            await removeStoredProfileImage(previousImage);
+        }
 
         return res.status(200).json({ message: 'Account deleted successfully.' });
     } catch (error) {
@@ -894,6 +1030,8 @@ module.exports = {
     refreshAccessToken,
     getCurrentUserProfile,
     updateCurrentUserProfile,
+    uploadProfilePicture,
+    deleteProfilePicture,
     getCurrentUserSettings,
     updateCurrentUserEmail,
     updateCurrentUserPassword,

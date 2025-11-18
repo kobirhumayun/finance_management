@@ -1,6 +1,7 @@
 const Project = require('../models/Project');
 const Transaction = require('../models/Transaction');
 const { getPlanLimitsForUser } = require('../services/planLimits');
+const { saveTransactionAttachment, discardDescriptor } = require('../services/imageService');
 
 const {
     clampLimit,
@@ -13,6 +14,27 @@ const {
     toStorageType,
     parseTransactionDate,
 } = require('../utils/transactionQueryHelpers');
+
+const cloneAttachment = (attachment) => {
+    if (!attachment) {
+        return null;
+    }
+    if (typeof attachment.toObject === 'function') {
+        return attachment.toObject();
+    }
+    return { ...attachment };
+};
+
+const removeStoredAttachment = async (attachment) => {
+    if (!attachment) {
+        return;
+    }
+    try {
+        await discardDescriptor(attachment);
+    } catch (error) {
+        console.error('Failed to delete stored attachment:', error);
+    }
+};
 
 const mapProject = (project) => ({
     id: project._id.toString(),
@@ -224,6 +246,20 @@ const deleteProject = async (req, res, next) => {
             return res.status(404).json({ message: 'Project not found.' });
         }
 
+        const attachments = await Transaction.find({
+            project_id: project._id,
+            user_id: userId,
+            'attachment.path': { $exists: true, $ne: null },
+        })
+            .select({ attachment: 1 })
+            .lean();
+
+        if (Array.isArray(attachments) && attachments.length > 0) {
+            await Promise.all(
+                attachments.map((record) => removeStoredAttachment(record.attachment)),
+            );
+        }
+
         await Transaction.deleteMany({ project_id: project._id, user_id: userId });
 
         res.status(200).json({
@@ -385,6 +421,8 @@ const getTransactions = async (req, res, next) => {
 };
 
 const createTransaction = async (req, res, next) => {
+    let newAttachment = null;
+    let attachmentPersisted = false;
     try {
         const userId = req.user?._id;
         const { projectId } = req.params;
@@ -426,6 +464,20 @@ const createTransaction = async (req, res, next) => {
             }
         }
 
+        if (req.file) {
+            try {
+                newAttachment = await saveTransactionAttachment({
+                    file: req.file,
+                    userId,
+                    projectId: project._id.toString(),
+                });
+            } catch (error) {
+                return res.status(400).json({
+                    message: error.message || 'Unable to process the attached image.',
+                });
+            }
+        }
+
         const transaction = await Transaction.create({
             project_id: project._id,
             user_id: userId,
@@ -434,15 +486,24 @@ const createTransaction = async (req, res, next) => {
             subcategory: subcategory.trim(),
             description: (description || '').trim(),
             transaction_date: transactionDate,
+            attachment: newAttachment,
         });
+
+        attachmentPersisted = true;
 
         res.status(201).json({ transaction: mapTransaction(transaction) });
     } catch (error) {
+        if (newAttachment && !attachmentPersisted) {
+            await removeStoredAttachment(newAttachment);
+        }
         next(error);
     }
 };
 
 const updateTransaction = async (req, res, next) => {
+    let newAttachment = null;
+    let previousAttachment = null;
+    let attachmentPersisted = false;
     try {
         const userId = req.user?._id;
         const { projectId, transactionId } = req.params;
@@ -490,10 +551,51 @@ const updateTransaction = async (req, res, next) => {
             transaction.transaction_date = parsedDate;
         }
 
-        await transaction.save();
+        const removeAttachment = req.body.removeAttachment === true;
+
+        if (req.file) {
+            try {
+                newAttachment = await saveTransactionAttachment({
+                    file: req.file,
+                    userId,
+                    projectId: project._id.toString(),
+                });
+            } catch (error) {
+                return res.status(400).json({
+                    message: error.message || 'Unable to process the attached image.',
+                });
+            }
+        }
+
+        if (newAttachment) {
+            previousAttachment = cloneAttachment(transaction.attachment);
+            transaction.attachment = newAttachment;
+            transaction.markModified('attachment');
+        } else if (removeAttachment && transaction.attachment) {
+            previousAttachment = cloneAttachment(transaction.attachment);
+            transaction.attachment = undefined;
+            transaction.markModified('attachment');
+        }
+
+        try {
+            await transaction.save();
+            attachmentPersisted = true;
+        } catch (saveError) {
+            if (newAttachment && !attachmentPersisted) {
+                await removeStoredAttachment(newAttachment);
+            }
+            throw saveError;
+        }
+
+        if (previousAttachment) {
+            await removeStoredAttachment(previousAttachment);
+        }
 
         res.status(200).json({ transaction: mapTransaction(transaction) });
     } catch (error) {
+        if (newAttachment && !attachmentPersisted) {
+            await removeStoredAttachment(newAttachment);
+        }
         next(error);
     }
 };
@@ -520,6 +622,10 @@ const deleteTransaction = async (req, res, next) => {
 
         if (!transaction) {
             return res.status(404).json({ message: 'Transaction not found.' });
+        }
+
+        if (transaction.attachment) {
+            await removeStoredAttachment(cloneAttachment(transaction.attachment));
         }
 
         res.status(200).json({

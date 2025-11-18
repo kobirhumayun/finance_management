@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const projectController = require('../controllers/projectController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { upload } = require('../middleware/uploadMiddleware');
 const {
     projectCreateValidationRules,
     projectUpdateValidationRules,
@@ -60,6 +61,7 @@ router.get(
 
 router.post(
     '/:projectId/transactions',
+    upload.single('attachment'),
     transactionCreateValidationRules(),
     handleValidationErrors,
     projectController.createTransaction,
@@ -67,6 +69,7 @@ router.post(
 
 router.put(
     '/:projectId/transactions/:transactionId',
+    upload.single('attachment'),
     transactionUpdateValidationRules(),
     handleValidationErrors,
     projectController.updateTransaction,

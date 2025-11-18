@@ -24,6 +24,7 @@ import {
   formatAdminUserStatus,
 } from "@/lib/queries/admin-users";
 import { adminPlansOptions } from "@/lib/queries/admin-plans";
+import { resolveAssetUrl } from "@/lib/utils";
 
 const ROLE_OPTIONS = ["user", "admin", "editor", "support"];
 const SUBSCRIPTION_STATUS_OPTIONS = [
@@ -741,7 +742,10 @@ export default function UserProfileClient({ userId }) {
             <CardHeader className="flex flex-col gap-4">
               <div className="flex items-center gap-4">
                 <Avatar className="size-16">
-                  <AvatarImage src={profile?.profilePictureUrl ?? undefined} alt={profile?.username ?? profile?.email ?? "User avatar"} />
+                  <AvatarImage
+                    src={resolveAssetUrl(profile?.profilePictureUrl) || undefined}
+                    alt={profile?.username ?? profile?.email ?? "User avatar"}
+                  />
                   <AvatarFallback>{initials(profile?.fullName || profile?.username || profile?.email)}</AvatarFallback>
                 </Avatar>
                 <div className="space-y-1">

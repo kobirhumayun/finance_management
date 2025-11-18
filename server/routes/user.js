@@ -7,6 +7,7 @@ const router = express.Router();
 const userController = require('../controllers/user');
 const authController = require('../controllers/authController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { upload } = require('../middleware/uploadMiddleware');
 const {
     registerValidationRules,
     loginValidationRules,
@@ -111,6 +112,17 @@ router.patch('/me',
     updateProfileValidationRules(),
     handleValidationErrors,
     userController.updateCurrentUserProfile
+);
+
+router.post('/me/profile-picture',
+    authenticate,
+    upload.single('profile'),
+    userController.uploadProfilePicture,
+);
+
+router.delete('/me/profile-picture',
+    authenticate,
+    userController.deleteProfilePicture,
 );
 
 router.get('/me/settings',
