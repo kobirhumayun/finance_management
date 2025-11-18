@@ -1,7 +1,8 @@
 // File: src/components/features/projects/add-transaction-dialog.js
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -19,6 +20,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
+import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -28,15 +30,77 @@ const schema = z.object({
   description: z.string().min(3, "Provide a short description"),
 });
 
+const ACCEPTED_ATTACHMENT_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const DEFAULT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES =
+  Number(process.env.NEXT_PUBLIC_UPLOAD_MAX_BYTES) > 0
+    ? Number(process.env.NEXT_PUBLIC_UPLOAD_MAX_BYTES)
+    : DEFAULT_MAX_ATTACHMENT_BYTES;
+
+const getErrorMessage = (error, fallback) => {
+  if (!error) return fallback;
+  if (error.body) {
+    if (typeof error.body === "string") return error.body;
+    if (typeof error.body?.message === "string") return error.body.message;
+    if (Array.isArray(error.body?.errors) && error.body.errors.length > 0) {
+      const [first] = error.body.errors;
+      if (first?.msg) return first.msg;
+      if (first?.message) return first.message;
+    }
+  }
+  return error.message || fallback;
+};
+
+const validateAttachment = (file) => {
+  if (!file) return null;
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    return `File is too large. Max size is ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`;
+  }
+  if (file.type && !ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
+    return "Unsupported image format. Upload a PNG, JPG, or WebP file.";
+  }
+  return null;
+};
+
 // Dialog used to capture transaction details.
 export default function AddTransactionDialog({ open, onOpenChange, onSubmit, projectName, initialData }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState(null);
+  const [attachmentError, setAttachmentError] = useState(null);
+  const [removeExistingAttachment, setRemoveExistingAttachment] = useState(false);
+  const fileInputRef = useRef(null);
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: { date: "", type: "income", amount: 0, subcategory: "", description: "" },
   });
   const typeValue = form.watch("type");
   const isEditMode = Boolean(initialData);
+  const existingAttachment = initialData?.attachment || null;
+  const existingAttachmentUrl = resolveAssetUrl(
+    existingAttachment?.url,
+    existingAttachment?.uploadedAt ?? existingAttachment?.updatedAt
+  );
+
+  const replaceAttachmentPreview = useCallback((nextUrl) => {
+    setAttachmentPreview((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return nextUrl;
+    });
+  }, []);
+
+  useEffect(() => () => {
+    replaceAttachmentPreview(null);
+  }, [replaceAttachmentPreview]);
+
+  const resetAttachmentState = useCallback(() => {
+    setAttachmentFile(null);
+    replaceAttachmentPreview(null);
+    setAttachmentError(null);
+    setRemoveExistingAttachment(false);
+  }, [replaceAttachmentPreview]);
 
   useEffect(() => {
     if (open) {
@@ -51,18 +115,57 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
             }
           : { date: "", type: "income", amount: 0, subcategory: "", description: "" }
       );
+      resetAttachmentState();
     }
-  }, [open, initialData, form]);
+  }, [open, initialData, form, resetAttachmentState]);
+
+  const handleAttachmentChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const errorMessage = validateAttachment(file);
+    if (errorMessage) {
+      setAttachmentError(errorMessage);
+      replaceAttachmentPreview(null);
+      setAttachmentFile(null);
+      return;
+    }
+    setAttachmentFile(file);
+    replaceAttachmentPreview(URL.createObjectURL(file));
+    setAttachmentError(null);
+    setRemoveExistingAttachment(false);
+  };
+
+  const handleRemoveSelectedFile = () => {
+    setAttachmentFile(null);
+    replaceAttachmentPreview(null);
+    setAttachmentError(null);
+  };
+
+  const handleRemoveStoredAttachment = () => {
+    if (!existingAttachment) return;
+    setAttachmentFile(null);
+    replaceAttachmentPreview(null);
+    setAttachmentError(null);
+    setRemoveExistingAttachment(true);
+  };
 
   const handleSubmit = async (values) => {
     setIsSaving(true);
+    setAttachmentError(null);
     try {
-      await onSubmit?.(values);
+      await onSubmit?.({
+        ...values,
+        attachmentFile: attachmentFile ?? undefined,
+        removeAttachment: removeExistingAttachment && !attachmentFile ? true : undefined,
+      });
       toast.success(isEditMode ? "Transaction updated" : "Transaction recorded");
       form.reset({ date: "", type: "income", amount: 0, subcategory: "", description: "" });
+      resetAttachmentState();
       onOpenChange(false);
     } catch (error) {
-      toast.error("Unable to save transaction");
+      const message = getErrorMessage(error, "Unable to save transaction");
+      setAttachmentError(message);
+      toast.error(message);
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -126,6 +229,64 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
             />
             {form.formState.errors.description && (
               <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label>Attachment (optional)</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_ATTACHMENT_TYPES.join(",")}
+              className="hidden"
+              onChange={handleAttachmentChange}
+              disabled={isSaving}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
+                {attachmentFile ? "Change image" : "Upload image"}
+              </Button>
+              {attachmentFile ? (
+                <Button type="button" variant="ghost" size="sm" onClick={handleRemoveSelectedFile} disabled={isSaving}>
+                  Clear selection
+                </Button>
+              ) : null}
+              {existingAttachment && !attachmentFile && !removeExistingAttachment ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveStoredAttachment}
+                  disabled={isSaving}
+                >
+                  Remove stored image
+                </Button>
+              ) : null}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attachmentFile
+                ? `${attachmentFile.name} (${formatFileSize(attachmentFile.size, { fallback: "unknown size" })})`
+                : existingAttachment && !removeExistingAttachment
+                ? `Currently stored: ${existingAttachment.filename || "Attachment"} (${formatFileSize(existingAttachment.size, {
+                    fallback: "unknown size",
+                  })})`
+                : `PNG, JPG, or WebP up to ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`}
+            </p>
+            {removeExistingAttachment && !attachmentFile ? (
+              <p className="text-xs text-muted-foreground">The current attachment will be removed when you save.</p>
+            ) : null}
+            {attachmentError ? <p className="text-sm text-destructive">{attachmentError}</p> : null}
+            {(attachmentPreview || (existingAttachmentUrl && !attachmentFile && !removeExistingAttachment)) && (
+              <div className="overflow-hidden rounded-lg border bg-muted/20">
+                {attachmentPreview ? (
+                  <img src={attachmentPreview} alt="Selected transaction attachment" className="max-h-48 w-full object-contain" />
+                ) : (
+                  <img
+                    src={existingAttachmentUrl}
+                    alt={existingAttachment?.filename || "Stored attachment"}
+                    className="max-h-48 w-full object-contain"
+                  />
+                )}
+              </div>
             )}
           </div>
         </form>

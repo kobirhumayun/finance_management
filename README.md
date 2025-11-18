@@ -78,6 +78,7 @@ Use the combinations below to quickly start the stack in each environment. Every
   docker run --rm -v finance-management-mongo-data:/data busybox tar czf - /data > mongo-backup.tgz
   ```
 - Redis stores session locks and tokens in `finance-management-redis-data`. Back up this volume if retaining session continuity across restarts is important; otherwise it can be treated as disposable cache data.
+- Uploaded transaction attachments and profile photos live under the path defined by `UPLOADS_ROOT` (defaults to `server/uploads`). Mount this directory to a persistent volume or bind mount on the host so user-provided files survive container restarts and deployments.
 
 ## Security
 - No service in this stack publishes host ports; only the shared edge Nginx service faces the public internet.

@@ -24,6 +24,7 @@ import {
   formatAdminUserStatus,
 } from "@/lib/queries/admin-users";
 import { adminPlansOptions } from "@/lib/queries/admin-plans";
+import { resolveAssetUrl } from "@/lib/utils";
 
 const ROLE_OPTIONS = ["user", "admin", "editor", "support"];
 const SUBSCRIPTION_STATUS_OPTIONS = [
@@ -54,7 +55,6 @@ const defaultFormValues = {
   lastName: "",
   role: "",
   planId: "",
-  profilePictureUrl: "",
   subscriptionStatus: "",
   subscriptionStartDate: "",
   subscriptionEndDate: "",
@@ -109,7 +109,6 @@ const mapProfileToForm = (profile) => {
     lastName: profile.lastName ?? "",
     role: matchSelectOption(profile.role, ROLE_OPTIONS),
     planId: resolvePlanFieldValue(profile),
-    profilePictureUrl: profile.profilePictureUrl ?? "",
     subscriptionStatus: matchSelectOption(
       profile.subscriptionStatus,
       SUBSCRIPTION_STATUS_OPTIONS
@@ -182,10 +181,6 @@ const buildUpdatePayload = (values, profile) => {
   const planId = values.planId?.trim();
   if (planId && planId !== profile?.planId && planId !== profile?.planSlug) {
     payload.planId = planId;
-  }
-  const profilePictureUrl = values.profilePictureUrl?.trim() || null;
-  if ((profile?.profilePictureUrl ?? null) !== profilePictureUrl) {
-    payload.profilePictureUrl = profilePictureUrl;
   }
   const subscriptionStatus = values.subscriptionStatus?.trim() || null;
   if ((profile?.subscriptionStatus ?? null) !== subscriptionStatus) {
@@ -263,6 +258,18 @@ export default function UserProfileClient({ userId }) {
   });
   const profile = profileResult?.profile ?? null;
   const formValues = profileResult?.formValues ?? null;
+  const rawProfileAvatarUrl =
+    typeof profile?.profilePictureUrl === "string" ? profile.profilePictureUrl : "";
+  const profileAvatarVersion =
+    profile?.raw?.profileImage?.uploadedAt ??
+    profile?.raw?.profileImage?.updatedAt ??
+    profile?.raw?.profilePicture?.uploadedAt ??
+    profile?.raw?.profilePictureUpdatedAt ??
+    profile?.raw?.profileImageUpdatedAt ??
+    profile?.raw?.updatedAt ??
+    profile?.lastLoginAt ??
+    null;
+  const resolvedProfileAvatarUrl = resolveAssetUrl(rawProfileAvatarUrl, profileAvatarVersion) || undefined;
   const { data: listData } = useQuery(adminUsersOptions());
   const { data: plansData = [] } = useQuery({
     ...adminPlansOptions(),
@@ -668,15 +675,6 @@ export default function UserProfileClient({ userId }) {
                   )}
                 />
                 <div className="grid gap-2">
-                  <Label htmlFor="profilePictureUrl">Profile picture URL</Label>
-                  <Input
-                    id="profilePictureUrl"
-                    placeholder="https://"
-                    disabled={isSaving}
-                    {...form.register("profilePictureUrl")}
-                  />
-                </div>
-                <div className="grid gap-2">
                   <Label htmlFor="subscriptionStartDate">Subscription start</Label>
                   <Input
                     id="subscriptionStartDate"
@@ -741,7 +739,10 @@ export default function UserProfileClient({ userId }) {
             <CardHeader className="flex flex-col gap-4">
               <div className="flex items-center gap-4">
                 <Avatar className="size-16">
-                  <AvatarImage src={profile?.profilePictureUrl ?? undefined} alt={profile?.username ?? profile?.email ?? "User avatar"} />
+                  <AvatarImage
+                    src={resolvedProfileAvatarUrl}
+                    alt={profile?.username ?? profile?.email ?? "User avatar"}
+                  />
                   <AvatarFallback>{initials(profile?.fullName || profile?.username || profile?.email)}</AvatarFallback>
                 </Avatar>
                 <div className="space-y-1">

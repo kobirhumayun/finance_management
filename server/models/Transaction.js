@@ -5,6 +5,17 @@ const Schema = mongoose.Schema;
 /**
  * @description Represents a single cash inflow or outflow transaction for a project.
  */
+const attachmentSchema = new Schema({
+    filename: { type: String, trim: true },
+    mimeType: { type: String, trim: true },
+    size: { type: Number },
+    width: { type: Number },
+    height: { type: Number },
+    url: { type: String, trim: true },
+    path: { type: String },
+    uploadedAt: { type: Date },
+}, { _id: false });
+
 const transactionSchema = new Schema({
     project_id: {
         type: Schema.Types.ObjectId,
@@ -55,6 +66,10 @@ const transactionSchema = new Schema({
         type: Date,
         required: [true, 'Transaction date is required.'],
         index: true // Index for date-range queries
+    },
+    attachment: {
+        type: attachmentSchema,
+        default: null,
     }
 }, {
     // Automatically add createdAt and updatedAt timestamps

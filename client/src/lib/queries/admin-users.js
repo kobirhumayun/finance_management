@@ -133,7 +133,9 @@ export const normalizeAdminUser = (user) => {
   const registeredAt = extractDate(merged.registeredAt ?? merged.createdAt);
   const lastLoginAt = extractDate(merged.lastLoginAt ?? merged.updatedAt);
 
-  const profilePictureUrl = toStringSafe(merged.profilePictureUrl ?? merged.avatarUrl) || null;
+  const profilePictureUrl = toStringSafe(
+    merged.profileImage?.url ?? merged.profilePictureUrl ?? merged.avatarUrl
+  ) || null;
 
   return {
     id,

@@ -36,6 +36,21 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 const PROJECTS_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
 
+const buildPendingAttachmentDescriptor = (file) => {
+  if (!file) return null;
+  const size = typeof file.size === "number" ? file.size : Number(file.size);
+  return {
+    filename: file.name || "Attachment",
+    mimeType: file.type || "image/*",
+    size: Number.isFinite(size) ? size : null,
+    width: null,
+    height: null,
+    url: "",
+    uploadedAt: new Date().toISOString(),
+    isPending: true,
+  };
+};
+
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
   if (error.body) {
@@ -385,8 +400,8 @@ export default function ProjectsPage() {
   });
 
   const createTransactionMutation = useMutation({
-    mutationFn: ({ projectId, values }) => createTransaction({ projectId, ...values }),
-    onMutate: async ({ projectId, values }) => {
+    mutationFn: ({ projectId, values, attachmentFile }) => createTransaction({ projectId, attachmentFile, ...values }),
+    onMutate: async ({ projectId, values, attachmentFile }) => {
       const detailKey = qk.projects.detail(projectId, transactionListFilters);
       await queryClient.cancelQueries({ queryKey: ["projects", "detail", String(projectId)] });
       const previousDetail = queryClient.getQueryData(detailKey);
@@ -399,6 +414,7 @@ export default function ProjectsPage() {
         amount: Number(values.amount) || 0,
         subcategory: values.subcategory,
         description: values.description,
+        attachment: attachmentFile ? buildPendingAttachmentDescriptor(attachmentFile) : null,
       };
 
       queryClient.setQueryData(detailKey, (current) => {
@@ -481,9 +497,9 @@ export default function ProjectsPage() {
   });
 
   const updateTransactionMutation = useMutation({
-    mutationFn: ({ projectId, transactionId, values }) =>
-      updateTransaction({ projectId, transactionId, ...values }),
-    onMutate: async ({ projectId, transactionId, values }) => {
+    mutationFn: ({ projectId, transactionId, values, attachmentFile, removeAttachment }) =>
+      updateTransaction({ projectId, transactionId, attachmentFile, removeAttachment, ...values }),
+    onMutate: async ({ projectId, transactionId, values, attachmentFile, removeAttachment }) => {
       const detailKey = qk.projects.detail(projectId, transactionListFilters);
       await queryClient.cancelQueries({ queryKey: ["projects", "detail", String(projectId)] });
       const previousDetail = queryClient.getQueryData(detailKey);
@@ -496,6 +512,11 @@ export default function ProjectsPage() {
             ...page,
             transactions: page.transactions.map((transaction) => {
               if (transaction.id !== transactionId) return transaction;
+              const nextAttachment = attachmentFile
+                ? buildPendingAttachmentDescriptor(attachmentFile)
+                : removeAttachment
+                ? null
+                : transaction.attachment;
               return {
                 ...transaction,
                 date: values.date,
@@ -503,6 +524,7 @@ export default function ProjectsPage() {
                 subcategory: values.subcategory,
                 type: values.type === "income" ? "Income" : "Expense",
                 amount: Number(values.amount) || transaction.amount,
+                attachment: nextAttachment,
               };
             }),
           };
@@ -510,7 +532,7 @@ export default function ProjectsPage() {
         return { ...current, pages };
       });
 
-      return { detailKey, previousDetail, projectId };
+      return { detailKey, previousDetail, projectId, transactionId };
     },
     onError: (error, _variables, context) => {
       if (context?.previousDetail) {
@@ -518,7 +540,21 @@ export default function ProjectsPage() {
       }
       toast.error(getErrorMessage(error, "Unable to update transaction."));
     },
-    onSuccess: () => {
+    onSuccess: (data, _variables, context) => {
+      const transaction = data?.transaction;
+      if (transaction && context?.detailKey) {
+        queryClient.setQueryData(context.detailKey, (current) => {
+          if (!current) return current;
+          const pages = current.pages?.map((page) => {
+            if (!Array.isArray(page?.transactions)) return page;
+            return {
+              ...page,
+              transactions: page.transactions.map((item) => (item.id === transaction.id ? transaction : item)),
+            };
+          });
+          return { ...current, pages };
+        });
+      }
       toast.success("Transaction updated.");
     },
     onSettled: (_data, _error, variables, context) => {
@@ -590,14 +626,21 @@ export default function ProjectsPage() {
   const handleTransactionSubmit = async (values) => {
     if (!selectedProjectId) return;
     const editingTransaction = transactionDialogState.transaction;
+    const { attachmentFile, removeAttachment, ...payload } = values || {};
     if (editingTransaction?.id) {
       await updateTransactionMutation.mutateAsync({
         projectId: selectedProjectId,
         transactionId: editingTransaction.id,
-        values,
+        values: payload,
+        attachmentFile,
+        removeAttachment,
       });
     } else {
-      await createTransactionMutation.mutateAsync({ projectId: selectedProjectId, values });
+      await createTransactionMutation.mutateAsync({
+        projectId: selectedProjectId,
+        values: payload,
+        attachmentFile,
+      });
     }
   };
 

@@ -1,6 +1,7 @@
 // File: src/components/features/projects/transaction-table.js
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import TransactionAttachmentDialog from "@/components/features/projects/transaction-attachment-dialog";
 
 // Responsive table displaying transactions for the currently selected project.
 export default function TransactionTable({
@@ -26,6 +28,7 @@ export default function TransactionTable({
   onSortChange,
 }) {
   const displayTransactions = Array.isArray(transactions) ? transactions : [];
+  const [attachmentDialogState, setAttachmentDialogState] = useState({ open: false, transaction: null });
 
   const handleSearchChange = (event) => {
     onSearchChange?.(event.target.value);
@@ -33,6 +36,15 @@ export default function TransactionTable({
 
   const handleSortChange = (value) => {
     onSortChange?.(value);
+  };
+
+  const openAttachmentDialog = (transaction) => {
+    if (!transaction?.attachment) return;
+    setAttachmentDialogState({ open: true, transaction });
+  };
+
+  const closeAttachmentDialog = () => {
+    setAttachmentDialogState({ open: false, transaction: null });
   };
 
   return (
@@ -136,7 +148,16 @@ export default function TransactionTable({
                     <TableCell>{subcategory}</TableCell>
                     <TableCell className="text-right font-medium">{formattedAmount}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="whitespace-nowrap"
+                          onClick={() => openAttachmentDialog(transaction)}
+                          disabled={!transaction?.attachment}
+                        >
+                          {transaction?.attachment?.isPending ? "Processing..." : "View image"}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -222,11 +243,19 @@ export default function TransactionTable({
                   <span className="text-muted-foreground">{subcategory}</span>
                   <span className="font-semibold">{formattedAmount}</span>
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="col-span-2"
+                    onClick={() => openAttachmentDialog(transaction)}
+                    disabled={!transaction?.attachment}
+                  >
+                    {transaction?.attachment?.isPending ? "Processing attachment" : "View image"}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
                     onClick={() => transaction?.id && onEditTransaction?.(transaction)}
                     disabled={!transaction?.id}
                   >
@@ -235,7 +264,6 @@ export default function TransactionTable({
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="flex-1"
                     onClick={() => transaction?.id && onDeleteTransaction?.(transaction)}
                     disabled={!transaction?.id}
                   >
@@ -269,6 +297,17 @@ export default function TransactionTable({
           </Button>
         </div>
       )}
+      <TransactionAttachmentDialog
+        open={attachmentDialogState.open}
+        transaction={attachmentDialogState.transaction}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeAttachmentDialog();
+          } else {
+            setAttachmentDialogState((prev) => ({ ...prev, open: true }));
+          }
+        }}
+      />
     </div>
   );
 }

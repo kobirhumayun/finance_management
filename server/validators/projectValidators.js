@@ -125,6 +125,10 @@ const transactionUpdateValidationRules = () => [
         .isString().withMessage('Description must be a string.')
         .trim()
         .isLength({ min: 3, max: 1024 }).withMessage('Description must be between 3 and 1024 characters.'),
+    body('removeAttachment')
+        .optional()
+        .isBoolean().withMessage('removeAttachment must be a boolean value.')
+        .toBoolean(),
     body()
         .custom((value, { req }) => {
             const provided = Object.keys(req.body || {});

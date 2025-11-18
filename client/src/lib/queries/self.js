@@ -120,6 +120,18 @@ const normalizeProfile = (profile) => {
     ? profile.metadata
     : {};
 
+  const profileImage = profile.profileImage && typeof profile.profileImage === "object"
+    ? {
+        filename: profile.profileImage.filename ?? "",
+        mimeType: profile.profileImage.mimeType ?? "",
+        size: toNumber(profile.profileImage.size, { fallback: null }),
+        width: toNumber(profile.profileImage.width, { fallback: null }),
+        height: toNumber(profile.profileImage.height, { fallback: null }),
+        url: profile.profileImage.url ?? "",
+        uploadedAt: profile.profileImage.uploadedAt ?? null,
+      }
+    : null;
+
   return {
     id: profile.id ?? profile._id ?? "",
     username: profile.username ?? "",
@@ -127,7 +139,8 @@ const normalizeProfile = (profile) => {
     firstName: profile.firstName ?? "",
     lastName: profile.lastName ?? "",
     displayName: profile.displayName ?? "",
-    profilePictureUrl: profile.profilePictureUrl ?? "",
+    profilePictureUrl: profile.profilePictureUrl ?? profileImage?.url ?? "",
+    profileImage,
     subscription: {
       plan: normalizePlan(subscription.plan),
       status: subscription.status ?? "",
@@ -338,11 +351,6 @@ const mapProfileInput = (input = {}) => {
     output.displayName = value === "" ? null : value;
   }
 
-  if (input.profilePictureUrl !== undefined) {
-    const value = String(input.profilePictureUrl).trim();
-    output.profilePictureUrl = value === "" ? null : value;
-  }
-
   return output;
 };
 
@@ -410,6 +418,30 @@ export async function updateSelfPreferences(input, { signal } = {}) {
   const response = await apiJSON(`${SELF_ENDPOINT}/preferences`, { method: "PATCH", body, signal });
   const preferences = response?.preferences ?? response;
   return normalizePreferences(preferences);
+}
+
+export async function uploadProfilePicture({ file }, { signal } = {}) {
+  if (!file) {
+    throw new Error("file is required");
+  }
+  const formData = new FormData();
+  formData.append("profile", file);
+  const response = await apiJSON(`${SELF_ENDPOINT}/profile-picture`, {
+    method: "POST",
+    body: formData,
+    signal,
+  });
+  const profile = response?.profile ?? response;
+  return normalizeProfile(profile);
+}
+
+export async function deleteProfilePicture({ signal } = {}) {
+  const response = await apiJSON(`${SELF_ENDPOINT}/profile-picture`, {
+    method: "DELETE",
+    signal,
+  });
+  const profile = response?.profile ?? response;
+  return normalizeProfile(profile);
 }
 
 export async function updateSelfEmail(input, { signal } = {}) {

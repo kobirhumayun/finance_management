@@ -37,6 +37,10 @@ Populate the copies with the values that match your infrastructure. The tables b
 | `DEFAULT_PASSWORD_RESET_REDIRECT` | HTTPS URL users should land on after resetting a password. |
 | `SUBSCRIPTION_JOB_LOCK_TTL_MS` | Milliseconds the recurring subscription job should hold the MongoDB advisory lock. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins for browser requests. |
+| `UPLOADS_ROOT` | Absolute/relative path where processed uploads (profile photos, attachments) are stored. Mount this path to persistent storage in production. |
+| `UPLOAD_MAX_BYTES` | Maximum upload size (in bytes) enforced by Multer and Sharp. Defaults to 5 MB when unset. |
+| `UPLOAD_MAX_DIMENSION` | Largest width/height (pixels) for transaction attachments before they are resized. |
+| `PROFILE_IMAGE_MAX_DIMENSION` | Largest width/height (pixels) for profile avatars. |
 
 ### Frontend settings
 

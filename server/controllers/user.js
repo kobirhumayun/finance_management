@@ -2,8 +2,12 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const UsedRefreshToken = require('../models/UsedRefreshToken');
 const Order = require('../models/Order');
+const Project = require('../models/Project');
+const Transaction = require('../models/Transaction');
 const jwt = require('jsonwebtoken');
 const { isValidObjectId } = mongoose;
+const imageService = require('../services/imageService');
+const { streamStoredFile } = require('../utils/storageStreamer');
 
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
@@ -32,6 +36,182 @@ const normalizeDecimal = (value) => {
     return value;
 };
 
+const cloneImageDescriptor = (descriptor) => {
+    if (!descriptor) {
+        return null;
+    }
+    if (typeof descriptor.toObject === 'function') {
+        return descriptor.toObject();
+    }
+    return { ...descriptor };
+};
+
+const removeStoredProfileImage = async (descriptor) => {
+    if (!descriptor) {
+        return;
+    }
+    try {
+        await imageService.discardDescriptor(descriptor);
+    } catch (error) {
+        console.error('Failed to delete profile image:', error);
+    }
+};
+
+const cleanupUserAttachments = async (userId) => {
+    if (!userId) {
+        return;
+    }
+
+    try {
+        const [projects, transactions] = await Promise.all([
+            Project.find({ user_id: userId })
+                .select({ attachment: 1 })
+                .lean(),
+            Transaction.find({ user_id: userId })
+                .select({ attachment: 1 })
+                .lean(),
+        ]);
+
+        const attachmentRecords = [];
+
+        (projects || []).forEach((project) => {
+            if (project?.attachment?.path) {
+                attachmentRecords.push({
+                    descriptor: project.attachment,
+                    model: 'project',
+                    documentId: project._id,
+                });
+            }
+        });
+
+        (transactions || []).forEach((transaction) => {
+            if (transaction?.attachment?.path) {
+                attachmentRecords.push({
+                    descriptor: transaction.attachment,
+                    model: 'transaction',
+                    documentId: transaction._id,
+                });
+            }
+        });
+
+        if (!attachmentRecords.length) {
+            return;
+        }
+
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < attachmentRecords.length; i += BATCH_SIZE) {
+            const chunk = attachmentRecords.slice(i, i + BATCH_SIZE);
+            await Promise.all(chunk.map(async ({ descriptor }) => {
+                try {
+                    await imageService.discardDescriptor(descriptor);
+                } catch (error) {
+                    console.error('Failed to delete attachment during account deletion:', error);
+                }
+            }));
+        }
+
+        const projectIds = attachmentRecords
+            .filter((record) => record.model === 'project')
+            .map((record) => record.documentId);
+        const transactionIds = attachmentRecords
+            .filter((record) => record.model === 'transaction')
+            .map((record) => record.documentId);
+
+        const updates = [];
+
+        if (projectIds.length) {
+            updates.push(Project.updateMany(
+                { _id: { $in: projectIds } },
+                { $unset: { attachment: '' } },
+            ));
+        }
+
+        if (transactionIds.length) {
+            updates.push(Transaction.updateMany(
+                { _id: { $in: transactionIds } },
+                { $unset: { attachment: '' } },
+            ));
+        }
+
+        if (updates.length) {
+            await Promise.all(updates);
+        }
+    } catch (error) {
+        console.error('Failed to clean up attachments during account deletion:', error);
+    }
+};
+
+const buildProfileImageUrl = (userId) => {
+    if (!userId) {
+        return '';
+    }
+    const stringId = typeof userId === 'string' ? userId : userId?.toString();
+    if (!stringId) {
+        return '';
+    }
+    return `/api/users/${stringId}/profile-picture`;
+};
+
+const buildProfileImageResponseUrl = (userId, uploadedAt) => {
+    const baseUrl = buildProfileImageUrl(userId);
+    if (!baseUrl) {
+        return '';
+    }
+
+    if (!uploadedAt) {
+        return baseUrl;
+    }
+
+    const versionDate = new Date(uploadedAt);
+    const version = Number.isFinite(versionDate.getTime()) ? versionDate.getTime() : null;
+    if (!version) {
+        return baseUrl;
+    }
+
+    return `${baseUrl}?v=${version}`;
+};
+
+const mapProfileImage = (image, userId) => {
+    if (!image) {
+        return null;
+    }
+
+    const routedUrl = image.path
+        ? buildProfileImageResponseUrl(userId, image.uploadedAt)
+        : (image.url || '');
+    return {
+        filename: image.filename || '',
+        mimeType: image.mimeType || '',
+        size: typeof image.size === 'number' ? image.size : null,
+        width: typeof image.width === 'number' ? image.width : null,
+        height: typeof image.height === 'number' ? image.height : null,
+        url: routedUrl,
+        uploadedAt: image.uploadedAt ? new Date(image.uploadedAt).toISOString() : null,
+    };
+};
+
+const buildAuthUserPayload = (userDoc) => {
+    if (!userDoc) {
+        return null;
+    }
+
+    const profileImage = mapProfileImage(userDoc.profileImage, userDoc._id);
+    const planSlug = userDoc.planId && typeof userDoc.planId === 'object'
+        ? userDoc.planId.slug
+        : (userDoc.subscriptionStatus === 'free' ? 'free' : null);
+
+    return {
+        _id: userDoc._id,
+        username: userDoc.username,
+        email: userDoc.email,
+        role: userDoc.role,
+        plan: planSlug,
+        subscriptionStatus: userDoc.subscriptionStatus,
+        profilePictureUrl: profileImage?.url || userDoc.profilePictureUrl || '',
+        profileImage,
+    };
+};
+
 const buildProfileResponse = (userDoc) => {
     if (!userDoc) {
         return null;
@@ -56,6 +236,8 @@ const buildProfileResponse = (userDoc) => {
         || [userDoc.firstName, userDoc.lastName].filter(Boolean).join(' ')
         || userDoc.username;
 
+    const profileImage = mapProfileImage(userDoc.profileImage, userDoc._id);
+
     return {
         id: userDoc._id,
         username: userDoc.username,
@@ -63,7 +245,8 @@ const buildProfileResponse = (userDoc) => {
         firstName: userDoc.firstName || '',
         lastName: userDoc.lastName || '',
         displayName: computedDisplayName,
-        profilePictureUrl: userDoc.profilePictureUrl || '',
+        profilePictureUrl: profileImage?.url || userDoc.profilePictureUrl || '',
+        profileImage,
         subscription: {
             plan: planDoc,
             status: userDoc.subscriptionStatus,
@@ -244,18 +427,13 @@ const loginUser = async (req, res) => {
         // subscription checks and saving the refresh token alongside the last login time.
         const { accessToken, refreshToken } = await user.generateAccessAndRefereshTokens();
 
+        const authUser = buildAuthUserPayload(user);
+
         res.status(200).json({
             message: 'Login successful.',
             accessToken,
             refreshToken,
-            user: { // Send back non-sensitive user info
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                role: user.role,
-                plan: user.planId && typeof user.planId === 'object' ? user.planId.slug : (user.subscriptionStatus === 'free' ? 'free' : null),
-                subscriptionStatus: user.subscriptionStatus
-            }
+            user: authUser,
         });
 
     } catch (error) {
@@ -337,10 +515,13 @@ const refreshAccessToken = async (req, res) => {
             // Note: The `generateAccessAndRefereshTokens` method should handle saving the newRefreshToken to the user document.
             // console.log('Token sussesfully refreshed:', incomingRefreshToken);
 
+            const authUser = buildAuthUserPayload(user);
+
             return res.status(200).json({
                 message: 'Access token refreshed.',
                 accessToken,
                 refreshToken: newRefreshToken,
+                user: authUser,
             });
         }
 
@@ -354,10 +535,13 @@ const refreshAccessToken = async (req, res) => {
             // We issue a new access token but return the *already rotated* refresh token
             // that is now stored on the user object to keep all clients in sync.
             const accessToken = isInGraceList.accessToken;
+            const authUser = buildAuthUserPayload(user);
+
             return res.status(200).json({
                 message: 'Access token refreshed (grace period).',
                 accessToken,
                 refreshToken: user.refreshToken, // Send the newest token
+                user: authUser,
             });
         }
 
@@ -464,6 +648,134 @@ const updateCurrentUserProfile = async (req, res) => {
     } catch (error) {
         console.error('Error updating current user profile:', error);
         return res.status(500).json({ message: 'Failed to update profile.' });
+    }
+};
+
+const uploadProfilePicture = async (req, res) => {
+    let newImage = null;
+    let imagePersisted = false;
+    try {
+        const userId = req.user?._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Please select an image to upload.' });
+        }
+
+        try {
+            newImage = await imageService.saveProfileImage({
+                file: req.file,
+                userId,
+            });
+        } catch (error) {
+            return res.status(400).json({
+                message: error.message || 'Unable to process the uploaded image.',
+            });
+        }
+
+        const previousImage = cloneImageDescriptor(user.profileImage);
+        user.profileImage = newImage;
+        user.profilePictureUrl = buildProfileImageUrl(userId);
+        user.markModified('profileImage');
+
+        await user.save();
+        imagePersisted = true;
+
+        if (previousImage) {
+            await removeStoredProfileImage(previousImage);
+        }
+
+        await user.populate('planId', 'name slug billingCycle price currency');
+        const profile = buildProfileResponse(user.toObject());
+
+        return res.status(200).json({
+            message: 'Profile picture updated successfully.',
+            profile,
+        });
+    } catch (error) {
+        if (newImage && !imagePersisted) {
+            await removeStoredProfileImage(newImage);
+        }
+        console.error('Error uploading profile picture:', error);
+        return res.status(500).json({ message: 'Failed to upload profile picture.' });
+    }
+};
+
+const deleteProfilePicture = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isActive === false) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const previousImage = cloneImageDescriptor(user.profileImage);
+        user.profileImage = undefined;
+        user.profilePictureUrl = undefined;
+        user.markModified('profileImage');
+
+        await user.save();
+
+        if (previousImage) {
+            await removeStoredProfileImage(previousImage);
+        }
+
+        await user.populate('planId', 'name slug billingCycle price currency');
+        const profile = buildProfileResponse(user.toObject());
+
+        return res.status(200).json({
+            message: 'Profile picture removed successfully.',
+            profile,
+        });
+    } catch (error) {
+        console.error('Error removing profile picture:', error);
+        return res.status(500).json({ message: 'Failed to remove profile picture.' });
+    }
+};
+
+const streamProfilePicture = async (req, res, next) => {
+    try {
+        const requester = req.user || {};
+        const requestedId = req.params.userId === 'me'
+            ? requester?._id?.toString()
+            : req.params.userId;
+
+        if (!requestedId || !isValidObjectId(requestedId)) {
+            return res.status(400).json({ message: 'Invalid user identifier provided.' });
+        }
+
+        const requesterId = requester?._id?.toString();
+        const privilegedRoles = new Set(['admin', 'support', 'editor']);
+        const isOwner = requesterId === requestedId;
+        const isPrivileged = requester?.role && privilegedRoles.has(requester.role);
+
+        if (!isOwner && !isPrivileged) {
+            return res.status(403).json({ message: 'You do not have permission to access this profile image.' });
+        }
+
+        const user = await User.findOne({ _id: requestedId, isActive: { $ne: false } })
+            .select({ profileImage: 1 })
+            .lean();
+
+        if (!user?.profileImage?.path) {
+            return res.status(404).json({ message: 'Profile image not found.' });
+        }
+
+        await streamStoredFile({
+            descriptor: user.profileImage,
+            res,
+            fallbackFilename: `profile-${requestedId}`,
+        });
+    } catch (error) {
+        if (error.code === 'ENOENT' || error.code === 'ERR_INVALID_PATH') {
+            return res.status(404).json({ message: 'Profile image not found.' });
+        }
+        return next(error);
     }
 };
 
@@ -602,6 +914,7 @@ const deleteCurrentUserAccount = async (req, res) => {
             return res.status(401).json({ message: 'Current password is incorrect.' });
         }
 
+        const previousImage = cloneImageDescriptor(user.profileImage);
         user.isActive = false;
         user.refreshToken = undefined;
         user.markModified('refreshToken');
@@ -615,9 +928,18 @@ const deleteCurrentUserAccount = async (req, res) => {
 
         user.metadata = metadata;
         user.markModified('metadata');
+        if (user.profileImage) {
+            user.profileImage = undefined;
+            user.profilePictureUrl = '';
+            user.markModified('profileImage');
+        }
 
         await user.save();
         await UsedRefreshToken.deleteMany({ userId });
+        await cleanupUserAttachments(userId);
+        if (previousImage) {
+            await removeStoredProfileImage(previousImage);
+        }
 
         return res.status(200).json({ message: 'Account deleted successfully.' });
     } catch (error) {
@@ -894,6 +1216,9 @@ module.exports = {
     refreshAccessToken,
     getCurrentUserProfile,
     updateCurrentUserProfile,
+    uploadProfilePicture,
+    deleteProfilePicture,
+    streamProfilePicture,
     getCurrentUserSettings,
     updateCurrentUserEmail,
     updateCurrentUserPassword,
