@@ -27,8 +27,11 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
   const attachment = transaction?.attachment;
   const isPending = Boolean(attachment?.isPending);
   const attachmentUrl = attachment?.url ?? "";
-  const routedUrl = attachmentUrl.startsWith("/api/") ? resolveAssetUrl(attachmentUrl) : attachmentUrl;
-  const resolvedUrl = isPending ? "" : routedUrl;
+  const resolvedAttachmentUrl = resolveAssetUrl(
+    attachmentUrl,
+    attachment?.uploadedAt ?? attachment?.updatedAt
+  );
+  const resolvedUrl = isPending ? "" : resolvedAttachmentUrl;
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {

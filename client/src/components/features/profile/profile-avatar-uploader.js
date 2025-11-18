@@ -29,9 +29,7 @@ export default function ProfileAvatarUploader({
 }) {
   const fileInputRef = useRef(null);
   const rawAvatarUrl = typeof avatarUrl === "string" ? avatarUrl : "";
-  const resolvedAvatarUrl = rawAvatarUrl.startsWith("/api/")
-    ? resolveAssetUrl(rawAvatarUrl)
-    : rawAvatarUrl;
+  const resolvedAvatarUrl = resolveAssetUrl(rawAvatarUrl, lastUpdated);
   const initialsSource = displayName || username || "User";
   const initials = initialsSource
     .split(/\s+/)
