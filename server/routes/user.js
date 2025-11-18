@@ -125,6 +125,11 @@ router.delete('/me/profile-picture',
     userController.deleteProfilePicture,
 );
 
+router.get('/:userId/profile-picture',
+    authenticate,
+    userController.streamProfilePicture,
+);
+
 router.get('/me/settings',
     authenticate,
     userController.getCurrentUserSettings
