@@ -66,12 +66,33 @@ const buildProfileImageUrl = (userId) => {
     return `/api/users/${stringId}/profile-picture`;
 };
 
+const buildProfileImageResponseUrl = (userId, uploadedAt) => {
+    const baseUrl = buildProfileImageUrl(userId);
+    if (!baseUrl) {
+        return '';
+    }
+
+    if (!uploadedAt) {
+        return baseUrl;
+    }
+
+    const versionDate = new Date(uploadedAt);
+    const version = Number.isFinite(versionDate.getTime()) ? versionDate.getTime() : null;
+    if (!version) {
+        return baseUrl;
+    }
+
+    return `${baseUrl}?v=${version}`;
+};
+
 const mapProfileImage = (image, userId) => {
     if (!image) {
         return null;
     }
 
-    const routedUrl = image.path ? buildProfileImageUrl(userId) : (image.url || '');
+    const routedUrl = image.path
+        ? buildProfileImageResponseUrl(userId, image.uploadedAt)
+        : (image.url || '');
     return {
         filename: image.filename || '',
         mimeType: image.mimeType || '',
