@@ -77,7 +77,10 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
   const typeValue = form.watch("type");
   const isEditMode = Boolean(initialData);
   const existingAttachment = initialData?.attachment || null;
-  const existingAttachmentUrl = existingAttachment?.url ? resolveAssetUrl(existingAttachment.url) : "";
+  const existingAttachmentUrl = resolveAssetUrl(
+    existingAttachment?.url,
+    existingAttachment?.uploadedAt ?? existingAttachment?.updatedAt
+  );
 
   const replaceAttachmentPreview = useCallback((nextUrl) => {
     setAttachmentPreview((prev) => {

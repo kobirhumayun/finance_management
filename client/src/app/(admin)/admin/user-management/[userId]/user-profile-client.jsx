@@ -260,9 +260,16 @@ export default function UserProfileClient({ userId }) {
   const formValues = profileResult?.formValues ?? null;
   const rawProfileAvatarUrl =
     typeof profile?.profilePictureUrl === "string" ? profile.profilePictureUrl : "";
-  const resolvedProfileAvatarUrl = rawProfileAvatarUrl.startsWith("/api/")
-    ? resolveAssetUrl(rawProfileAvatarUrl)
-    : rawProfileAvatarUrl || undefined;
+  const profileAvatarVersion =
+    profile?.raw?.profileImage?.uploadedAt ??
+    profile?.raw?.profileImage?.updatedAt ??
+    profile?.raw?.profilePicture?.uploadedAt ??
+    profile?.raw?.profilePictureUpdatedAt ??
+    profile?.raw?.profileImageUpdatedAt ??
+    profile?.raw?.updatedAt ??
+    profile?.lastLoginAt ??
+    null;
+  const resolvedProfileAvatarUrl = resolveAssetUrl(rawProfileAvatarUrl, profileAvatarVersion) || undefined;
   const { data: listData } = useQuery(adminUsersOptions());
   const { data: plansData = [] } = useQuery({
     ...adminPlansOptions(),
