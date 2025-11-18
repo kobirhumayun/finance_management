@@ -2,6 +2,7 @@ const Project = require('../models/Project');
 const Transaction = require('../models/Transaction');
 const { getPlanLimitsForUser } = require('../services/planLimits');
 const { saveTransactionAttachment, discardDescriptor } = require('../services/imageService');
+const { streamStoredFile } = require('../utils/storageStreamer');
 
 const {
     clampLimit,
@@ -133,6 +134,43 @@ const getProjects = async (req, res, next) => {
             totalCount,
         });
     } catch (error) {
+        next(error);
+    }
+};
+
+const streamTransactionAttachment = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        const { projectId, transactionId } = req.params;
+
+        if (!isValidObjectId(projectId) || !isValidObjectId(transactionId)) {
+            return res.status(400).json({ message: 'Invalid transaction identifier.' });
+        }
+
+        const transaction = await Transaction.findOne({
+            _id: transactionId,
+            project_id: projectId,
+            user_id: userId,
+        })
+            .select({ attachment: 1 })
+            .lean();
+
+        if (!transaction?.attachment?.path) {
+            return res.status(404).json({ message: 'Attachment not found for this transaction.' });
+        }
+
+        await streamStoredFile({
+            descriptor: transaction.attachment,
+            res,
+            fallbackFilename: `transaction-${transactionId}`,
+        });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(404).json({ message: 'Attachment file is no longer available.' });
+        }
+        if (error.code === 'ERR_INVALID_PATH') {
+            return res.status(404).json({ message: 'Attachment could not be located.' });
+        }
         next(error);
     }
 };
@@ -707,4 +745,5 @@ module.exports = {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    streamTransactionAttachment,
 };

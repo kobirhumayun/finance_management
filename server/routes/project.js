@@ -67,6 +67,13 @@ router.post(
     projectController.createTransaction,
 );
 
+router.get(
+    '/:projectId/transactions/:transactionId/attachment',
+    transactionIdParamValidationRules(),
+    handleValidationErrors,
+    projectController.streamTransactionAttachment,
+);
+
 router.put(
     '/:projectId/transactions/:transactionId',
     upload.single('attachment'),

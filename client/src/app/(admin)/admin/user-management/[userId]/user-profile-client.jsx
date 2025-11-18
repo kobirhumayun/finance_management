@@ -258,6 +258,11 @@ export default function UserProfileClient({ userId }) {
   });
   const profile = profileResult?.profile ?? null;
   const formValues = profileResult?.formValues ?? null;
+  const rawProfileAvatarUrl =
+    typeof profile?.profilePictureUrl === "string" ? profile.profilePictureUrl : "";
+  const resolvedProfileAvatarUrl = rawProfileAvatarUrl.startsWith("/api/")
+    ? resolveAssetUrl(rawProfileAvatarUrl)
+    : rawProfileAvatarUrl || undefined;
   const { data: listData } = useQuery(adminUsersOptions());
   const { data: plansData = [] } = useQuery({
     ...adminPlansOptions(),
@@ -728,7 +733,7 @@ export default function UserProfileClient({ userId }) {
               <div className="flex items-center gap-4">
                 <Avatar className="size-16">
                   <AvatarImage
-                    src={resolveAssetUrl(profile?.profilePictureUrl) || undefined}
+                    src={resolvedProfileAvatarUrl}
                     alt={profile?.username ?? profile?.email ?? "User avatar"}
                   />
                   <AvatarFallback>{initials(profile?.fullName || profile?.username || profile?.email)}</AvatarFallback>

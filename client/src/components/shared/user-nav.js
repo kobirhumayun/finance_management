@@ -29,10 +29,15 @@ export default function UserNav() {
   const initials =
     profile?.username?.slice(0, 2)?.toUpperCase() || profile?.email?.[0]?.toUpperCase() || "U";
 
+  const resolveProfileAssetUrl = (value) => {
+    if (!value) return "";
+    return value.startsWith("/api/") ? resolveAssetUrl(value) : value;
+  };
+
   const avatarUrl = profile?.profilePictureUrl
-    ? resolveAssetUrl(profile.profilePictureUrl)
+    ? resolveProfileAssetUrl(profile.profilePictureUrl)
     : profile?.profileImage?.url
-      ? resolveAssetUrl(profile.profileImage.url)
+      ? resolveProfileAssetUrl(profile.profileImage.url)
       : "";
 
   const handleSignOut = async () => {

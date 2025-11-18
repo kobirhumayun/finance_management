@@ -61,10 +61,21 @@ const extractProjectReference = (project) => {
     return { projectId: '', projectName: null };
 };
 
-const mapAttachment = (attachment) => {
+const buildTransactionAttachmentUrl = (projectId, transactionId) => {
+    if (!projectId || !transactionId) {
+        return '';
+    }
+    return `/api/projects/${projectId}/transactions/${transactionId}/attachment`;
+};
+
+const mapAttachment = (attachment, { projectId, transactionId } = {}) => {
     if (!attachment || typeof attachment !== 'object') {
         return null;
     }
+
+    const transactionAttachmentUrl = (attachment.path && projectId && transactionId)
+        ? buildTransactionAttachmentUrl(projectId, transactionId)
+        : (attachment.url || '');
 
     return {
         filename: attachment.filename || '',
@@ -72,7 +83,7 @@ const mapAttachment = (attachment) => {
         size: typeof attachment.size === 'number' ? attachment.size : null,
         width: typeof attachment.width === 'number' ? attachment.width : null,
         height: typeof attachment.height === 'number' ? attachment.height : null,
-        url: attachment.url || '',
+        url: transactionAttachmentUrl,
         uploadedAt: attachment.uploadedAt
             ? new Date(attachment.uploadedAt).toISOString()
             : null,
@@ -81,6 +92,8 @@ const mapAttachment = (attachment) => {
 
 const mapTransaction = (transaction) => {
     const { projectId, projectName } = extractProjectReference(transaction.project_id);
+
+    const transactionId = transaction._id ? transaction._id.toString() : '';
 
     return {
         id: transaction._id ? transaction._id.toString() : '',
@@ -91,7 +104,7 @@ const mapTransaction = (transaction) => {
         amount: transaction.amount,
         subcategory: transaction.subcategory,
         description: transaction.description || '',
-        attachment: mapAttachment(transaction.attachment),
+        attachment: mapAttachment(transaction.attachment, { projectId, transactionId }),
         createdAt: transaction.createdAt ? transaction.createdAt.toISOString() : null,
         updatedAt: transaction.updatedAt ? transaction.updatedAt.toISOString() : null,
     };

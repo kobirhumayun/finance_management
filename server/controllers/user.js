@@ -5,6 +5,7 @@ const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
 const { isValidObjectId } = mongoose;
 const { saveProfileImage, discardDescriptor } = require('../services/imageService');
+const { streamStoredFile } = require('../utils/storageStreamer');
 
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
@@ -54,17 +55,30 @@ const removeStoredProfileImage = async (descriptor) => {
     }
 };
 
-const mapProfileImage = (image) => {
+const buildProfileImageUrl = (userId) => {
+    if (!userId) {
+        return '';
+    }
+    const stringId = typeof userId === 'string' ? userId : userId?.toString();
+    if (!stringId) {
+        return '';
+    }
+    return `/api/users/${stringId}/profile-picture`;
+};
+
+const mapProfileImage = (image, userId) => {
     if (!image) {
         return null;
     }
+
+    const routedUrl = image.path ? buildProfileImageUrl(userId) : (image.url || '');
     return {
         filename: image.filename || '',
         mimeType: image.mimeType || '',
         size: typeof image.size === 'number' ? image.size : null,
         width: typeof image.width === 'number' ? image.width : null,
         height: typeof image.height === 'number' ? image.height : null,
-        url: image.url || '',
+        url: routedUrl,
         uploadedAt: image.uploadedAt ? new Date(image.uploadedAt).toISOString() : null,
     };
 };
@@ -74,7 +88,7 @@ const buildAuthUserPayload = (userDoc) => {
         return null;
     }
 
-    const profileImage = mapProfileImage(userDoc.profileImage);
+    const profileImage = mapProfileImage(userDoc.profileImage, userDoc._id);
     const planSlug = userDoc.planId && typeof userDoc.planId === 'object'
         ? userDoc.planId.slug
         : (userDoc.subscriptionStatus === 'free' ? 'free' : null);
@@ -115,7 +129,7 @@ const buildProfileResponse = (userDoc) => {
         || [userDoc.firstName, userDoc.lastName].filter(Boolean).join(' ')
         || userDoc.username;
 
-    const profileImage = mapProfileImage(userDoc.profileImage);
+    const profileImage = mapProfileImage(userDoc.profileImage, userDoc._id);
 
     return {
         id: userDoc._id,
@@ -558,7 +572,7 @@ const uploadProfilePicture = async (req, res) => {
 
         const previousImage = cloneImageDescriptor(user.profileImage);
         user.profileImage = newImage;
-        user.profilePictureUrl = newImage.url;
+        user.profilePictureUrl = buildProfileImageUrl(userId);
         user.markModified('profileImage');
 
         await user.save();
@@ -614,6 +628,47 @@ const deleteProfilePicture = async (req, res) => {
     } catch (error) {
         console.error('Error removing profile picture:', error);
         return res.status(500).json({ message: 'Failed to remove profile picture.' });
+    }
+};
+
+const streamProfilePicture = async (req, res, next) => {
+    try {
+        const requester = req.user || {};
+        const requestedId = req.params.userId === 'me'
+            ? requester?._id?.toString()
+            : req.params.userId;
+
+        if (!requestedId || !isValidObjectId(requestedId)) {
+            return res.status(400).json({ message: 'Invalid user identifier provided.' });
+        }
+
+        const requesterId = requester?._id?.toString();
+        const privilegedRoles = new Set(['admin', 'support', 'editor']);
+        const isOwner = requesterId === requestedId;
+        const isPrivileged = requester?.role && privilegedRoles.has(requester.role);
+
+        if (!isOwner && !isPrivileged) {
+            return res.status(403).json({ message: 'You do not have permission to access this profile image.' });
+        }
+
+        const user = await User.findOne({ _id: requestedId, isActive: { $ne: false } })
+            .select({ profileImage: 1 })
+            .lean();
+
+        if (!user?.profileImage?.path) {
+            return res.status(404).json({ message: 'Profile image not found.' });
+        }
+
+        await streamStoredFile({
+            descriptor: user.profileImage,
+            res,
+            fallbackFilename: `profile-${requestedId}`,
+        });
+    } catch (error) {
+        if (error.code === 'ENOENT' || error.code === 'ERR_INVALID_PATH') {
+            return res.status(404).json({ message: 'Profile image not found.' });
+        }
+        return next(error);
     }
 };
 
@@ -1055,6 +1110,7 @@ module.exports = {
     updateCurrentUserProfile,
     uploadProfilePicture,
     deleteProfilePicture,
+    streamProfilePicture,
     getCurrentUserSettings,
     updateCurrentUserEmail,
     updateCurrentUserPassword,

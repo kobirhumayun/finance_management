@@ -11,10 +11,20 @@ export function resolveAssetUrl(pathname) {
   if (!pathname) return "";
   const value = String(pathname).trim();
   if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value;
+  if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) {
+    return value;
+  }
   if (value.startsWith("/api/proxy/")) return value;
-  const normalized = value.startsWith("/") ? value : `/${value}`;
-  return `/api/proxy${normalized}`;
+  if (value.startsWith("/api/")) {
+    return `/api/proxy${value}`;
+  }
+  if (value.startsWith("/")) {
+    return value;
+  }
+  if (value.startsWith("./")) {
+    return value.slice(1);
+  }
+  return `/${value}`;
 }
 
 export function formatFileSize(bytes, { fallback = "" } = {}) {

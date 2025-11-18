@@ -26,7 +26,9 @@ const formatDateTime = (value) => {
 export default function TransactionAttachmentDialog({ open, onOpenChange, transaction }) {
   const attachment = transaction?.attachment;
   const isPending = Boolean(attachment?.isPending);
-  const resolvedUrl = isPending ? "" : resolveAssetUrl(attachment?.url);
+  const attachmentUrl = attachment?.url ?? "";
+  const routedUrl = attachmentUrl.startsWith("/api/") ? resolveAssetUrl(attachmentUrl) : attachmentUrl;
+  const resolvedUrl = isPending ? "" : routedUrl;
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -100,7 +102,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
                 </Button>
               ) : null}
               <p className="text-xs text-muted-foreground">
-                Attachments are served from the private `/api/uploads` endpoint behind authentication.
+                Attachments are streamed through the authenticated project endpoint to keep receipts private.
               </p>
             </div>
           </div>

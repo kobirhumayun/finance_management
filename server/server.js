@@ -13,8 +13,6 @@ const invoiceRoutes = require('./routes/invoice');
 const adminUserRoutes = require('./routes/adminUsers');
 const projectRoutes = require('./routes/project');
 const reportRoutes = require('./routes/report');
-const { authenticate } = require('./middleware/authMiddleware');
-const { getUploadsRoot } = require('./services/imageService');
 const { initializeEnforcer } = require('./services/casbin');
 const { initializePlaywright } = require('./services/playwrightPool');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
@@ -47,18 +45,6 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(morgan('dev'));
-
-const uploadsRoot = getUploadsRoot();
-app.use(
-    '/api/uploads',
-    authenticate,
-    express.static(uploadsRoot, {
-        index: false,
-        setHeaders: (res) => {
-            res.set('Cache-Control', 'private, max-age=300');
-        },
-    }),
-);
 
 // Routes
 app.get('/', (req, res) => {
