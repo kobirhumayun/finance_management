@@ -69,12 +69,6 @@ const profileSchema = z.object({
     .max(80, "Display name must be 80 characters or fewer")
     .optional()
     .or(z.literal("")),
-  profilePictureUrl: z
-    .string()
-    .trim()
-    .url("Enter a valid URL")
-    .optional()
-    .or(z.literal("")),
 });
 
 const ORDER_PAGE_SIZE = 10;
@@ -153,7 +147,6 @@ const mapProfileValuesToPayload = (values) => ({
   firstName: values.firstName ?? "",
   lastName: values.lastName ?? "",
   displayName: values.displayName ?? "",
-  profilePictureUrl: values.profilePictureUrl ?? "",
 });
 
 const applyOptimisticProfile = (current, values) => {
@@ -171,7 +164,6 @@ const applyOptimisticProfile = (current, values) => {
     firstName,
     lastName,
     displayName: computedDisplayName,
-    profilePictureUrl: values.profilePictureUrl ?? "",
   };
 };
 
@@ -236,7 +228,6 @@ export default function ProfilePage() {
       firstName: "",
       lastName: "",
       displayName: "",
-      profilePictureUrl: "",
     },
   });
 
@@ -247,7 +238,6 @@ export default function ProfilePage() {
         firstName: profile.firstName ?? "",
         lastName: profile.lastName ?? "",
         displayName: profile.displayName ?? "",
-        profilePictureUrl: profile.profilePictureUrl ?? "",
       });
     }
   }, [profile, form]);
@@ -471,23 +461,6 @@ export default function ProfilePage() {
                     )}
                   />
                 </div>
-                <FormField
-                  control={form.control}
-                  name="profilePictureUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Profile image URL</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="https://images.example.com/avatar.jpg"
-                          disabled={updateProfileMutation.isPending}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                   <Button
                     type="button"

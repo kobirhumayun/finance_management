@@ -55,7 +55,6 @@ const defaultFormValues = {
   lastName: "",
   role: "",
   planId: "",
-  profilePictureUrl: "",
   subscriptionStatus: "",
   subscriptionStartDate: "",
   subscriptionEndDate: "",
@@ -110,7 +109,6 @@ const mapProfileToForm = (profile) => {
     lastName: profile.lastName ?? "",
     role: matchSelectOption(profile.role, ROLE_OPTIONS),
     planId: resolvePlanFieldValue(profile),
-    profilePictureUrl: profile.profilePictureUrl ?? "",
     subscriptionStatus: matchSelectOption(
       profile.subscriptionStatus,
       SUBSCRIPTION_STATUS_OPTIONS
@@ -183,10 +181,6 @@ const buildUpdatePayload = (values, profile) => {
   const planId = values.planId?.trim();
   if (planId && planId !== profile?.planId && planId !== profile?.planSlug) {
     payload.planId = planId;
-  }
-  const profilePictureUrl = values.profilePictureUrl?.trim() || null;
-  if ((profile?.profilePictureUrl ?? null) !== profilePictureUrl) {
-    payload.profilePictureUrl = profilePictureUrl;
   }
   const subscriptionStatus = values.subscriptionStatus?.trim() || null;
   if ((profile?.subscriptionStatus ?? null) !== subscriptionStatus) {
@@ -668,15 +662,6 @@ export default function UserProfileClient({ userId }) {
                     </div>
                   )}
                 />
-                <div className="grid gap-2">
-                  <Label htmlFor="profilePictureUrl">Profile picture URL</Label>
-                  <Input
-                    id="profilePictureUrl"
-                    placeholder="https://"
-                    disabled={isSaving}
-                    {...form.register("profilePictureUrl")}
-                  />
-                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="subscriptionStartDate">Subscription start</Label>
                   <Input
