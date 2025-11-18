@@ -47,7 +47,9 @@ RUN apt-get update \
         wget \
         xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /ms-playwright
+    && mkdir -p /ms-playwright \
+    && mkdir -p /app/uploads \
+    && chown node:node /app/uploads
 
 FROM base AS dependencies
 
