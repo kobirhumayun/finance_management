@@ -69,6 +69,28 @@ const mapProfileImage = (image) => {
     };
 };
 
+const buildAuthUserPayload = (userDoc) => {
+    if (!userDoc) {
+        return null;
+    }
+
+    const profileImage = mapProfileImage(userDoc.profileImage);
+    const planSlug = userDoc.planId && typeof userDoc.planId === 'object'
+        ? userDoc.planId.slug
+        : (userDoc.subscriptionStatus === 'free' ? 'free' : null);
+
+    return {
+        _id: userDoc._id,
+        username: userDoc.username,
+        email: userDoc.email,
+        role: userDoc.role,
+        plan: planSlug,
+        subscriptionStatus: userDoc.subscriptionStatus,
+        profilePictureUrl: profileImage?.url || userDoc.profilePictureUrl || '',
+        profileImage,
+    };
+};
+
 const buildProfileResponse = (userDoc) => {
     if (!userDoc) {
         return null;
@@ -284,18 +306,13 @@ const loginUser = async (req, res) => {
         // subscription checks and saving the refresh token alongside the last login time.
         const { accessToken, refreshToken } = await user.generateAccessAndRefereshTokens();
 
+        const authUser = buildAuthUserPayload(user);
+
         res.status(200).json({
             message: 'Login successful.',
             accessToken,
             refreshToken,
-            user: { // Send back non-sensitive user info
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                role: user.role,
-                plan: user.planId && typeof user.planId === 'object' ? user.planId.slug : (user.subscriptionStatus === 'free' ? 'free' : null),
-                subscriptionStatus: user.subscriptionStatus
-            }
+            user: authUser,
         });
 
     } catch (error) {
@@ -377,10 +394,13 @@ const refreshAccessToken = async (req, res) => {
             // Note: The `generateAccessAndRefereshTokens` method should handle saving the newRefreshToken to the user document.
             // console.log('Token sussesfully refreshed:', incomingRefreshToken);
 
+            const authUser = buildAuthUserPayload(user);
+
             return res.status(200).json({
                 message: 'Access token refreshed.',
                 accessToken,
                 refreshToken: newRefreshToken,
+                user: authUser,
             });
         }
 
@@ -394,10 +414,13 @@ const refreshAccessToken = async (req, res) => {
             // We issue a new access token but return the *already rotated* refresh token
             // that is now stored on the user object to keep all clients in sync.
             const accessToken = isInGraceList.accessToken;
+            const authUser = buildAuthUserPayload(user);
+
             return res.status(200).json({
                 message: 'Access token refreshed (grace period).',
                 accessToken,
                 refreshToken: user.refreshToken, // Send the newest token
+                user: authUser,
             });
         }
 

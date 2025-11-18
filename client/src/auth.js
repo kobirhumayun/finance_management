@@ -148,7 +148,7 @@ async function refreshAccessToken(token) {
       return { ...token, error: "RefreshAccessTokenError", refreshError: { status: res.status ?? 500, body: { message: "No accessToken in refresh response" } } };
     }
     const accessTokenExpires = computeAccessTokenExpires(data, accessToken);
-    return {
+    const nextToken = {
       ...token,
       accessToken,
       accessTokenExpires,
@@ -156,6 +156,15 @@ async function refreshAccessToken(token) {
       error: undefined,
       refreshError: undefined,
     };
+
+    if (data.user && typeof data.user === "object") {
+      nextToken.user = { ...(token.user || {}), ...data.user };
+      if (data.user.username) nextToken.username = data.user.username;
+      if (data.user.email) nextToken.email = data.user.email;
+      if (data.user.role) nextToken.role = data.user.role;
+    }
+
+    return nextToken;
   } catch (e) {
     return { ...token, error: "RefreshAccessTokenError", refreshError: { status: 0, body: { message: String(e) } } };
   }
