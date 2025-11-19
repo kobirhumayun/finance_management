@@ -488,6 +488,7 @@ const createTransaction = async (req, res, next) => {
         });
 
         const perProjectLimit = planLimits.transactions?.perProject;
+        const attachmentsAllowed = planLimits.transactions?.allowAttachments !== false;
         if (Number.isInteger(perProjectLimit) && perProjectLimit >= 0) {
             const userIdentifier = toObjectIdOrNull(userId) ?? userId;
             const transactionCount = await Transaction.countDocuments({
@@ -500,6 +501,12 @@ const createTransaction = async (req, res, next) => {
                     limit: perProjectLimit,
                 });
             }
+        }
+
+        if (!attachmentsAllowed && req.file) {
+            return res.status(403).json({
+                message: 'Your current plan does not allow transaction attachments.',
+            });
         }
 
         if (req.file) {
@@ -590,6 +597,18 @@ const updateTransaction = async (req, res, next) => {
         }
 
         const removeAttachment = req.body.removeAttachment === true;
+
+        const { limits: planLimits } = await getPlanLimitsForUser({
+            userId,
+            planSlug: req.user?.plan,
+        });
+        const attachmentsAllowed = planLimits.transactions?.allowAttachments !== false;
+
+        if (!attachmentsAllowed && (req.file || removeAttachment)) {
+            return res.status(403).json({
+                message: 'Your current plan does not allow transaction attachments.',
+            });
+        }
 
         if (req.file) {
             try {

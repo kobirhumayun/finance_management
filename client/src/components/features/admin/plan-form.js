@@ -43,6 +43,7 @@ const schema = z.object({
     }),
     transactions: z.object({
       perProject: limitNumberSchema,
+      allowAttachments: z.boolean(),
     }),
     summary: z.object({
       allowFilters: z.boolean(),
@@ -62,7 +63,7 @@ const createDefaultFormValues = () => ({
   isPublic: false,
   limits: {
     projects: { maxActive: "" },
-    transactions: { perProject: "1000" },
+    transactions: { perProject: "1000", allowAttachments: true },
     summary: { allowFilters: true, allowPagination: true, allowExport: true },
   },
 });
@@ -98,6 +99,8 @@ const prepareDefaultValues = (values) => {
           values.limits?.transactions?.perProject,
           base.limits.transactions.perProject
         ),
+        allowAttachments:
+          values.limits?.transactions?.allowAttachments ?? base.limits.transactions.allowAttachments,
       },
       summary: {
         allowFilters: values.limits?.summary?.allowFilters ?? base.limits.summary.allowFilters,
@@ -161,6 +164,7 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
     if (limits?.transactions) {
       normalizedLimits.transactions = {
         perProject: parseLimitNumber(limits.transactions.perProject ?? ""),
+        allowAttachments: Boolean(limits.transactions.allowAttachments),
       };
     }
 
@@ -296,6 +300,26 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
           )}
           <p className="text-xs text-muted-foreground">Leave blank for unlimited transactions per project.</p>
         </div>
+        <Controller
+          control={form.control}
+          name="limits.transactions.allowAttachments"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3 rounded-md border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="limits-transactions-allow-attachments">Enable transaction attachments</Label>
+                <p className="text-sm text-muted-foreground">
+                  Disable to prevent uploads or removals of transaction image attachments on this plan.
+                </p>
+              </div>
+              <Switch
+                id="limits-transactions-allow-attachments"
+                disabled={isSubmitting}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </div>
+          )}
+        />
         <Controller
           control={form.control}
           name="limits.summary.allowFilters"

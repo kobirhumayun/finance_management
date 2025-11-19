@@ -171,7 +171,10 @@ export default function PlanManagementPage() {
         isPublic: Boolean(plan.isPublic),
         limits: {
           projects: { maxActive: toLimitInput(planLimits?.projects?.maxActive) },
-          transactions: { perProject: toLimitInput(planLimits?.transactions?.perProject) },
+          transactions: {
+            perProject: toLimitInput(planLimits?.transactions?.perProject),
+            allowAttachments: planLimits?.transactions?.allowAttachments ?? true,
+          },
           summary: {
             allowFilters: planLimits?.summary?.allowFilters ?? true,
             allowPagination: planLimits?.summary?.allowPagination ?? true,

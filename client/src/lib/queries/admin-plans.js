@@ -23,6 +23,8 @@ const normalizePlanLimits = (rawLimits) => {
   const transactions =
     limits.transactions && typeof limits.transactions === "object" ? limits.transactions : {};
   const summary = limits.summary && typeof limits.summary === "object" ? limits.summary : {};
+  const allowAttachments =
+    typeof transactions.allowAttachments === "boolean" ? transactions.allowAttachments : true;
 
   const toLimitNumber = (value, fallback) => {
     if (value === null) return null;
@@ -42,6 +44,7 @@ const normalizePlanLimits = (rawLimits) => {
         transactions.perProject !== undefined
           ? toLimitNumber(transactions.perProject, 1000)
           : 1000,
+      allowAttachments,
     },
     summary: {
       allowFilters: typeof summary.allowFilters === "boolean" ? summary.allowFilters : true,
