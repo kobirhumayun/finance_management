@@ -182,7 +182,10 @@ export default function SummaryPage() {
     return pages.flatMap((page) => page.transactions ?? []);
   }, [summaryQuery.data]);
 
-  const summaryPages = summaryQuery.data?.pages ?? [];
+  const summaryPages = useMemo(
+    () => summaryQuery.data?.pages ?? [],
+    [summaryQuery.data],
+  );
   const latestCapabilities = useMemo(() => {
     for (let index = summaryPages.length - 1; index >= 0; index -= 1) {
       const pageCapabilities = summaryPages[index]?.capabilities;
@@ -192,10 +195,22 @@ export default function SummaryPage() {
     }
     return null;
   }, [summaryPages]);
-  const latestSummary = summaryPages.length ? summaryPages[summaryPages.length - 1]?.summary : null;
-  const summaryTotals = latestSummary ?? { income: 0, expense: 0, balance: 0, counts: { income: 0, expense: 0, total: 0 } };
-  const summaryCounts = summaryTotals.counts ?? { income: 0, expense: 0, total: 0 };
-  const totalCount = summaryPages.length ? summaryPages[0]?.totalCount ?? 0 : 0;
+  const latestSummary = useMemo(
+    () => (summaryPages.length ? summaryPages[summaryPages.length - 1]?.summary : null),
+    [summaryPages],
+  );
+  const summaryTotals = useMemo(
+    () => latestSummary ?? { income: 0, expense: 0, balance: 0, counts: { income: 0, expense: 0, total: 0 } },
+    [latestSummary],
+  );
+  const summaryCounts = useMemo(
+    () => summaryTotals.counts ?? { income: 0, expense: 0, total: 0 },
+    [summaryTotals],
+  );
+  const totalCount = useMemo(
+    () => (summaryPages.length ? summaryPages[0]?.totalCount ?? 0 : 0),
+    [summaryPages],
+  );
 
   const filtersCapabilityFromServer = filtersData?.capabilities?.filters;
   const exportsCapabilityFromServer = filtersData?.capabilities?.export;
