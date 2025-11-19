@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
 
 process.env.NODE_ENV ??= 'production';
@@ -39,9 +39,20 @@ process.env.HOST = hostname;
 process.env.HOSTNAME ??= hostname;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const standaloneServer = resolve(__dirname, '..', '.next', 'standalone', 'server.js');
+const projectRoot = resolve(__dirname, '..');
+const workspaceRoot = resolve(projectRoot, '..');
+const standaloneDir = resolve(projectRoot, '.next', 'standalone');
+const projectRelativePath = relative(workspaceRoot, projectRoot);
 
-if (!existsSync(standaloneServer)) {
+const standaloneCandidates = [resolve(standaloneDir, 'server.js')];
+
+if (projectRelativePath && !projectRelativePath.startsWith('..')) {
+  standaloneCandidates.push(resolve(standaloneDir, projectRelativePath, 'server.js'));
+}
+
+const standaloneServer = standaloneCandidates.find((candidate) => existsSync(candidate));
+
+if (!standaloneServer) {
   throw new Error(
     'Standalone server entry not found. Did you forget to run "npm run build" before starting?',
   );
