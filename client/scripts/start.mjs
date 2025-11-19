@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
@@ -62,6 +62,41 @@ if (!standaloneServer) {
     'Standalone server entry not found. Did you forget to run "npm run build" before starting?',
   );
 }
+
+function syncDirectory(source, destination) {
+  if (!existsSync(source)) {
+    return false;
+  }
+
+  const resolvedSource = resolve(source);
+  const resolvedDestination = resolve(destination);
+
+  if (resolvedSource === resolvedDestination) {
+    return true;
+  }
+
+  mkdirSync(dirname(resolvedDestination), { recursive: true });
+  rmSync(resolvedDestination, { recursive: true, force: true });
+  cpSync(resolvedSource, resolvedDestination, { recursive: true });
+  return true;
+}
+
+function ensureStandaloneAssets(standaloneServerPath) {
+  const standaloneServerDir = dirname(standaloneServerPath);
+  const projectStaticDir = resolve(projectRoot, '.next', 'static');
+  const standaloneStaticDir = resolve(standaloneServerDir, '.next', 'static');
+  const projectPublicDir = resolve(projectRoot, 'public');
+  const standalonePublicDir = resolve(standaloneServerDir, 'public');
+
+  const copiedStatic = syncDirectory(projectStaticDir, standaloneStaticDir);
+  if (!copiedStatic) {
+    throw new Error('Missing .next/static directory. Did the build step complete successfully?');
+  }
+
+  syncDirectory(projectPublicDir, standalonePublicDir);
+}
+
+ensureStandaloneAssets(standaloneServer);
 
 const result = spawnSync(process.execPath, [standaloneServer, ...passthroughArgs], {
   stdio: 'inherit',
