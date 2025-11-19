@@ -4,6 +4,8 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
+import nextEnv from '@next/env';
+const { loadEnvConfig } = nextEnv;
 
 process.env.NODE_ENV ??= 'production';
 process.env.NEXT_FORCE_WEBPACK = '1';
@@ -40,6 +42,9 @@ process.env.HOSTNAME ??= hostname;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
+// The standalone server doesn't automatically load env files, so emulate Next CLI
+// by hydrating process.env from .env*, ensuring secrets like NEXTAUTH_SECRET exist.
+loadEnvConfig(projectRoot, false);
 const workspaceRoot = resolve(projectRoot, '..');
 const standaloneDir = resolve(projectRoot, '.next', 'standalone');
 const projectRelativePath = relative(workspaceRoot, projectRoot);
