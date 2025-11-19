@@ -67,12 +67,32 @@ describe('planLimits service sanitization utilities', { concurrency: false }, ()
 
         assert.deepEqual(merged, {
             projects: { maxActive: 15 },
-            summary: { allowExport: true },
+            summary: { allowFilters: false, allowExport: true },
             transactions: { perProject: 500 },
         });
         assert.deepEqual(current, {
             projects: { maxActive: 5 },
             summary: { allowFilters: false, allowExport: false },
+        });
+    });
+
+    test('mergePlanLimits keeps existing nested values when the update omits them', () => {
+        const current = {
+            transactions: { perProject: 250, allowAttachments: true },
+            summary: { allowFilters: true, allowPagination: true, allowExport: true },
+        };
+        const updates = {
+            transactions: { allowAttachments: false },
+            summary: { allowPagination: false },
+        };
+
+        const merged = mergePlanLimits(current, updates);
+
+        assert.deepEqual(merged.transactions, { perProject: 250, allowAttachments: false });
+        assert.deepEqual(merged.summary, {
+            allowFilters: true,
+            allowPagination: false,
+            allowExport: true,
         });
     });
 

@@ -174,16 +174,25 @@ const mergePlanLimits = (current = {}, updates = {}) => {
 
     const merged = { ...base };
 
-    ['projects', 'transactions', 'summary'].forEach((section) => {
-        if (Object.prototype.hasOwnProperty.call(next, section)) {
-            const value = next[section];
-            if (!value || Object.keys(value).length === 0) {
-                delete merged[section];
-            } else {
-                merged[section] = value;
-            }
+    const mergeSection = (section) => {
+        if (!Object.prototype.hasOwnProperty.call(next, section)) {
+            return;
         }
-    });
+
+        const baseSection = merged[section] && typeof merged[section] === 'object'
+            ? { ...merged[section] }
+            : {};
+        const nextSection = next[section];
+
+        if (!nextSection || Object.keys(nextSection).length === 0) {
+            delete merged[section];
+            return;
+        }
+
+        merged[section] = { ...baseSection, ...nextSection };
+    };
+
+    ['projects', 'transactions', 'summary'].forEach(mergeSection);
 
     return merged;
 };
