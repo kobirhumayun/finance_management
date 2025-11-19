@@ -31,6 +31,22 @@ import {
 } from "@/lib/queries/admin-plans";
 import { formatPlanAmount } from "@/lib/formatters";
 
+const coerceBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y", "on", "enabled"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "n", "off", "disabled"].includes(normalized)) {
+      return false;
+    }
+  }
+  return fallback;
+};
+
 // Plan management interface for administrators.
 export default function PlanManagementPage() {
   const queryClient = useQueryClient();
@@ -168,17 +184,17 @@ export default function PlanManagementPage() {
         billingCycle: plan.billingCycle ?? "",
         description: plan.description ?? "",
         features: Array.isArray(plan.features) ? plan.features.join("\n") : "",
-        isPublic: Boolean(plan.isPublic),
+        isPublic: coerceBoolean(plan.isPublic, false),
         limits: {
           projects: { maxActive: toLimitInput(planLimits?.projects?.maxActive) },
           transactions: {
             perProject: toLimitInput(planLimits?.transactions?.perProject),
-            allowAttachments: planLimits?.transactions?.allowAttachments ?? true,
+            allowAttachments: coerceBoolean(planLimits?.transactions?.allowAttachments, true),
           },
           summary: {
-            allowFilters: planLimits?.summary?.allowFilters ?? true,
-            allowPagination: planLimits?.summary?.allowPagination ?? true,
-            allowExport: planLimits?.summary?.allowExport ?? true,
+            allowFilters: coerceBoolean(planLimits?.summary?.allowFilters, true),
+            allowPagination: coerceBoolean(planLimits?.summary?.allowPagination, true),
+            allowExport: coerceBoolean(planLimits?.summary?.allowExport, true),
           },
         },
       },
