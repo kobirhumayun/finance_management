@@ -3,6 +3,11 @@ import {
   PHASE_PRODUCTION_BUILD,
   PHASE_PRODUCTION_SERVER,
 } from 'next/constants.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = resolve(__dirname, '..');
 
 /**
  * @param {string} phase
@@ -15,6 +20,7 @@ const createConfig = (phase) => {
 
   return {
     output: 'standalone',
+    outputFileTracingRoot: workspaceRoot,
     serverExternalPackages: ['ioredis'],
     webpack: (config, { isServer, dev }) => {
       if (!isServer) {
