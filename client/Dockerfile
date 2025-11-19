@@ -54,6 +54,8 @@ COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
 COPY --from=builder /app/components.json ./components.json
 COPY --from=builder /app/jsconfig.json ./jsconfig.json
 
+RUN chown -R node:node /app
+
 USER node
 
 EXPOSE 3000
