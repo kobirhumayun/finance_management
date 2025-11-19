@@ -220,9 +220,15 @@ const getPlans = (planFilter = {}) => async (req, res) => {
 
     const plans = await Plan.find(query)
       .sort({ price: 1 })
-      .select('-__v'); // Exclude the version key
+      .select('-__v')
+      .lean();
 
-    res.status(200).json(plans);
+    const normalizedPlans = plans.map((plan) => ({
+      ...plan,
+      limits: applyPlanLimitDefaults(plan?.limits),
+    }));
+
+    res.status(200).json(normalizedPlans);
   } catch (error) {
     console.error('Error fetching plans:', error);
     res.status(500).json({ message: 'Server error while fetching plans.' });

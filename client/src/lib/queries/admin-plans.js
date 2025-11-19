@@ -17,14 +17,28 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const toBoolean = (value, fallback) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y", "enabled"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "n", "disabled"].includes(normalized)) {
+      return false;
+    }
+  }
+  return fallback;
+};
+
 const normalizePlanLimits = (rawLimits) => {
   const limits = rawLimits && typeof rawLimits === "object" && !Array.isArray(rawLimits) ? rawLimits : {};
   const projects = limits.projects && typeof limits.projects === "object" ? limits.projects : {};
   const transactions =
     limits.transactions && typeof limits.transactions === "object" ? limits.transactions : {};
   const summary = limits.summary && typeof limits.summary === "object" ? limits.summary : {};
-  const allowAttachments =
-    typeof transactions.allowAttachments === "boolean" ? transactions.allowAttachments : true;
+  const allowAttachments = toBoolean(transactions.allowAttachments, true);
 
   const toLimitNumber = (value, fallback) => {
     if (value === null) return null;
@@ -47,9 +61,9 @@ const normalizePlanLimits = (rawLimits) => {
       allowAttachments,
     },
     summary: {
-      allowFilters: typeof summary.allowFilters === "boolean" ? summary.allowFilters : true,
-      allowPagination: typeof summary.allowPagination === "boolean" ? summary.allowPagination : true,
-      allowExport: typeof summary.allowExport === "boolean" ? summary.allowExport : true,
+      allowFilters: toBoolean(summary.allowFilters, true),
+      allowPagination: toBoolean(summary.allowPagination, true),
+      allowExport: toBoolean(summary.allowExport, true),
     },
   };
 };
