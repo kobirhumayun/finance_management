@@ -85,7 +85,7 @@ export const normalizeAdminPlan = (plan) => {
     price: toNumber(plan?.price),
     billingCycle: plan?.billingCycle ?? "",
     features,
-    isPublic: Boolean(plan?.isPublic),
+    isPublic: toBoolean(plan?.isPublic, false),
     currency: plan?.currency ?? null,
     displayOrder: plan?.displayOrder ?? null,
     createdAt: extractDate(plan?.createdAt),
