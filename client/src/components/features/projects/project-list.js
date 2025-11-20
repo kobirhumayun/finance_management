@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/formatters";
 
 // Sidebar list rendering all projects with search and sorting controls.
 export default function ProjectList({
@@ -85,7 +86,7 @@ export default function ProjectList({
               typeof project?.description === "string" && project.description.trim().length
                 ? project.description
                 : "No description available.";
-            const createdLabel = project?.createdAt || "—";
+            const createdLabel = formatDate(project?.createdAt, { fallback: "—" });
             const isActive = selectedProjectId === projectId;
             const handleSelect = () => {
               if (projectId) {

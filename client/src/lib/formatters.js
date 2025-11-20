@@ -160,3 +160,34 @@ export const formatPlanAmount = (
     fallback: fallback ?? FALLBACK_DISPLAY,
   });
 };
+
+export const formatDate = (value, { fallback = FALLBACK_DISPLAY } = {}) => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toLocaleDateString();
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    const isoLikeMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoLikeMatch) {
+      const [, year, month, day] = isoLikeMatch;
+      return `${day}-${month}-${year}`;
+    }
+
+    return trimmed || fallback;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString();
+    }
+  }
+
+  return String(value);
+};

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { qk } from "@/lib/query-keys";
 import { fetchReportCharts, fetchReportFilters } from "@/lib/queries/reports";
-import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
 import { toNumeric } from "@/lib/utils/numbers";
 
 const toDateInputString = (date) => {
@@ -160,11 +160,15 @@ export default function ReportsPage() {
 
     let rangeLabel = "Complete history";
     if (appliedDateStart && appliedDateEnd) {
-      rangeLabel = `${appliedDateStart} to ${appliedDateEnd}`;
+      const formattedStart = formatDate(appliedDateStart, { fallback: appliedDateStart });
+      const formattedEnd = formatDate(appliedDateEnd, { fallback: appliedDateEnd });
+      rangeLabel = `${formattedStart} to ${formattedEnd}`;
     } else if (appliedDateStart) {
-      rangeLabel = `From ${appliedDateStart}`;
+      const formattedStart = formatDate(appliedDateStart, { fallback: appliedDateStart });
+      rangeLabel = `From ${formattedStart}`;
     } else if (appliedDateEnd) {
-      rangeLabel = `Through ${appliedDateEnd}`;
+      const formattedEnd = formatDate(appliedDateEnd, { fallback: appliedDateEnd });
+      rangeLabel = `Through ${formattedEnd}`;
     }
 
     return `${projectLabel} · ${typeLabel} · ${rangeLabel}`;
