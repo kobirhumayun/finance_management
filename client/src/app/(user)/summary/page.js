@@ -33,7 +33,7 @@ import {
   SUMMARY_XLSX_ENDPOINT,
 } from "@/lib/queries/reports";
 import { myPlanQueryOptions } from "@/lib/queries/plans";
-import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
 
 const PAGE_SIZE = 20;
 
@@ -813,7 +813,7 @@ export default function SummaryPage() {
                   <TableBody>
                     {transactions.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell>{item.date}</TableCell>
+                        <TableCell>{formatDate(item.date)}</TableCell>
                         <TableCell>{item.projectName || item.projectId || "--"}</TableCell>
                         <TableCell>{item.type}</TableCell>
                         <TableCell>{item.subcategory || "--"}</TableCell>
