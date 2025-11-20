@@ -41,13 +41,13 @@ describe('planLimits service sanitization utilities', { concurrency: false }, ()
     test('sanitizePlanLimitsInput normalizes numeric and boolean fields', () => {
         const sanitized = sanitizePlanLimitsInput({
             projects: { maxActive: ' 10 ' },
-            transactions: { perProject: '200 ' },
+            transactions: { perProject: '200 ', allowAttachments: 'no' },
             summary: { allowFilters: 'false', allowPagination: 'yes', allowExport: '0' },
         });
 
         assert.deepEqual(sanitized, {
             projects: { maxActive: 10 },
-            transactions: { perProject: 200 },
+            transactions: { perProject: 200, allowAttachments: false },
             summary: { allowFilters: false, allowPagination: true, allowExport: false },
         });
     });
@@ -67,12 +67,32 @@ describe('planLimits service sanitization utilities', { concurrency: false }, ()
 
         assert.deepEqual(merged, {
             projects: { maxActive: 15 },
-            summary: { allowExport: true },
+            summary: { allowFilters: false, allowExport: true },
             transactions: { perProject: 500 },
         });
         assert.deepEqual(current, {
             projects: { maxActive: 5 },
             summary: { allowFilters: false, allowExport: false },
+        });
+    });
+
+    test('mergePlanLimits keeps existing nested values when the update omits them', () => {
+        const current = {
+            transactions: { perProject: 250, allowAttachments: true },
+            summary: { allowFilters: true, allowPagination: true, allowExport: true },
+        };
+        const updates = {
+            transactions: { allowAttachments: false },
+            summary: { allowPagination: false },
+        };
+
+        const merged = mergePlanLimits(current, updates);
+
+        assert.deepEqual(merged.transactions, { perProject: 250, allowAttachments: false });
+        assert.deepEqual(merged.summary, {
+            allowFilters: true,
+            allowPagination: false,
+            allowExport: true,
         });
     });
 
@@ -84,7 +104,7 @@ describe('planLimits service sanitization utilities', { concurrency: false }, ()
 
         assert.deepEqual(applied, {
             projects: { maxActive: 25 },
-            transactions: { perProject: 1000 },
+            transactions: { perProject: 1000, allowAttachments: true },
             summary: { allowFilters: false, allowPagination: true, allowExport: true },
         });
     });
@@ -102,7 +122,7 @@ describe('planLimits service getPlanLimitsForUser', { concurrency: false }, () =
 
         assert.equal(result.slug, 'pro');
         assert.deepEqual(result.limits.projects, { maxActive: 50 });
-        assert.deepEqual(result.limits.transactions, { perProject: 1000 });
+        assert.deepEqual(result.limits.transactions, { perProject: 1000, allowAttachments: true });
         assert.deepEqual(result.limits.summary, {
             allowFilters: true,
             allowPagination: true,
@@ -125,7 +145,7 @@ describe('planLimits service getPlanLimitsForUser', { concurrency: false }, () =
 
         assert.deepEqual(requestedSlugs, ['nonexistent', 'free']);
         assert.equal(result.slug, 'free');
-        assert.deepEqual(result.limits.transactions, { perProject: 750 });
+        assert.deepEqual(result.limits.transactions, { perProject: 750, allowAttachments: true });
     });
 
     test('derives limits from the user document when a plan slug is not provided', async () => {
@@ -152,6 +172,6 @@ describe('planLimits service getPlanLimitsForUser', { concurrency: false }, () =
             allowPagination: false,
             allowExport: false,
         });
-        assert.deepEqual(result.limits.transactions, { perProject: 1000 });
+        assert.deepEqual(result.limits.transactions, { perProject: 1000, allowAttachments: true });
     });
 });

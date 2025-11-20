@@ -43,6 +43,7 @@ const schema = z.object({
     }),
     transactions: z.object({
       perProject: limitNumberSchema,
+      allowAttachments: z.boolean(),
     }),
     summary: z.object({
       allowFilters: z.boolean(),
@@ -51,6 +52,32 @@ const schema = z.object({
     }),
   }),
 });
+
+const parseBooleanInput = (value, fallback) => {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y", "on", "enabled"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "n", "off", "disabled"].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return Boolean(value);
+};
 
 const createDefaultFormValues = () => ({
   name: "",
@@ -62,7 +89,7 @@ const createDefaultFormValues = () => ({
   isPublic: false,
   limits: {
     projects: { maxActive: "" },
-    transactions: { perProject: "1000" },
+    transactions: { perProject: "1000", allowAttachments: true },
     summary: { allowFilters: true, allowPagination: true, allowExport: true },
   },
 });
@@ -88,7 +115,7 @@ const prepareDefaultValues = (values) => {
     billingCycle: values.billingCycle ?? base.billingCycle,
     description: values.description ?? base.description,
     features: values.features ?? base.features,
-    isPublic: values.isPublic ?? base.isPublic,
+    isPublic: parseBooleanInput(values.isPublic, base.isPublic),
     limits: {
       projects: {
         maxActive: normalizeNumberInput(values.limits?.projects?.maxActive, base.limits.projects.maxActive),
@@ -98,11 +125,24 @@ const prepareDefaultValues = (values) => {
           values.limits?.transactions?.perProject,
           base.limits.transactions.perProject
         ),
+        allowAttachments: parseBooleanInput(
+          values.limits?.transactions?.allowAttachments,
+          base.limits.transactions.allowAttachments
+        ),
       },
       summary: {
-        allowFilters: values.limits?.summary?.allowFilters ?? base.limits.summary.allowFilters,
-        allowPagination: values.limits?.summary?.allowPagination ?? base.limits.summary.allowPagination,
-        allowExport: values.limits?.summary?.allowExport ?? base.limits.summary.allowExport,
+        allowFilters: parseBooleanInput(
+          values.limits?.summary?.allowFilters,
+          base.limits.summary.allowFilters
+        ),
+        allowPagination: parseBooleanInput(
+          values.limits?.summary?.allowPagination,
+          base.limits.summary.allowPagination
+        ),
+        allowExport: parseBooleanInput(
+          values.limits?.summary?.allowExport,
+          base.limits.summary.allowExport
+        ),
       },
     },
   };
@@ -146,9 +186,9 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
 
     const normalizedLimits = {
       summary: {
-        allowFilters: Boolean(limits?.summary?.allowFilters),
-        allowPagination: Boolean(limits?.summary?.allowPagination),
-        allowExport: Boolean(limits?.summary?.allowExport),
+        allowFilters: parseBooleanInput(limits?.summary?.allowFilters, true),
+        allowPagination: parseBooleanInput(limits?.summary?.allowPagination, true),
+        allowExport: parseBooleanInput(limits?.summary?.allowExport, true),
       },
     };
 
@@ -161,6 +201,7 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
     if (limits?.transactions) {
       normalizedLimits.transactions = {
         perProject: parseLimitNumber(limits.transactions.perProject ?? ""),
+        allowAttachments: parseBooleanInput(limits.transactions.allowAttachments, true),
       };
     }
 
@@ -172,7 +213,7 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
       description: baseValues.description.trim(),
       price,
       features: parsedFeatures,
-      isPublic: Boolean(baseValues.isPublic),
+      isPublic: parseBooleanInput(baseValues.isPublic, false),
       limits: normalizedLimits,
     };
 
@@ -296,6 +337,26 @@ export default function PlanForm({ defaultValues, onSubmit, onCancel, isSubmitti
           )}
           <p className="text-xs text-muted-foreground">Leave blank for unlimited transactions per project.</p>
         </div>
+        <Controller
+          control={form.control}
+          name="limits.transactions.allowAttachments"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3 rounded-md border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="limits-transactions-allow-attachments">Enable transaction attachments</Label>
+                <p className="text-sm text-muted-foreground">
+                  Disable to prevent uploads or removals of transaction image attachments on this plan.
+                </p>
+              </div>
+              <Switch
+                id="limits-transactions-allow-attachments"
+                disabled={isSubmitting}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </div>
+          )}
+        />
         <Controller
           control={form.control}
           name="limits.summary.allowFilters"

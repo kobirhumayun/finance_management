@@ -217,4 +217,55 @@ describe('projectController plan limit enforcement', { concurrency: false }, () 
         assert.equal(createInvoked, true);
         assert.equal(res.jsonPayload?.transaction?.subcategory, 'Ads');
     });
+
+    test('createTransaction rejects attachment uploads when the plan disables attachments', async () => {
+        Plan.findOne = () => createQueryResult({
+            slug: 'starter',
+            limits: { transactions: { perProject: 10, allowAttachments: false } },
+        });
+        const projectId = '507f1f77bcf86cd799439091';
+        Project.findOne = async (query) => {
+            if (query?._id?.toString() === projectId) {
+                return {
+                    _id: projectId,
+                    user_id: '507f1f77bcf86cd799439092',
+                    name: 'Growth',
+                };
+            }
+            return null;
+        };
+        Transaction.countDocuments = async () => 0;
+        let createInvoked = false;
+        Transaction.create = async () => {
+            createInvoked = true;
+            return null;
+        };
+
+        const req = {
+            user: { _id: '507f1f77bcf86cd799439092', plan: 'starter' },
+            params: { projectId },
+            body: {
+                type: 'income',
+                date: '2024-04-10',
+                amount: 220,
+                subcategory: 'Bonus',
+                description: 'Performance bonus',
+            },
+            file: {
+                originalname: 'receipt.png',
+                mimetype: 'image/png',
+                buffer: Buffer.from('fake-image-data'),
+                size: 1024,
+            },
+        };
+        const res = createResponseDouble();
+
+        await createTransaction(req, res, (error) => {
+            throw error || new Error('createTransaction should not call next on attachment enforcement');
+        });
+
+        assert.equal(res.statusCode, 403);
+        assert.equal(createInvoked, false);
+        assert.match(res.jsonPayload?.message || '', /does not allow transaction attachments/i);
+    });
 });

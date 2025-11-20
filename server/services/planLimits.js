@@ -3,7 +3,7 @@ const User = require('../models/User');
 
 const DEFAULT_PLAN_LIMITS = Object.freeze({
     projects: { maxActive: null },
-    transactions: { perProject: 1000 },
+    transactions: { perProject: 1000, allowAttachments: true },
     summary: { allowFilters: true, allowPagination: true, allowExport: true },
 });
 
@@ -106,11 +106,19 @@ const sanitizePlanLimitsInput = (raw) => {
     if (Object.prototype.hasOwnProperty.call(raw, 'transactions')) {
         const transactions = raw.transactions;
         if (transactions === null) {
-            sanitized.transactions = { perProject: null };
+            sanitized.transactions = { perProject: null, allowAttachments: null };
         } else if (isPlainObject(transactions)) {
             const perProject = parseOptionalInteger(transactions.perProject, 'limits.transactions.perProject');
+            const allowAttachments = parseOptionalBoolean(transactions.allowAttachments, 'limits.transactions.allowAttachments');
+            const transactionValues = {};
             if (perProject !== undefined) {
-                sanitized.transactions = { perProject };
+                transactionValues.perProject = perProject;
+            }
+            if (allowAttachments !== undefined) {
+                transactionValues.allowAttachments = allowAttachments;
+            }
+            if (Object.keys(transactionValues).length > 0) {
+                sanitized.transactions = transactionValues;
             }
         } else {
             throw new Error('limits.transactions must be an object.');
@@ -166,16 +174,25 @@ const mergePlanLimits = (current = {}, updates = {}) => {
 
     const merged = { ...base };
 
-    ['projects', 'transactions', 'summary'].forEach((section) => {
-        if (Object.prototype.hasOwnProperty.call(next, section)) {
-            const value = next[section];
-            if (!value || Object.keys(value).length === 0) {
-                delete merged[section];
-            } else {
-                merged[section] = value;
-            }
+    const mergeSection = (section) => {
+        if (!Object.prototype.hasOwnProperty.call(next, section)) {
+            return;
         }
-    });
+
+        const baseSection = merged[section] && typeof merged[section] === 'object'
+            ? { ...merged[section] }
+            : {};
+        const nextSection = next[section];
+
+        if (!nextSection || Object.keys(nextSection).length === 0) {
+            delete merged[section];
+            return;
+        }
+
+        merged[section] = { ...baseSection, ...nextSection };
+    };
+
+    ['projects', 'transactions', 'summary'].forEach(mergeSection);
 
     return merged;
 };
@@ -185,7 +202,10 @@ const applyPlanLimitDefaults = (limits) => {
 
     return {
         projects: { maxActive: sanitized.projects?.maxActive ?? DEFAULT_PLAN_LIMITS.projects.maxActive },
-        transactions: { perProject: sanitized.transactions?.perProject ?? DEFAULT_PLAN_LIMITS.transactions.perProject },
+        transactions: {
+            perProject: sanitized.transactions?.perProject ?? DEFAULT_PLAN_LIMITS.transactions.perProject,
+            allowAttachments: sanitized.transactions?.allowAttachments ?? DEFAULT_PLAN_LIMITS.transactions.allowAttachments,
+        },
         summary: {
             allowFilters: sanitized.summary?.allowFilters ?? DEFAULT_PLAN_LIMITS.summary.allowFilters,
             allowPagination: sanitized.summary?.allowPagination ?? DEFAULT_PLAN_LIMITS.summary.allowPagination,

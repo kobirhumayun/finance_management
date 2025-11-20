@@ -26,9 +26,11 @@ export default function TransactionTable({
   onSearchChange,
   sortValue = "newest",
   onSortChange,
+  attachmentsAllowed = true,
 }) {
   const displayTransactions = Array.isArray(transactions) ? transactions : [];
   const [attachmentDialogState, setAttachmentDialogState] = useState({ open: false, transaction: null });
+  const attachmentsFeatureEnabled = attachmentsAllowed !== false;
 
   const handleSearchChange = (event) => {
     onSearchChange?.(event.target.value);
@@ -39,7 +41,7 @@ export default function TransactionTable({
   };
 
   const openAttachmentDialog = (transaction) => {
-    if (!transaction?.attachment) return;
+    if (!attachmentsFeatureEnabled || !transaction?.attachment) return;
     setAttachmentDialogState({ open: true, transaction });
   };
 
@@ -152,9 +154,12 @@ export default function TransactionTable({
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="whitespace-nowrap"
+                          className={cn(
+                            "whitespace-nowrap disabled:pointer-events-auto",
+                            !attachmentsFeatureEnabled && "cursor-not-allowed"
+                          )}
                           onClick={() => openAttachmentDialog(transaction)}
-                          disabled={!transaction?.attachment}
+                          disabled={!attachmentsFeatureEnabled || !transaction?.attachment}
                         >
                           {transaction?.attachment?.isPending ? "Processing..." : "View image"}
                         </Button>
@@ -247,9 +252,12 @@ export default function TransactionTable({
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="col-span-2"
+                    className={cn(
+                      "col-span-2 disabled:pointer-events-auto",
+                      !attachmentsFeatureEnabled && "cursor-not-allowed"
+                    )}
                     onClick={() => openAttachmentDialog(transaction)}
-                    disabled={!transaction?.attachment}
+                    disabled={!attachmentsFeatureEnabled || !transaction?.attachment}
                   >
                     {transaction?.attachment?.isPending ? "Processing attachment" : "View image"}
                   </Button>

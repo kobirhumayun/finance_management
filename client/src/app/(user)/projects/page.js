@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
 import ProjectList from "@/components/features/projects/project-list";
 import TransactionTable from "@/components/features/projects/transaction-table";
@@ -32,6 +32,7 @@ import {
 } from "@/lib/queries/projects";
 import { toast } from "@/components/ui/sonner";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { myPlanQueryOptions } from "@/lib/queries/plans";
 
 const PROJECTS_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
@@ -67,6 +68,10 @@ const getErrorMessage = (error, fallback) => {
 // Projects workspace featuring list and transaction management.
 export default function ProjectsPage() {
   const queryClient = useQueryClient();
+  const planQuery = useQuery(myPlanQueryOptions());
+  const planLimits = planQuery.data?.plan?.limits ?? {};
+  const planTransactionLimits = planLimits.transactions ?? {};
+  const attachmentsAllowed = planTransactionLimits.allowAttachments !== false;
 
   const [projectSearch, setProjectSearch] = useState("");
   const [projectSort, setProjectSort] = useState("newest");
@@ -627,19 +632,21 @@ export default function ProjectsPage() {
     if (!selectedProjectId) return;
     const editingTransaction = transactionDialogState.transaction;
     const { attachmentFile, removeAttachment, ...payload } = values || {};
+    const attachmentFileInput = attachmentsAllowed ? attachmentFile : undefined;
+    const removeAttachmentInput = attachmentsAllowed ? removeAttachment : undefined;
     if (editingTransaction?.id) {
       await updateTransactionMutation.mutateAsync({
         projectId: selectedProjectId,
         transactionId: editingTransaction.id,
         values: payload,
-        attachmentFile,
-        removeAttachment,
+        attachmentFile: attachmentFileInput,
+        removeAttachment: removeAttachmentInput,
       });
     } else {
       await createTransactionMutation.mutateAsync({
         projectId: selectedProjectId,
         values: payload,
-        attachmentFile,
+        attachmentFile: attachmentFileInput,
       });
     }
   };
@@ -695,6 +702,7 @@ export default function ProjectsPage() {
             onSearchChange={setTransactionSearch}
             sortValue={transactionSort}
             onSortChange={setTransactionSort}
+            attachmentsAllowed={attachmentsAllowed}
           />
         </div>
       </Card>
@@ -803,6 +811,7 @@ export default function ProjectsPage() {
         }}
         onSubmit={handleTransactionSubmit}
         projectName={selectedProject?.name}
+        attachmentsAllowed={attachmentsAllowed}
       />
     </div>
   );

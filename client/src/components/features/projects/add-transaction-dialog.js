@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
-import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
+import { cn, formatFileSize, resolveAssetUrl } from "@/lib/utils";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -63,7 +64,14 @@ const validateAttachment = (file) => {
 };
 
 // Dialog used to capture transaction details.
-export default function AddTransactionDialog({ open, onOpenChange, onSubmit, projectName, initialData }) {
+export default function AddTransactionDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  projectName,
+  initialData,
+  attachmentsAllowed = true,
+}) {
   const [isSaving, setIsSaving] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
@@ -81,6 +89,7 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
     existingAttachment?.url,
     existingAttachment?.uploadedAt ?? existingAttachment?.updatedAt
   );
+  const attachmentsFeatureEnabled = attachmentsAllowed !== false;
 
   const replaceAttachmentPreview = useCallback((nextUrl) => {
     setAttachmentPreview((prev) => {
@@ -120,6 +129,7 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
   }, [open, initialData, form, resetAttachmentState]);
 
   const handleAttachmentChange = (event) => {
+    if (!attachmentsFeatureEnabled) return;
     const file = event.target.files?.[0];
     if (!file) return;
     const errorMessage = validateAttachment(file);
@@ -142,7 +152,7 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
   };
 
   const handleRemoveStoredAttachment = () => {
-    if (!existingAttachment) return;
+    if (!attachmentsFeatureEnabled || !existingAttachment) return;
     setAttachmentFile(null);
     replaceAttachmentPreview(null);
     setAttachmentError(null);
@@ -155,8 +165,9 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
     try {
       await onSubmit?.({
         ...values,
-        attachmentFile: attachmentFile ?? undefined,
-        removeAttachment: removeExistingAttachment && !attachmentFile ? true : undefined,
+        attachmentFile: attachmentsFeatureEnabled ? attachmentFile ?? undefined : undefined,
+        removeAttachment:
+          attachmentsFeatureEnabled && removeExistingAttachment && !attachmentFile ? true : undefined,
       });
       toast.success(isEditMode ? "Transaction updated" : "Transaction recorded");
       form.reset({ date: "", type: "income", amount: 0, subcategory: "", description: "" });
@@ -233,20 +244,44 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
           </div>
           <div className="grid gap-2">
             <Label>Attachment (optional)</Label>
+            {!attachmentsFeatureEnabled && (
+              <div className="flex flex-col gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-sm text-primary">
+                <p>Your current plans do not include access to attachment features.</p>
+                <Button asChild size="sm" variant="outline" className="w-fit">
+                  <Link href="/pricing">See Plans</Link>
+                </Button>
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"
               accept={ACCEPTED_ATTACHMENT_TYPES.join(",")}
               className="hidden"
               onChange={handleAttachmentChange}
-              disabled={isSaving}
+              disabled={isSaving || !attachmentsFeatureEnabled}
             />
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => attachmentsFeatureEnabled && fileInputRef.current?.click()}
+                className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                aria-disabled={!attachmentsFeatureEnabled}
+                disabled={isSaving || !attachmentsFeatureEnabled}
+              >
                 {attachmentFile ? "Change image" : "Upload image"}
               </Button>
               {attachmentFile ? (
-                <Button type="button" variant="ghost" size="sm" onClick={handleRemoveSelectedFile} disabled={isSaving}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveSelectedFile}
+                  className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                  aria-disabled={!attachmentsFeatureEnabled}
+                  disabled={isSaving || !attachmentsFeatureEnabled}
+                >
                   Clear selection
                 </Button>
               ) : null}
@@ -256,7 +291,9 @@ export default function AddTransactionDialog({ open, onOpenChange, onSubmit, pro
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveStoredAttachment}
-                  disabled={isSaving}
+                  className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                  aria-disabled={!attachmentsFeatureEnabled}
+                  disabled={isSaving || !attachmentsFeatureEnabled}
                 >
                   Remove stored image
                 </Button>
