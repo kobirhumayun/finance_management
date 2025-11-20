@@ -266,6 +266,8 @@ export default function AddTransactionDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => attachmentsFeatureEnabled && fileInputRef.current?.click()}
+                className={!attachmentsFeatureEnabled ? "cursor-not-allowed pointer-events-none" : undefined}
+                aria-disabled={!attachmentsFeatureEnabled}
                 disabled={isSaving || !attachmentsFeatureEnabled}
               >
                 {attachmentFile ? "Change image" : "Upload image"}
@@ -276,6 +278,8 @@ export default function AddTransactionDialog({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveSelectedFile}
+                  className={!attachmentsFeatureEnabled ? "cursor-not-allowed pointer-events-none" : undefined}
+                  aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >
                   Clear selection
@@ -287,6 +291,8 @@ export default function AddTransactionDialog({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveStoredAttachment}
+                  className={!attachmentsFeatureEnabled ? "cursor-not-allowed pointer-events-none" : undefined}
+                  aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >
                   Remove stored image
