@@ -1,7 +1,7 @@
 "use client";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 
 // Small table summarizing the latest transactions across projects.
 export default function RecentTransactionsTable({ transactions = [], isLoading }) {
@@ -33,6 +33,7 @@ export default function RecentTransactionsTable({ transactions = [], isLoading }
         <TableBody>
           {transactions.map((transaction) => {
             const projectLabel = transaction.projectName || transaction.projectId || "—";
+            const dateLabel = formatDate(transaction.date, { fallback: "—" });
 
             let parsedAmount = null;
             if (typeof transaction.amount === "number" && Number.isFinite(transaction.amount)) {
@@ -51,7 +52,7 @@ export default function RecentTransactionsTable({ transactions = [], isLoading }
                 : `${isExpense ? "-" : "+"}${formatCurrency(Math.abs(parsedAmount))}`;
             return (
               <TableRow key={transaction.id}>
-                <TableCell>{transaction.date}</TableCell>
+                <TableCell>{dateLabel}</TableCell>
                 <TableCell>{projectLabel}</TableCell>
                 <TableCell>{transaction.type}</TableCell>
                 <TableCell className="text-right font-medium">{formattedAmount}</TableCell>

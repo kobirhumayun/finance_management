@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import TransactionAttachmentDialog from "@/components/features/projects/transaction-attachment-dialog";
 
@@ -134,7 +134,7 @@ export default function TransactionTable({
                   typeof transaction?.subcategory === "string" && transaction.subcategory.trim().length
                     ? transaction.subcategory
                     : "Uncategorized";
-                const dateLabel = transaction?.date || "—";
+                const dateLabel = formatDate(transaction?.date, { fallback: "—" });
                 return (
                   <TableRow key={transactionId}>
                     <TableCell>{dateLabel}</TableCell>
@@ -229,7 +229,7 @@ export default function TransactionTable({
               typeof transaction?.subcategory === "string" && transaction.subcategory.trim().length
                 ? transaction.subcategory
                 : "Uncategorized";
-            const dateLabel = transaction?.date || "—";
+            const dateLabel = formatDate(transaction?.date, { fallback: "—" });
             return (
               <div key={transactionId} className="rounded-lg border p-4 shadow-sm">
                 <div className="flex items-center justify-between">
