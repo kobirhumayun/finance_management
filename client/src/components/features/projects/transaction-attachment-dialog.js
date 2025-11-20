@@ -49,7 +49,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
 
   return (
     <Dialog open={showDialog} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[calc(100vh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{transaction?.subcategory || "Transaction attachment"}</DialogTitle>
           <DialogDescription>

@@ -61,7 +61,7 @@ export default function AddProjectDialog({ open, onOpenChange, onSubmit, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit project" : "Create a new project"}</DialogTitle>
           <DialogDescription>
