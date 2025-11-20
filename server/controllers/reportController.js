@@ -192,6 +192,20 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
     timeStyle: 'short',
 });
 
+const formatDisplayDate = (value) => {
+    if (typeof value !== 'string') {
+        return value ?? '';
+    }
+
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+        return value;
+    }
+
+    const [, year, month, day] = match;
+    return `${day}-${month}-${year}`;
+};
+
 const formatAmount = (value) => amountFormatter.format(toSafeNumber(value));
 
 const buildSummaryHtml = ({
@@ -203,18 +217,19 @@ const buildSummaryHtml = ({
     generatedAt,
 }) => {
     const transactionRows = transactions
-        .map(
-            (transaction) => `
+        .map((transaction) => {
+            const displayDate = formatDisplayDate(transaction.date || '');
+            return `
                 <tr>
-                    <td>${escapeHtml(transaction.date)}</td>
+                    <td>${escapeHtml(displayDate)}</td>
                     <td>${escapeHtml(transaction.projectName || transaction.projectId || '')}</td>
                     <td>${escapeHtml(transaction.type)}</td>
                     <td>${escapeHtml(transaction.subcategory || '')}</td>
                     <td class="numeric">${escapeHtml(formatAmount(transaction.amount))}</td>
                     <td>${escapeHtml(transaction.description || '')}</td>
                 </tr>
-            `,
-        )
+            `;
+        })
         .join('');
 
     const projectRows = projectBreakdown
@@ -857,7 +872,7 @@ const getSummaryXlsx = async (req, res, next) => {
             const mapped = mapSummaryTransaction(doc);
             transactionsSheet
                 .addRow({
-                    date: mapped.date,
+                    date: formatDisplayDate(mapped.date || ''),
                     projectName: mapped.projectName || '',
                     type: mapped.type,
                     subcategory: mapped.subcategory || '',
