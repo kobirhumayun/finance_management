@@ -21,7 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
-import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
+import { cn, formatFileSize, resolveAssetUrl } from "@/lib/utils";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -266,6 +266,8 @@ export default function AddTransactionDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => attachmentsFeatureEnabled && fileInputRef.current?.click()}
+                className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                aria-disabled={!attachmentsFeatureEnabled}
                 disabled={isSaving || !attachmentsFeatureEnabled}
               >
                 {attachmentFile ? "Change image" : "Upload image"}
@@ -276,6 +278,8 @@ export default function AddTransactionDialog({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveSelectedFile}
+                  className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                  aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >
                   Clear selection
@@ -287,6 +291,8 @@ export default function AddTransactionDialog({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveStoredAttachment}
+                  className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                  aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >
                   Remove stored image
