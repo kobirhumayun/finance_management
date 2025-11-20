@@ -167,6 +167,7 @@ export default function ProjectsPage() {
     () => transactionsQuery.data?.pages ?? [],
     [transactionsQuery.data]
   );
+  const attachmentLimitBytes = transactionPages[0]?.attachmentLimitBytes ?? null;
   const transactions = useMemo(
     () =>
       transactionPages.flatMap((page) =>
@@ -812,6 +813,7 @@ export default function ProjectsPage() {
         onSubmit={handleTransactionSubmit}
         projectName={selectedProject?.name}
         attachmentsAllowed={attachmentsAllowed}
+        maxAttachmentBytes={attachmentLimitBytes}
       />
     </div>
   );
