@@ -21,7 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
-import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
+import { cn, formatFileSize, resolveAssetUrl } from "@/lib/utils";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -266,7 +266,7 @@ export default function AddTransactionDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => attachmentsFeatureEnabled && fileInputRef.current?.click()}
-                className={!attachmentsFeatureEnabled ? "cursor-not-allowed pointer-events-none" : undefined}
+                className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
                 aria-disabled={!attachmentsFeatureEnabled}
                 disabled={isSaving || !attachmentsFeatureEnabled}
               >
@@ -278,7 +278,7 @@ export default function AddTransactionDialog({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveSelectedFile}
-                  className={!attachmentsFeatureEnabled ? "cursor-not-allowed pointer-events-none" : undefined}
+                  className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
                   aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >
@@ -291,7 +291,7 @@ export default function AddTransactionDialog({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveStoredAttachment}
-                  className={!attachmentsFeatureEnabled ? "cursor-not-allowed pointer-events-none" : undefined}
+                  className={cn("disabled:pointer-events-auto", !attachmentsFeatureEnabled && "cursor-not-allowed")}
                   aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >

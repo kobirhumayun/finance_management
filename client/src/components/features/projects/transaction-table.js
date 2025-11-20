@@ -154,7 +154,10 @@ export default function TransactionTable({
                         <Button
                           variant="secondary"
                           size="sm"
-                          className={cn("whitespace-nowrap", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                          className={cn(
+                            "whitespace-nowrap disabled:pointer-events-auto",
+                            !attachmentsFeatureEnabled && "cursor-not-allowed"
+                          )}
                           onClick={() => openAttachmentDialog(transaction)}
                           disabled={!attachmentsFeatureEnabled || !transaction?.attachment}
                         >
@@ -249,7 +252,10 @@ export default function TransactionTable({
                   <Button
                     variant="secondary"
                     size="sm"
-                    className={cn("col-span-2", !attachmentsFeatureEnabled && "cursor-not-allowed")}
+                    className={cn(
+                      "col-span-2 disabled:pointer-events-auto",
+                      !attachmentsFeatureEnabled && "cursor-not-allowed"
+                    )}
                     onClick={() => openAttachmentDialog(transaction)}
                     disabled={!attachmentsFeatureEnabled || !transaction?.attachment}
                   >
