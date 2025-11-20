@@ -185,7 +185,7 @@ export default function AddTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit transaction" : "Add transaction"}</DialogTitle>
           <DialogDescription>
