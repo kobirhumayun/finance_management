@@ -1,7 +1,11 @@
 const Project = require('../models/Project');
 const Transaction = require('../models/Transaction');
 const { getPlanLimitsForUser } = require('../services/planLimits');
-const { saveTransactionAttachment, discardDescriptor } = require('../services/imageService');
+const {
+    saveTransactionAttachment,
+    discardDescriptor,
+    getUploadFileSizeLimit,
+} = require('../services/imageService');
 const { streamStoredFile } = require('../utils/storageStreamer');
 
 const {
@@ -452,6 +456,7 @@ const getTransactions = async (req, res, next) => {
                 nextCursor,
                 limit,
             },
+            attachmentLimitBytes: getUploadFileSizeLimit(),
         });
     } catch (error) {
         next(error);

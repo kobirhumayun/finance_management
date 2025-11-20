@@ -3,7 +3,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -33,10 +33,14 @@ const schema = z.object({
 
 const ACCEPTED_ATTACHMENT_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const DEFAULT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-const MAX_ATTACHMENT_BYTES =
-  Number(process.env.NEXT_PUBLIC_UPLOAD_MAX_BYTES) > 0
-    ? Number(process.env.NEXT_PUBLIC_UPLOAD_MAX_BYTES)
-    : DEFAULT_MAX_ATTACHMENT_BYTES;
+
+const resolveMaxAttachmentBytes = (value) => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_MAX_ATTACHMENT_BYTES;
+};
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
@@ -52,17 +56,6 @@ const getErrorMessage = (error, fallback) => {
   return error.message || fallback;
 };
 
-const validateAttachment = (file) => {
-  if (!file) return null;
-  if (file.size > MAX_ATTACHMENT_BYTES) {
-    return `File is too large. Max size is ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`;
-  }
-  if (file.type && !ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
-    return "Unsupported image format. Upload a PNG, JPG, or WebP file.";
-  }
-  return null;
-};
-
 // Dialog used to capture transaction details.
 export default function AddTransactionDialog({
   open,
@@ -71,6 +64,7 @@ export default function AddTransactionDialog({
   projectName,
   initialData,
   attachmentsAllowed = true,
+  maxAttachmentBytes,
 }) {
   const [isSaving, setIsSaving] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
@@ -78,6 +72,23 @@ export default function AddTransactionDialog({
   const [attachmentError, setAttachmentError] = useState(null);
   const [removeExistingAttachment, setRemoveExistingAttachment] = useState(false);
   const fileInputRef = useRef(null);
+  const resolvedMaxAttachmentBytes = useMemo(
+    () => resolveMaxAttachmentBytes(maxAttachmentBytes),
+    [maxAttachmentBytes]
+  );
+  const validateAttachment = useCallback(
+    (file) => {
+      if (!file) return null;
+      if (file.size > resolvedMaxAttachmentBytes) {
+        return `File is too large. Max size is ${formatFileSize(resolvedMaxAttachmentBytes)}.`;
+      }
+      if (file.type && !ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
+        return "Unsupported image format. Upload a PNG, JPG, or WebP file.";
+      }
+      return null;
+    },
+    [resolvedMaxAttachmentBytes]
+  );
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: { date: "", type: "income", amount: 0, subcategory: "", description: "" },
@@ -175,8 +186,12 @@ export default function AddTransactionDialog({
       onOpenChange(false);
     } catch (error) {
       const message = getErrorMessage(error, "Unable to save transaction");
-      setAttachmentError(message);
-      toast.error(message);
+      const normalizedMessage =
+        typeof message === "string" && message.toLowerCase().includes("file too large")
+          ? `File is too large. Max size is ${formatFileSize(resolvedMaxAttachmentBytes)}.`
+          : message;
+      setAttachmentError(normalizedMessage);
+      toast.error(normalizedMessage);
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -185,7 +200,7 @@ export default function AddTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl max-h-[min(90vh,calc(100vh-2rem))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit transaction" : "Add transaction"}</DialogTitle>
           <DialogDescription>
@@ -306,7 +321,7 @@ export default function AddTransactionDialog({
                 ? `Currently stored: ${existingAttachment.filename || "Attachment"} (${formatFileSize(existingAttachment.size, {
                     fallback: "unknown size",
                   })})`
-                : `PNG, JPG, or WebP up to ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`}
+                : `PNG, JPG, or WebP up to ${formatFileSize(resolvedMaxAttachmentBytes)}.`}
             </p>
             {removeExistingAttachment && !attachmentFile ? (
               <p className="text-xs text-muted-foreground">The current attachment will be removed when you save.</p>

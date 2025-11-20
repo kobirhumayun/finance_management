@@ -138,8 +138,12 @@ export async function listProjectTransactions({
   };
 
   const project = response?.project ? normalizeProject(response.project) : null;
+  const attachmentLimitBytes =
+    typeof response?.attachmentLimitBytes === "number"
+      ? response.attachmentLimitBytes
+      : null;
 
-  return { project, transactions, summary, pageInfo };
+  return { project, transactions, summary, pageInfo, attachmentLimitBytes };
 }
 
 export async function createProject(input, { signal } = {}) {
