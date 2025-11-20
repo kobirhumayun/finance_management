@@ -9,11 +9,11 @@ const dashboardSummary = {
 };
 
 const recentTransactions = [
-  { id: "txn-1", projectId: "proj-1", date: "2025-01-14", type: "Income", category: "Retainer", amount: 4200 },
-  { id: "txn-2", projectId: "proj-2", date: "2025-01-12", type: "Expense", category: "Advertising", amount: 940 },
-  { id: "txn-3", projectId: "proj-3", date: "2025-01-10", type: "Income", category: "Consulting", amount: 2800 },
-  { id: "txn-4", projectId: "proj-1", date: "2025-01-09", type: "Expense", category: "Software", amount: 460 },
-  { id: "txn-5", projectId: "proj-4", date: "2025-01-07", type: "Income", category: "Subscription", amount: 1300 },
+  { id: "txn-1", projectId: "proj-1", date: "14-01-2025", type: "Income", category: "Retainer", amount: 4200 },
+  { id: "txn-2", projectId: "proj-2", date: "12-01-2025", type: "Expense", category: "Advertising", amount: 940 },
+  { id: "txn-3", projectId: "proj-3", date: "10-01-2025", type: "Income", category: "Consulting", amount: 2800 },
+  { id: "txn-4", projectId: "proj-1", date: "09-01-2025", type: "Expense", category: "Software", amount: 460 },
+  { id: "txn-5", projectId: "proj-4", date: "07-01-2025", type: "Income", category: "Subscription", amount: 1300 },
 ];
 
 const mockProjects = [
@@ -21,45 +21,45 @@ const mockProjects = [
     id: "proj-1",
     name: "Marketing Revamp",
     description: "Rebuilding acquisition funnels across paid and organic channels.",
-    createdAt: "2024-11-02",
+    createdAt: "02-11-2024",
   },
   {
     id: "proj-2",
     name: "Mobile Application",
     description: "Feature roadmap and release management for the consumer app.",
-    createdAt: "2024-12-11",
+    createdAt: "11-12-2024",
   },
   {
     id: "proj-3",
     name: "Enterprise Rollout",
     description: "Implementation for enterprise clients with custom integrations.",
-    createdAt: "2025-01-05",
+    createdAt: "05-01-2025",
   },
   {
     id: "proj-4",
     name: "Support Automation",
     description: "Self-service tooling to reduce inbound support requests.",
-    createdAt: "2024-10-24",
+    createdAt: "24-10-2024",
   },
 ];
 
 const mockTransactionsByProject = {
   "proj-1": [
-    { id: "txn-10", date: "2025-01-12", type: "Income", description: "Quarterly retainer", subcategory: "Retainer", amount: 4200 },
-    { id: "txn-11", date: "2025-01-10", type: "Expense", description: "Design tooling", subcategory: "Software", amount: 340 },
-    { id: "txn-12", date: "2025-01-07", type: "Expense", description: "Freelance copy", subcategory: "Contractor", amount: 520 },
+    { id: "txn-10", date: "12-01-2025", type: "Income", description: "Quarterly retainer", subcategory: "Retainer", amount: 4200 },
+    { id: "txn-11", date: "10-01-2025", type: "Expense", description: "Design tooling", subcategory: "Software", amount: 340 },
+    { id: "txn-12", date: "07-01-2025", type: "Expense", description: "Freelance copy", subcategory: "Contractor", amount: 520 },
   ],
   "proj-2": [
-    { id: "txn-20", date: "2025-01-09", type: "Income", description: "iOS release milestone", subcategory: "Milestone", amount: 3200 },
-    { id: "txn-21", date: "2025-01-06", type: "Expense", description: "App Store fees", subcategory: "Operations", amount: 299 },
+    { id: "txn-20", date: "09-01-2025", type: "Income", description: "iOS release milestone", subcategory: "Milestone", amount: 3200 },
+    { id: "txn-21", date: "06-01-2025", type: "Expense", description: "App Store fees", subcategory: "Operations", amount: 299 },
   ],
   "proj-3": [
-    { id: "txn-30", date: "2025-01-14", type: "Income", description: "Integration consulting", subcategory: "Consulting", amount: 2800 },
-    { id: "txn-31", date: "2025-01-08", type: "Expense", description: "Data warehouse credits", subcategory: "Infrastructure", amount: 620 },
+    { id: "txn-30", date: "14-01-2025", type: "Income", description: "Integration consulting", subcategory: "Consulting", amount: 2800 },
+    { id: "txn-31", date: "08-01-2025", type: "Expense", description: "Data warehouse credits", subcategory: "Infrastructure", amount: 620 },
   ],
   "proj-4": [
-    { id: "txn-40", date: "2025-01-10", type: "Expense", description: "Automation tooling", subcategory: "Software", amount: 460 },
-    { id: "txn-41", date: "2025-01-09", type: "Income", description: "SaaS upsell", subcategory: "Subscription", amount: 1300 },
+    { id: "txn-40", date: "10-01-2025", type: "Expense", description: "Automation tooling", subcategory: "Software", amount: 460 },
+    { id: "txn-41", date: "09-01-2025", type: "Income", description: "SaaS upsell", subcategory: "Subscription", amount: 1300 },
   ],
 };
 
@@ -142,9 +142,9 @@ const adminPlans = plans.map((plan, index) => ({
 }));
 
 const adminPayments = [
-  { id: "pay-01", user: "kobirhumayun", amount: 99, method: "Mobile Banking", status: "Pending", submittedAt: "2025-01-12" },
-  { id: "pay-02", user: "finops", amount: 249, method: "Wire", status: "Pending", submittedAt: "2025-01-10" },
-  { id: "pay-03", user: "strategist", amount: 29, method: "Card", status: "Approved", submittedAt: "2025-01-07" },
+  { id: "pay-01", user: "kobirhumayun", amount: 99, method: "Mobile Banking", status: "Pending", submittedAt: "12-01-2025" },
+  { id: "pay-02", user: "finops", amount: 249, method: "Wire", status: "Pending", submittedAt: "10-01-2025" },
+  { id: "pay-03", user: "strategist", amount: 29, method: "Card", status: "Approved", submittedAt: "07-01-2025" },
 ];
 
 export async function fetchDashboardSummary() {
