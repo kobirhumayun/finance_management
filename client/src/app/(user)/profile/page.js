@@ -44,7 +44,7 @@ import {
   uploadProfilePicture,
   deleteProfilePicture,
 } from "@/lib/queries/self";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 
 const profileSchema = z.object({
   username: z
@@ -75,7 +75,15 @@ const profileSchema = z.object({
 });
 
 const ORDER_PAGE_SIZE = 10;
-const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const DEFAULT_PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+const resolveProfileImageMaxBytes = (value) => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_PROFILE_IMAGE_MAX_BYTES;
+};
 
 const ORDER_STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -225,6 +233,10 @@ export default function ProfilePage() {
   const profile = profileQuery.data;
   const profilePhotoUrl = profile?.profilePictureUrl;
   const profilePhotoUpdatedAt = profile?.profileImage?.uploadedAt;
+  const profileImageMaxBytes = useMemo(
+    () => resolveProfileImageMaxBytes(profile?.profileImageLimitBytes),
+    [profile?.profileImageLimitBytes]
+  );
   const settings = settingsQuery.data;
 
   const form = useForm({
@@ -428,13 +440,15 @@ export default function ProfilePage() {
         toast.error("Please choose an image file (PNG, JPG, or WebP).");
         return;
       }
-      if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-        toast.error("Profile photos must be 5 MB or smaller.");
+      if (file.size > profileImageMaxBytes) {
+        toast.error(
+          `Profile photos must be ${formatFileSize(profileImageMaxBytes, { fallback: "5 MB" })} or smaller.`
+        );
         return;
       }
       uploadProfilePictureMutation.mutate({ file });
     },
-    [uploadProfilePictureMutation]
+    [profileImageMaxBytes, uploadProfilePictureMutation]
   );
 
   const handleAvatarRemove = useCallback(() => {
@@ -482,6 +496,7 @@ export default function ProfilePage() {
               isUploading={uploadProfilePictureMutation.isPending}
               isRemoving={deleteProfilePictureMutation.isPending}
               disabled={isProfileLoading}
+              maxUploadBytes={profileImageMaxBytes}
             />
             <Form {...form}>
               <form className="space-y-4" onSubmit={handleSubmit}>

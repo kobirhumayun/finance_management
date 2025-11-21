@@ -1,9 +1,19 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { resolveAssetUrl } from "@/lib/utils";
+import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
+
+const DEFAULT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+const resolveMaxUploadBytes = (value) => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_MAX_UPLOAD_BYTES;
+};
 
 const formatTimestamp = (value) => {
   if (!value) return null;
@@ -26,6 +36,7 @@ export default function ProfileAvatarUploader({
   isUploading,
   isRemoving,
   disabled,
+  maxUploadBytes,
 }) {
   const fileInputRef = useRef(null);
   const rawAvatarUrl = typeof avatarUrl === "string" ? avatarUrl : "";
@@ -41,6 +52,10 @@ export default function ProfileAvatarUploader({
 
   const hasAvatar = Boolean(resolvedAvatarUrl);
   const lastUpdatedLabel = formatTimestamp(lastUpdated);
+  const resolvedMaxUploadBytes = useMemo(
+    () => resolveMaxUploadBytes(maxUploadBytes),
+    [maxUploadBytes]
+  );
 
   const handleSelectClick = () => {
     fileInputRef.current?.click();
@@ -89,7 +104,8 @@ export default function ProfileAvatarUploader({
           <p className="text-xs text-muted-foreground">Last updated on {lastUpdatedLabel}</p>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          PNG, JPG, or WebP up to 5&nbsp;MB. Images stay on this server—no third-party processing.
+          PNG, JPG, or WebP up to {formatFileSize(resolvedMaxUploadBytes, { fallback: "5 MB" })}. Images stay on this
+          server—no third-party processing.
         </p>
       </div>
     </div>
