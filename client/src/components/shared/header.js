@@ -65,6 +65,14 @@ export default function Header({ variant = "public", onMenuClick }) {
   }, [searchTerm]);
 
   useEffect(() => {
+    if (hasSearchTerm) {
+      setIsSearchOpen(true);
+      projectsQuery.refetch();
+      transactionsQuery.refetch();
+    }
+  }, [hasSearchTerm, projectsQuery, transactionsQuery]);
+
+  useEffect(() => {
     if (isSearchOpen) {
       requestAnimationFrame(() => {
         searchInputRef.current?.focus();
@@ -194,7 +202,10 @@ export default function Header({ variant = "public", onMenuClick }) {
                   value={searchTerm}
                   ref={searchInputRef}
                   onFocus={() => setIsSearchOpen(true)}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => {
+                    setIsSearchOpen(true);
+                    setSearchTerm(event.target.value);
+                  }}
                 />
                 {isLoadingResults ? (
                   <Loader2 className="absolute right-3 h-4 w-4 animate-spin text-muted-foreground" />

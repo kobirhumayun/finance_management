@@ -132,9 +132,6 @@ export default function ProjectsPage() {
   );
 
   const updateUrlSelection = (projectId, transactionId = null) => {
-    setSelectedProjectId(projectId ?? null);
-    setHighlightTransactionId(transactionId ?? null);
-
     const params = new URLSearchParams(searchParams.toString());
 
     if (projectId) {
@@ -151,7 +148,17 @@ export default function ProjectsPage() {
 
     const queryString = params.toString();
     const basePath = "/projects";
-    router.replace(queryString ? `${basePath}?${queryString}` : basePath, { scroll: false });
+    const nextUrl = queryString ? `${basePath}?${queryString}` : basePath;
+    const currentUrl = searchParams.toString()
+      ? `${basePath}?${searchParams.toString()}`
+      : basePath;
+
+    if (nextUrl !== currentUrl) {
+      router.replace(nextUrl, { scroll: false });
+    }
+
+    setSelectedProjectId(projectId ?? null);
+    setHighlightTransactionId(transactionId ?? null);
   };
 
   useEffect(() => {
