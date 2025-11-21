@@ -179,6 +179,39 @@ const streamTransactionAttachment = async (req, res, next) => {
     }
 };
 
+const searchGlobalTransactions = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        const { search, limit: limitParam } = req.query;
+
+        const trimmedSearch = typeof search === 'string' ? search.trim() : '';
+
+        if (!trimmedSearch) {
+            return res.status(200).json({ transactions: [] });
+        }
+
+        const limit = clampLimit(limitParam, { defaultValue: 10, max: 20 });
+        const userIdentifier = toObjectIdOrNull(userId) ?? userId;
+        const expression = new RegExp(escapeRegex(trimmedSearch), 'i');
+
+        const transactions = await Transaction.find({
+            user_id: userIdentifier,
+            $or: [
+                { description: { $regex: expression } },
+                { subcategory: { $regex: expression } },
+            ],
+        })
+            .sort({ transaction_date: -1, _id: -1 })
+            .limit(limit)
+            .populate({ path: 'project_id', select: { name: 1 } })
+            .lean();
+
+        res.status(200).json({ transactions: transactions.map(mapTransaction) });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const createProject = async (req, res, next) => {
     try {
         const userId = req.user?._id;
@@ -770,4 +803,5 @@ module.exports = {
     updateTransaction,
     deleteTransaction,
     streamTransactionAttachment,
+    searchGlobalTransactions,
 };

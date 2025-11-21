@@ -2,6 +2,7 @@
 import { apiJSON } from "@/lib/api";
 
 const PROJECTS_ENDPOINT = "/api/projects";
+const GLOBAL_TRANSACTION_SEARCH_ENDPOINT = `${PROJECTS_ENDPOINT}/search/global-transactions`;
 
 const buildQueryString = (params = {}) => {
   const searchParams = new URLSearchParams();
@@ -226,4 +227,18 @@ export async function deleteTransaction({ projectId, transactionId }, { signal }
     method: "DELETE",
     signal,
   });
+}
+
+export async function searchGlobalTransactions({ search, limit, signal } = {}) {
+  const queryString = buildQueryString({ search, limit });
+  const response = await apiJSON(`${GLOBAL_TRANSACTION_SEARCH_ENDPOINT}${queryString}`, {
+    method: "GET",
+    signal,
+  });
+
+  const transactions = Array.isArray(response?.transactions)
+    ? response.transactions.map(normalizeTransaction).filter(Boolean)
+    : [];
+
+  return { transactions };
 }

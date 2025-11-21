@@ -178,6 +178,17 @@ const transactionListValidationRules = () => [
         .trim(),
 ];
 
+const globalTransactionSearchValidationRules = () => [
+    query('search')
+        .isString().withMessage('Search term must be a string.')
+        .trim()
+        .isLength({ min: 1, max: 200 }).withMessage('Search term must be between 1 and 200 characters.'),
+    query('limit')
+        .optional()
+        .isInt({ min: 1, max: 20 }).withMessage('Limit must be between 1 and 20 records.')
+        .toInt(),
+];
+
 module.exports = {
     projectCreateValidationRules,
     projectUpdateValidationRules,
@@ -187,4 +198,5 @@ module.exports = {
     transactionUpdateValidationRules,
     transactionIdParamValidationRules,
     transactionListValidationRules,
+    globalTransactionSearchValidationRules,
 };

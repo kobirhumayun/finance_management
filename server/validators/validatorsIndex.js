@@ -66,6 +66,7 @@ module.exports = {
     transactionUpdateValidationRules: projectValidators.transactionUpdateValidationRules,
     transactionIdParamValidationRules: projectValidators.transactionIdParamValidationRules,
     transactionListValidationRules: projectValidators.transactionListValidationRules,
+    globalTransactionSearchValidationRules: projectValidators.globalTransactionSearchValidationRules,
     summaryListValidationRules: reportValidators.summaryListValidationRules,
     reportChartsValidationRules: reportValidators.reportChartsValidationRules,
     listOrdersValidationRules: orderValidators.listOrdersValidationRules,

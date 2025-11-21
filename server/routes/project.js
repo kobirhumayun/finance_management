@@ -12,10 +12,18 @@ const {
     transactionUpdateValidationRules,
     transactionIdParamValidationRules,
     transactionListValidationRules,
+    globalTransactionSearchValidationRules,
     handleValidationErrors,
 } = require('../validators/validatorsIndex');
 
 router.use(authenticate);
+
+router.get(
+    '/search/global-transactions',
+    globalTransactionSearchValidationRules(),
+    handleValidationErrors,
+    projectController.searchGlobalTransactions,
+);
 
 router.get(
     '/',
