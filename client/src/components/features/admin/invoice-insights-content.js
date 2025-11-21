@@ -127,30 +127,49 @@ const BreakdownTable = ({ title, description, rows, emptyLabel = "No data", valu
       <CardTitle className="text-base">{title}</CardTitle>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </CardHeader>
-    <CardContent>
+    <CardContent className="space-y-4">
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Segment</TableHead>
-                <TableHead className="text-right">Invoices</TableHead>
-                <TableHead className="text-right">Billed</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.key ?? row.label}>
-                  <TableCell>{row.label}</TableCell>
-                  <TableCell className="text-right">{formatInvoiceCount(row.count)}</TableCell>
-                  <TableCell className="text-right">{valueFormatter(row)}</TableCell>
+        <>
+          <div className="space-y-3 md:hidden">
+            {rows.map((row) => (
+              <div key={row.key ?? row.label} className="rounded-lg border bg-card p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-medium leading-tight">{row.label}</div>
+                  <div className="text-right text-sm font-semibold">
+                    {valueFormatter(row)}
+                    <div className="text-xs font-normal text-muted-foreground">Billed</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Invoices</span>
+                  <span className="font-semibold">{formatInvoiceCount(row.count)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Segment</TableHead>
+                  <TableHead className="text-right">Invoices</TableHead>
+                  <TableHead className="text-right">Billed</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.key ?? row.label}>
+                    <TableCell>{row.label}</TableCell>
+                    <TableCell className="text-right">{formatInvoiceCount(row.count)}</TableCell>
+                    <TableCell className="text-right">{valueFormatter(row)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </CardContent>
   </Card>
@@ -346,7 +365,29 @@ function TopCustomersSection({ customers, hasMore, isFetchingNextPage, onLoadMor
             <p className="text-sm text-muted-foreground">No customers match the current filters.</p>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 md:hidden">
+                {customers.map((customer) => (
+                  <div key={customer.userId ?? customer.displayName} className="rounded-lg border bg-card p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="font-medium leading-tight">{customer.displayName}</div>
+                        {customer.userEmail ? (
+                          <div className="text-xs text-muted-foreground">{customer.userEmail}</div>
+                        ) : null}
+                      </div>
+                      <div className="text-right text-sm font-semibold">
+                        {formatAmount(customer.totalAmount, customer.currency)}
+                        <div className="text-xs font-normal text-muted-foreground">Total billed</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Invoices</span>
+                      <span className="font-semibold">{formatInvoiceCount(customer.count)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -359,10 +400,12 @@ function TopCustomersSection({ customers, hasMore, isFetchingNextPage, onLoadMor
                     {customers.map((customer) => (
                       <TableRow key={customer.userId ?? customer.displayName}>
                         <TableCell>
-                          <div className="font-medium">{customer.displayName}</div>
-                          {customer.userEmail ? (
-                            <div className="text-xs text-muted-foreground">{customer.userEmail}</div>
-                          ) : null}
+                          <div className="space-y-0.5">
+                            <div className="font-medium">{customer.displayName}</div>
+                            {customer.userEmail ? (
+                              <div className="text-xs text-muted-foreground">{customer.userEmail}</div>
+                            ) : null}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">{formatInvoiceCount(customer.count)}</TableCell>
                         <TableCell className="text-right">{formatAmount(customer.totalAmount, customer.currency)}</TableCell>
@@ -378,6 +421,7 @@ function TopCustomersSection({ customers, hasMore, isFetchingNextPage, onLoadMor
                   size="sm"
                   onClick={onLoadMore}
                   disabled={!hasMore || isFetchingNextPage}
+                  className="w-full md:w-auto"
                 >
                   {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All customers loaded"}
                 </Button>
@@ -418,7 +462,74 @@ function InvoiceListSection({
             <p className="text-sm text-muted-foreground">No invoices match the current filters.</p>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 md:hidden">
+                {invoices.map((invoice) => {
+                  const isSelected = selectedInvoiceNumber === invoice.invoiceNumber;
+
+                  return (
+                    <div
+                      key={invoice.id ?? invoice.invoiceNumber}
+                      className={cn(
+                        "rounded-lg border bg-card p-4 shadow-sm transition-colors",
+                        isSelected && "border-primary/50 ring-1 ring-primary/30",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Invoice</div>
+                          <div className="text-lg font-semibold leading-tight">{invoice.invoiceNumber}</div>
+                          {invoice.planName ? (
+                            <div className="text-xs text-muted-foreground">Plan: {invoice.planName}</div>
+                          ) : null}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground">Amount</div>
+                          <div className="text-base font-semibold">
+                            {formatAmount(invoice.amount, invoice.currency)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{formatDateOnly(invoice.issuedDate)}</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">Customer</span>
+                          <span className="text-right font-medium">
+                            {invoice.userName}
+                            {invoice.userEmail ? (
+                              <span className="block text-xs text-muted-foreground">{invoice.userEmail}</span>
+                            ) : null}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">Status</span>
+                          <Badge
+                            variant={
+                              invoice.status === "paid"
+                                ? "outline"
+                                : invoice.status === "cancelled"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {invoice.statusLabel || formatStatusLabel(invoice.status)}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => onSelect(invoice.invoiceNumber, event.currentTarget)}
+                        >
+                          View details
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -498,6 +609,7 @@ function InvoiceListSection({
                   size="sm"
                   onClick={onLoadMore}
                   disabled={!hasMore || isFetchingNextPage}
+                  className="w-full md:w-auto"
                 >
                   {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All invoices loaded"}
                 </Button>
