@@ -27,6 +27,8 @@ export default function Footer() {
                   href={link.href}
                   aria-label={link.name}
                   className="hover:text-foreground"
+                  target="_blank"
+                  rel="noreferrer"
                 >
                   <Icon className="h-4 w-4" />
                 </Link>
