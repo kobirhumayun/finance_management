@@ -4,9 +4,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import ThemeToggle from "@/components/shared/theme-toggle";
 import UserNav from "@/components/shared/user-nav";
 import Logo from "@/components/shared/logo";
@@ -27,10 +26,6 @@ export default function Header({ variant = "public", onMenuClick }) {
           </Button>
         </div>
         <div className="flex flex-1 items-center justify-end gap-3">
-          <div className="relative hidden max-w-sm flex-1 items-center gap-2 md:flex">
-            <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search..." aria-label="Search dashboard" />
-          </div>
           <ThemeToggle />
           <Button variant="ghost" size="icon" aria-label="View notifications">
             <Bell className="h-5 w-5" />
