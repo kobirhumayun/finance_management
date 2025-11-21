@@ -101,30 +101,52 @@ const BreakdownTable = ({
       <CardTitle className="text-base">{title}</CardTitle>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </CardHeader>
-    <CardContent>
+    <CardContent className="space-y-4">
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Segment</TableHead>
-                <TableHead className="text-right">{countLabel}</TableHead>
-                <TableHead className="text-right">{amountLabel}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.key ?? row.label}>
-                  <TableCell>{row.label}</TableCell>
-                  <TableCell className="text-right">{formatCount(row.count)}</TableCell>
-                  <TableCell className="text-right">{valueFormatter(row)}</TableCell>
+        <>
+          <div className="space-y-3 md:hidden">
+            {rows.map((row) => (
+              <div
+                key={row.key ?? row.label}
+                className="rounded-lg border bg-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-medium leading-tight">{row.label}</div>
+                  <div className="text-right text-sm font-semibold">
+                    {valueFormatter(row)}
+                    <div className="text-xs font-normal text-muted-foreground">{amountLabel}</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{countLabel}</span>
+                  <span className="font-semibold">{formatCount(row.count)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Segment</TableHead>
+                  <TableHead className="text-right">{countLabel}</TableHead>
+                  <TableHead className="text-right">{amountLabel}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.key ?? row.label}>
+                    <TableCell>{row.label}</TableCell>
+                    <TableCell className="text-right">{formatCount(row.count)}</TableCell>
+                    <TableCell className="text-right">{valueFormatter(row)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </CardContent>
   </Card>
