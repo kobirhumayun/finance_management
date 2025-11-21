@@ -76,6 +76,7 @@ const profileSchema = z.object({
 
 const ORDER_PAGE_SIZE = 10;
 const DEFAULT_PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 const resolveProfileImageMaxBytes = (value) => {
   const parsed = Number(value);
@@ -225,6 +226,7 @@ export default function ProfilePage() {
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const [detailAnchorElement, setDetailAnchorElement] = useState(null);
   const [hoveredOrderNumber, setHoveredOrderNumber] = useState(null);
+  const [avatarError, setAvatarError] = useState(null);
 
   const [profileQuery, settingsQuery] = useQueries({
     queries: [selfProfileQueryOptions(), selfSettingsQueryOptions()],
@@ -296,12 +298,19 @@ export default function ProfilePage() {
       await queryClient.cancelQueries({ queryKey: qk.self.profile() });
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, "Unable to upload your profile photo."));
+      const message = getErrorMessage(error, "Unable to upload your profile photo.");
+      const normalizedMessage =
+        typeof message === "string" && message.toLowerCase().includes("file too large")
+          ? `Profile photos must be ${formatFileSize(profileImageMaxBytes, { fallback: "5 MB" })} or smaller.`
+          : message;
+      setAvatarError(normalizedMessage);
+      toast.error(normalizedMessage);
     },
     onSuccess: (data) => {
       if (data) {
         queryClient.setQueryData(qk.self.profile(), data);
       }
+      setAvatarError(null);
       toast.success("Profile photo updated.");
     },
     onSettled: () => {
@@ -436,16 +445,25 @@ export default function ProfilePage() {
       if (!file) {
         return;
       }
-      if (!file.type?.startsWith("image/")) {
-        toast.error("Please choose an image file (PNG, JPG, or WebP).");
+      const validateAttachment = () => {
+        if (file.size > profileImageMaxBytes) {
+          return `Profile photos must be ${formatFileSize(profileImageMaxBytes, { fallback: "5 MB" })} or smaller.`;
+        }
+        if (file.type && !ACCEPTED_AVATAR_TYPES.includes(file.type)) {
+          return "Please choose an image file (PNG, JPG, or WebP).";
+        }
+        if (!file.type?.startsWith("image/")) {
+          return "Please choose an image file (PNG, JPG, or WebP).";
+        }
+        return null;
+      };
+
+      const errorMessage = validateAttachment();
+      if (errorMessage) {
+        setAvatarError(errorMessage);
         return;
       }
-      if (file.size > profileImageMaxBytes) {
-        toast.error(
-          `Profile photos must be ${formatFileSize(profileImageMaxBytes, { fallback: "5 MB" })} or smaller.`
-        );
-        return;
-      }
+      setAvatarError(null);
       uploadProfilePictureMutation.mutate({ file });
     },
     [profileImageMaxBytes, uploadProfilePictureMutation]
@@ -455,6 +473,7 @@ export default function ProfilePage() {
     if (!profilePhotoUrl) {
       return;
     }
+    setAvatarError(null);
     deleteProfilePictureMutation.mutate();
   }, [deleteProfilePictureMutation, profilePhotoUrl]);
 
@@ -497,6 +516,7 @@ export default function ProfilePage() {
               isRemoving={deleteProfilePictureMutation.isPending}
               disabled={isProfileLoading}
               maxUploadBytes={profileImageMaxBytes}
+              errorMessage={avatarError}
             />
             <Form {...form}>
               <form className="space-y-4" onSubmit={handleSubmit}>

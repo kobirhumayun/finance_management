@@ -37,6 +37,7 @@ export default function ProfileAvatarUploader({
   isRemoving,
   disabled,
   maxUploadBytes,
+  errorMessage,
 }) {
   const fileInputRef = useRef(null);
   const rawAvatarUrl = typeof avatarUrl === "string" ? avatarUrl : "";
@@ -107,6 +108,7 @@ export default function ProfileAvatarUploader({
           PNG, JPG, or WebP up to {formatFileSize(resolvedMaxUploadBytes, { fallback: "5 MB" })}. Images stay on this
           server—no third-party processing.
         </p>
+        {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
       </div>
     </div>
   );
