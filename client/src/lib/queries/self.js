@@ -132,6 +132,8 @@ const normalizeProfile = (profile) => {
       }
     : null;
 
+  const profileImageLimitBytes = toNumber(profile.profileImageLimitBytes, { fallback: null });
+
   return {
     id: profile.id ?? profile._id ?? "",
     username: profile.username ?? "",
@@ -160,6 +162,7 @@ const normalizeProfile = (profile) => {
       lastLoginAt: metadata.lastLoginAt ?? null,
       createdAt: metadata.createdAt ?? null,
     },
+    profileImageLimitBytes,
   };
 };
 

@@ -237,6 +237,7 @@ const buildProfileResponse = (userDoc) => {
         || userDoc.username;
 
     const profileImage = mapProfileImage(userDoc.profileImage, userDoc._id);
+    const profileImageLimitBytes = imageService.getUploadFileSizeLimit();
 
     return {
         id: userDoc._id,
@@ -247,6 +248,7 @@ const buildProfileResponse = (userDoc) => {
         displayName: computedDisplayName,
         profilePictureUrl: profileImage?.url || userDoc.profilePictureUrl || '',
         profileImage,
+        profileImageLimitBytes,
         subscription: {
             plan: planDoc,
             status: userDoc.subscriptionStatus,
