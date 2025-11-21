@@ -2,8 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { Facebook, Github, Linkedin } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { siteConfig } from "@/config/site";
 
 // Marketing footer displayed on all public pages.
 export default function Footer() {
@@ -19,15 +19,19 @@ export default function Footer() {
             <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>
           </div>
           <div className="flex items-center gap-3 text-muted-foreground">
-            <Link href="https://facebook.com" aria-label="Facebook" className="hover:text-foreground">
-              <Facebook className="h-4 w-4" />
-            </Link>
-            <Link href="https://github.com" aria-label="GitHub" className="hover:text-foreground">
-              <Github className="h-4 w-4" />
-            </Link>
-            <Link href="https://linkedin.com" aria-label="LinkedIn" className="hover:text-foreground">
-              <Linkedin className="h-4 w-4" />
-            </Link>
+            {siteConfig.socialLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  aria-label={link.name}
+                  className="hover:text-foreground"
+                >
+                  <Icon className="h-4 w-4" />
+                </Link>
+              );
+            })}
           </div>
         </div>
         <Separator className="my-6" />
