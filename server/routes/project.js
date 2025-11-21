@@ -25,6 +25,11 @@ router.get(
 );
 
 router.get(
+    '/search/global-transactions',
+    projectController.searchGlobalTransactions
+);
+
+router.get(
     '/:projectId',
     projectIdParamValidationRules(),
     handleValidationErrors,

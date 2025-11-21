@@ -227,6 +227,53 @@ const createProject = async (req, res, next) => {
     }
 };
 
+const searchGlobalTransactions = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        const { search } = req.query;
+
+        if (!search || typeof search !== 'string' || !search.trim()) {
+            return res.status(200).json({ transactions: [] });
+        }
+
+        const expression = new RegExp(escapeRegex(search.trim()), 'i');
+        const query = {
+            user_id: userId,
+            $or: [
+                { description: { $regex: expression } },
+                { subcategory: { $regex: expression } },
+            ],
+        };
+
+        const transactions = await Transaction.find(query)
+            .sort({ transaction_date: -1 })
+            .limit(10)
+            .populate('project_id', 'name currency')
+            .lean();
+
+        // Map transactions to include project details
+        const formattedTransactions = transactions.map(t => {
+            const mapped = mapTransaction(t);
+            // mapTransaction in utils might handle population if structure matches
+            // but let's ensure project details are set if mapTransaction doesn't do it fully for populated fields
+            // Looking at mapTransaction in utils, it uses extractProjectReference which handles object
+            // So mapped.projectName should be set correctly if t.project_id is an object with name.
+            return {
+              ...mapped,
+              project: t.project_id ? {
+                  id: t.project_id._id.toString(),
+                  name: t.project_id.name,
+                  currency: t.project_id.currency
+              } : null
+            };
+        });
+
+        res.status(200).json({ transactions: formattedTransactions });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const updateProject = async (req, res, next) => {
     try {
         const userId = req.user?._id;
@@ -770,4 +817,5 @@ module.exports = {
     updateTransaction,
     deleteTransaction,
     streamTransactionAttachment,
+    searchGlobalTransactions,
 };

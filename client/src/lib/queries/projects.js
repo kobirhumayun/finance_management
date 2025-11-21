@@ -218,6 +218,29 @@ export async function updateTransaction(
   });
 }
 
+export async function searchGlobalTransactions({ search, signal } = {}) {
+  if (!search) {
+    return { transactions: [] };
+  }
+  const queryString = buildQueryString({ search });
+  const response = await apiJSON(`${PROJECTS_ENDPOINT}/search/global-transactions${queryString}`, {
+    method: "GET",
+    signal,
+  });
+
+  const transactions = Array.isArray(response?.transactions)
+    ? response.transactions.map((t) => {
+        const normalized = normalizeTransaction(t);
+        if (t.project) {
+          normalized.project = normalizeProject(t.project);
+        }
+        return normalized;
+      }).filter(Boolean)
+    : [];
+
+  return { transactions };
+}
+
 export async function deleteTransaction({ projectId, transactionId }, { signal } = {}) {
   if (!projectId || !transactionId) {
     throw new Error("projectId and transactionId are required to delete a transaction");
