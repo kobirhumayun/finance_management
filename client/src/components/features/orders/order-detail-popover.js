@@ -101,11 +101,28 @@ export function OrderDetailPopover({
 
       const availableRight = Math.max(0, viewportWidth - margin - rect.right);
       const availableLeft = Math.max(0, rect.left - margin);
-      const nextSide = availableRight >= availableLeft ? "right" : "left";
-      const horizontalEdge = nextSide === "right" ? rect.right : rect.left;
-      const anchorX = clamp(horizontalEdge, margin, Math.max(margin, viewportWidth - margin));
+      const prefersVertical = viewportWidth < 640;
+      const nextSide = prefersVertical
+        ? "bottom"
+        : availableRight >= availableLeft
+          ? "right"
+          : "left";
+
+      const anchorX = clamp(
+        nextSide === "right"
+          ? rect.right
+          : nextSide === "left"
+            ? rect.left
+            : rect.left + rect.width / 2,
+        margin,
+        Math.max(margin, viewportWidth - margin),
+      );
       const anchorY = clamp(
-        rect.top + rect.height / 2,
+        nextSide === "bottom"
+          ? rect.bottom
+          : nextSide === "top"
+            ? rect.top
+            : rect.top + rect.height / 2,
         margin,
         Math.max(margin, viewportHeight - margin),
       );
@@ -298,7 +315,7 @@ export function OrderDetailPopover({
     >
       <PopoverAnchor virtualRef={virtualAnchorRef} />
       <PopoverContent
-        align="start"
+        align={popoverSide === "bottom" ? "center" : "start"}
         side={popoverSide}
         sideOffset={12}
         collisionPadding={16}
