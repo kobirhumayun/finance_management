@@ -60,6 +60,7 @@ const normalizeTransaction = (transaction) => {
   return {
     id: transaction.id ?? "",
     projectId: transaction.projectId ?? "",
+    projectName: transaction.projectName ?? "",
     date: transaction.date ?? null,
     type: transaction.type ?? "Expense",
     amount: transaction.amount ?? 0,

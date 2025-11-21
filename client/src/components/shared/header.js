@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, FileText, Folder, Loader2, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export default function Header({ variant = "public", onMenuClick }) {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef(null);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const hasSearchTerm = debouncedSearch.trim().length > 0;
 
@@ -63,16 +64,29 @@ export default function Header({ variant = "public", onMenuClick }) {
     }
   }, [searchTerm]);
 
+  useEffect(() => {
+    if (isSearchOpen) {
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    }
+  }, [isSearchOpen]);
+
   const handleProjectSelect = (projectId) => {
     if (!projectId) return;
-    router.push(`/projects/${projectId}`);
+    const params = new URLSearchParams({ projectId });
+    router.push(`/projects?${params.toString()}`);
     setIsSearchOpen(false);
     setSearchTerm("");
   };
 
   const handleTransactionSelect = (transaction) => {
     if (!transaction?.projectId || !transaction?.id) return;
-    router.push(`/projects/${transaction.projectId}?highlight=${transaction.id}`);
+    const params = new URLSearchParams({
+      projectId: transaction.projectId,
+      transactionId: transaction.id,
+    });
+    router.push(`/projects?${params.toString()}`);
     setIsSearchOpen(false);
     setSearchTerm("");
   };
@@ -160,13 +174,25 @@ export default function Header({ variant = "public", onMenuClick }) {
         <div className="flex flex-1 items-center justify-end gap-3">
           <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
             <PopoverTrigger asChild>
-              <div className="relative hidden max-w-sm flex-1 items-center gap-2 md:flex">
+              <div
+                className="relative hidden max-w-sm flex-1 items-center gap-2 md:flex"
+                role="combobox"
+                aria-expanded={isSearchOpen}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  setIsSearchOpen(true);
+                  requestAnimationFrame(() => {
+                    searchInputRef.current?.focus();
+                  });
+                }}
+              >
                 <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
                   placeholder="Search projects or transactions..."
                   aria-label="Search dashboard"
                   value={searchTerm}
+                  ref={searchInputRef}
                   onFocus={() => setIsSearchOpen(true)}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />

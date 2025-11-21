@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/shared/page-header";
 import ProjectList from "@/components/features/projects/project-list";
@@ -67,6 +68,8 @@ const getErrorMessage = (error, fallback) => {
 
 // Projects workspace featuring list and transaction management.
 export default function ProjectsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const planQuery = useQuery(myPlanQueryOptions());
   const planLimits = planQuery.data?.plan?.limits ?? {};
@@ -77,7 +80,10 @@ export default function ProjectsPage() {
   const [projectSort, setProjectSort] = useState("newest");
   const [transactionSearch, setTransactionSearch] = useState("");
   const [transactionSort, setTransactionSort] = useState("newest");
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(() => searchParams.get("projectId"));
+  const [highlightTransactionId, setHighlightTransactionId] = useState(() =>
+    searchParams.get("transactionId")
+  );
   const [projectDialogState, setProjectDialogState] = useState({ open: false, project: null });
   const [transactionDialogState, setTransactionDialogState] = useState({ open: false, transaction: null });
   const [projectToDelete, setProjectToDelete] = useState(null);
@@ -125,22 +131,58 @@ export default function ProjectsPage() {
     [projectPages]
   );
 
+  const updateUrlSelection = (projectId, transactionId = null) => {
+    setSelectedProjectId(projectId ?? null);
+    setHighlightTransactionId(transactionId ?? null);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (projectId) {
+      params.set("projectId", projectId);
+    } else {
+      params.delete("projectId");
+    }
+
+    if (transactionId) {
+      params.set("transactionId", transactionId);
+    } else {
+      params.delete("transactionId");
+    }
+
+    const queryString = params.toString();
+    const basePath = "/projects";
+    router.replace(queryString ? `${basePath}?${queryString}` : basePath, { scroll: false });
+  };
+
+  useEffect(() => {
+    const projectIdParam = searchParams.get("projectId");
+    const transactionIdParam = searchParams.get("transactionId");
+
+    if (projectIdParam && projectIdParam !== selectedProjectId) {
+      setSelectedProjectId(projectIdParam);
+    }
+
+    if (transactionIdParam !== highlightTransactionId) {
+      setHighlightTransactionId(transactionIdParam);
+    }
+  }, [searchParams, selectedProjectId, highlightTransactionId]);
+
   useEffect(() => {
     if (!projects.length) {
       if (selectedProjectId !== null) {
-        setSelectedProjectId(null);
+        updateUrlSelection(null);
       }
       return;
     }
 
     if (!selectedProjectId) {
-      setSelectedProjectId(projects[0]?.id ?? null);
+      updateUrlSelection(projects[0]?.id ?? null);
       return;
     }
 
     const hasSelectedProject = projects.some((project) => project?.id === selectedProjectId);
     if (!hasSelectedProject) {
-      setSelectedProjectId(projects[0]?.id ?? null);
+      updateUrlSelection(projects[0]?.id ?? null);
     }
   }, [projects, selectedProjectId]);
 
@@ -281,7 +323,7 @@ export default function ProjectsPage() {
       const name = project?.name || values?.name || "Project";
       toast.success(`Project "${name}" created.`);
       if (project?.id) {
-        setSelectedProjectId(project.id);
+        updateUrlSelection(project.id);
       }
     },
     onSettled: () => {
@@ -393,7 +435,7 @@ export default function ProjectsPage() {
       const name = variables?.projectName || "Project";
       toast.success(`Project "${name}" removed.`);
       if (context?.wasSelected) {
-        setSelectedProjectId(context.nextSelectedId ?? null);
+        updateUrlSelection(context.nextSelectedId ?? null);
       }
       if (context?.projectId) {
         queryClient.removeQueries({ queryKey: ["projects", "detail", String(context.projectId)] });
@@ -675,7 +717,7 @@ export default function ProjectsPage() {
             isLoadingMore={projectsQuery.isFetchingNextPage}
             hasNextPage={Boolean(projectsQuery.hasNextPage)}
             selectedProjectId={selectedProjectId}
-            onSelect={(project) => project?.id && setSelectedProjectId(project.id)}
+            onSelect={(project) => project?.id && updateUrlSelection(project.id)}
             onAddProject={() => setProjectDialogState({ open: true, project: null })}
             onDeleteProject={handleDeleteProject}
             onEditProject={handleEditProject}
@@ -704,6 +746,7 @@ export default function ProjectsPage() {
             sortValue={transactionSort}
             onSortChange={setTransactionSort}
             attachmentsAllowed={attachmentsAllowed}
+            highlightTransactionId={highlightTransactionId}
           />
         </div>
       </Card>

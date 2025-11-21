@@ -1,7 +1,7 @@
 // File: src/components/features/projects/transaction-table.js
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,10 +27,20 @@ export default function TransactionTable({
   sortValue = "newest",
   onSortChange,
   attachmentsAllowed = true,
+  highlightTransactionId = null,
 }) {
   const displayTransactions = Array.isArray(transactions) ? transactions : [];
   const [attachmentDialogState, setAttachmentDialogState] = useState({ open: false, transaction: null });
+  const desktopHighlightRef = useRef(null);
+  const mobileHighlightRef = useRef(null);
   const attachmentsFeatureEnabled = attachmentsAllowed !== false;
+
+  useEffect(() => {
+    const target = desktopHighlightRef.current ?? mobileHighlightRef.current;
+    if (highlightTransactionId && target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightTransactionId, displayTransactions.length]);
 
   const handleSearchChange = (event) => {
     onSearchChange?.(event.target.value);
@@ -109,6 +119,10 @@ export default function TransactionTable({
               {displayTransactions.map((transaction, index) => {
                 const transactionId = transaction?.id ?? `transaction-${index}`;
 
+                const isHighlighted = Boolean(
+                  highlightTransactionId && transactionId === highlightTransactionId
+                );
+
                 let parsedAmount = null;
                 if (typeof transaction?.amount === "number" && Number.isFinite(transaction.amount)) {
                   parsedAmount = transaction.amount;
@@ -129,14 +143,20 @@ export default function TransactionTable({
                 const description =
                   typeof transaction?.description === "string" && transaction.description.trim().length
                     ? transaction.description
-                    : "No description provided.";
+                  : "No description provided.";
                 const subcategory =
                   typeof transaction?.subcategory === "string" && transaction.subcategory.trim().length
                     ? transaction.subcategory
-                    : "Uncategorized";
+                  : "Uncategorized";
                 const dateLabel = formatDate(transaction?.date, { fallback: "—" });
                 return (
-                  <TableRow key={transactionId}>
+                  <TableRow
+                    key={transactionId}
+                    ref={isHighlighted ? desktopHighlightRef : null}
+                    className={cn(
+                      isHighlighted && "border-primary bg-primary/5"
+                    )}
+                  >
                     <TableCell>{dateLabel}</TableCell>
                     <TableCell>
                       <span className={cn(
@@ -204,6 +224,10 @@ export default function TransactionTable({
           displayTransactions.map((transaction, index) => {
             const transactionId = transaction?.id ?? `transaction-${index}`;
 
+            const isHighlighted = Boolean(
+              highlightTransactionId && transactionId === highlightTransactionId
+            );
+
             let parsedAmount = null;
             if (typeof transaction?.amount === "number" && Number.isFinite(transaction.amount)) {
               parsedAmount = transaction.amount;
@@ -231,7 +255,14 @@ export default function TransactionTable({
                 : "Uncategorized";
             const dateLabel = formatDate(transaction?.date, { fallback: "—" });
             return (
-              <div key={transactionId} className="rounded-lg border p-4 shadow-sm">
+              <div
+                key={transactionId}
+                ref={isHighlighted ? mobileHighlightRef : null}
+                className={cn(
+                  "rounded-lg border p-4 shadow-sm",
+                  isHighlighted && "border-primary bg-primary/5"
+                )}
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold">{description}</p>
