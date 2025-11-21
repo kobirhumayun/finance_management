@@ -717,7 +717,7 @@ export default function ProfilePage() {
               {getErrorMessage(ordersError, "We couldn't load your order history.")}
             </div>
           ) : null}
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -776,15 +776,76 @@ export default function ProfilePage() {
               </TableBody>
             </Table>
           </div>
+
+          <div className="grid gap-4 md:hidden">
+            {orders.length === 0 && !isOrdersLoading ? (
+              <div className="rounded-lg border bg-muted/40 p-4 text-center text-sm text-muted-foreground">
+                No orders yet.
+              </div>
+            ) : null}
+
+            {orders.map((order, index) => {
+              const orderIdentifier = getOrderIdentifier(order);
+              const cardKey = orderIdentifier || order.id || order.orderId || `order-${index}`;
+              const isSelected = selectedOrderNumber === orderIdentifier;
+
+              return (
+                <div
+                  key={cardKey}
+                  className={cn(
+                    "flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm",
+                    isSelected && "ring-2 ring-primary/60",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Order #</p>
+                      <p className="font-semibold leading-tight">{order.orderNumber || "—"}</p>
+                      <p className="text-sm text-muted-foreground">{order.plan?.name || "—"}</p>
+                    </div>
+                    <Badge variant={resolveStatusVariant(order.status)}>{formatStatus(order.status)}</Badge>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Amount</p>
+                      <p className="font-medium">
+                        {formatCurrencyWithCode(order.amount, order.currency || profile?.subscription?.plan?.currency || "BDT")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs uppercase text-muted-foreground">Created</p>
+                      <p className="font-medium">{formatDate(order.createdAt)}</p>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={(event) => handleOrderSelect(orderIdentifier, event.currentTarget)}
+                  >
+                    View details
+                  </Button>
+                </div>
+              );
+            })}
+
+            {isOrdersLoading ? (
+              <div className="rounded-lg border bg-muted/40 p-4 text-center text-sm text-muted-foreground">
+                Loading orders...
+              </div>
+            ) : null}
+          </div>
         </CardContent>
-        <CardFooter className="flex items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">
+        <CardFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground text-center sm:text-left">
             {ordersQuery.hasNextPage
               ? "Scroll through your historical invoices as needed."
               : "You've reached the end of your order history."}
           </p>
           <Button
             variant="outline"
+            className="w-full sm:w-auto"
             onClick={() => ordersQuery.fetchNextPage()}
             disabled={!ordersQuery.hasNextPage || ordersQuery.isFetchingNextPage}
           >
