@@ -366,8 +366,8 @@ export default function AdminDashboardPage() {
           <CardTitle>Recent manual payments</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto rounded-md border md:border-none">
+            <Table className="hidden min-w-[720px] md:table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference</TableHead>
@@ -448,6 +448,86 @@ export default function AdminDashboardPage() {
                 })}
               </TableBody>
             </Table>
+            <div className="grid gap-4 md:hidden">
+              {recentPayments.map((payment) => {
+                const statusLabel = payment.statusLabel || formatStatus(payment.status, "Unknown");
+                const reviewComment =
+                  typeof payment.reviewComment === "string" ? payment.reviewComment.trim() : "";
+                const hasReviewComment = Boolean(reviewComment);
+                const reviewMeta = (() => {
+                  const pieces = [];
+                  if (payment.reviewerLabel) {
+                    pieces.push(`by ${payment.reviewerLabel}`);
+                  }
+                  if (payment.reviewedAt) {
+                    const reviewedLabel = payment.reviewerLabel
+                      ? formatDateTime(payment.reviewedAt)
+                      : `on ${formatDateTime(payment.reviewedAt)}`;
+                    pieces.push(reviewedLabel);
+                  }
+                  if (pieces.length === 0) return null;
+                  return `Reviewed ${pieces.join(" • ")}`;
+                })();
+
+                const referenceDetails = Array.isArray(payment.referenceDetails)
+                  ? payment.referenceDetails
+                  : [];
+                const [primaryReference, ...otherReferences] = referenceDetails;
+
+                return (
+                  <div
+                    key={payment.id}
+                    className="space-y-3 rounded-lg border bg-muted/30 p-4 shadow-xs"
+                    aria-label={`Manual payment from ${payment.userName || "Unknown user"}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        {primaryReference ? (
+                          <div className="text-sm font-medium">
+                            {primaryReference.label}: {primaryReference.value}
+                          </div>
+                        ) : (
+                          <div className="text-sm font-medium">{payment.reference || "—"}</div>
+                        )}
+                        {otherReferences.map((detail) => (
+                          <div
+                            key={`${detail.type}-${detail.value}`}
+                            className="text-xs text-muted-foreground"
+                          >
+                            {detail.label}: {detail.value}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-semibold">
+                          {formatCurrency(payment.amount, payment.currency)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{formatDateTime(payment.submittedAt)}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">{payment.userName || "Unknown user"}</div>
+                      {payment.userEmail ? (
+                        <div className="text-xs text-muted-foreground break-words">
+                          {payment.userEmail}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-sm font-medium">{statusLabel}</span>
+                      {hasReviewComment ? (
+                        <p className="text-xs text-muted-foreground break-words">&ldquo;{reviewComment}&rdquo;</p>
+                      ) : null}
+                      {reviewMeta ? (
+                        <p className="text-xs text-muted-foreground">{reviewMeta}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </CardContent>
       </Card>
