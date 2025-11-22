@@ -793,37 +793,39 @@ export default function SummaryPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {summaryQuery.isError && (
                 <p className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
                   {errorMessage || "Unable to load transactions."}
                 </p>
               )}
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Projects</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Subcategories</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{formatDate(item.date)}</TableCell>
-                        <TableCell>{item.projectName || item.projectId || "--"}</TableCell>
-                        <TableCell>{item.type}</TableCell>
-                        <TableCell>{item.subcategory || "--"}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(item.amount)}
-                        </TableCell>
+              <div className="hidden md:block">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Projects</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Subcategories</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{formatDate(item.date)}</TableCell>
+                          <TableCell>{item.projectName || item.projectId || "--"}</TableCell>
+                          <TableCell>{item.type}</TableCell>
+                          <TableCell>{item.subcategory || "--"}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency(item.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
                 {!hasTransactions && !isRefetching && !summaryQuery.isError && (
                   <p className="p-4 text-sm text-muted-foreground">
                     {filtersEnabled
@@ -834,22 +836,89 @@ export default function SummaryPage() {
                 {isRefetching && !isInitialLoading && (
                   <div className="p-4 text-sm text-muted-foreground">Updating results…</div>
                 )}
-                {hasNextPage && paginationEnabled && (
-                  <div className="mt-4 flex justify-center">
-                    <Button onClick={() => summaryQuery.fetchNextPage()} disabled={isFetchingNextPage}>
-                      {isFetchingNextPage ? "Loading more..." : "Load more"}
-                    </Button>
-                  </div>
+              </div>
+
+              <div className="space-y-3 md:hidden">
+                {transactions.map((item) => {
+                  const typeLabel = item.type || "--";
+                  const typeLower = typeLabel.toLowerCase();
+                  const isIncome = typeLower === "income";
+                  const isExpense = typeLower === "expense";
+                  const typeBadgeClass = isIncome
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                    : isExpense
+                      ? "bg-rose-50 text-rose-700 border-rose-100"
+                      : "bg-muted text-muted-foreground border-transparent";
+
+                  return (
+                    <div key={item.id} className="rounded-lg border p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium leading-none">{formatDate(item.date)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.projectName || item.projectId || "--"}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${typeBadgeClass}`}
+                        >
+                          {typeLabel}
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-muted-foreground">Subcategory</p>
+                          <p className="font-medium text-right">{item.subcategory || "--"}</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-muted-foreground">Amount</p>
+                          <p
+                            className={`text-right text-base font-semibold ${
+                              isIncome
+                                ? "text-emerald-700"
+                                : isExpense
+                                  ? "text-rose-700"
+                                  : "text-foreground"
+                            }`}
+                          >
+                            {formatCurrency(item.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!hasTransactions && !isRefetching && !summaryQuery.isError && (
+                  <p className="p-4 text-sm text-muted-foreground text-center">
+                    {filtersEnabled
+                      ? "No transactions match the selected filters."
+                      : "No transactions recorded yet."}
+                  </p>
                 )}
-                {!paginationEnabled && (
-                  <div className="mt-4 flex flex-col items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-center text-sm text-primary">
-                    <p>Upgrade to paginate through your full transaction history.</p>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href="/pricing">Explore plans</Link>
-                    </Button>
-                  </div>
+                {isRefetching && !isInitialLoading && (
+                  <div className="p-4 text-sm text-muted-foreground text-center">Updating results…</div>
                 )}
               </div>
+
+              {hasNextPage && paginationEnabled && (
+                <div className="mt-2 flex justify-center">
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => summaryQuery.fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? "Loading more..." : "Load more"}
+                  </Button>
+                </div>
+              )}
+              {!paginationEnabled && (
+                <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4 text-center text-sm text-primary">
+                  <p>Upgrade to paginate through your full transaction history.</p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/pricing">Explore plans</Link>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

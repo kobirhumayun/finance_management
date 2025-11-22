@@ -101,30 +101,52 @@ const BreakdownTable = ({
       <CardTitle className="text-base">{title}</CardTitle>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </CardHeader>
-    <CardContent>
+    <CardContent className="space-y-4">
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Segment</TableHead>
-                <TableHead className="text-right">{countLabel}</TableHead>
-                <TableHead className="text-right">{amountLabel}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.key ?? row.label}>
-                  <TableCell>{row.label}</TableCell>
-                  <TableCell className="text-right">{formatCount(row.count)}</TableCell>
-                  <TableCell className="text-right">{valueFormatter(row)}</TableCell>
+        <>
+          <div className="space-y-3 md:hidden">
+            {rows.map((row) => (
+              <div
+                key={row.key ?? row.label}
+                className="rounded-lg border bg-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-medium leading-tight">{row.label}</div>
+                  <div className="text-right text-sm font-semibold">
+                    {valueFormatter(row)}
+                    <div className="text-xs font-normal text-muted-foreground">{amountLabel}</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{countLabel}</span>
+                  <span className="font-semibold">{formatCount(row.count)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Segment</TableHead>
+                  <TableHead className="text-right">{countLabel}</TableHead>
+                  <TableHead className="text-right">{amountLabel}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.key ?? row.label}>
+                    <TableCell>{row.label}</TableCell>
+                    <TableCell className="text-right">{formatCount(row.count)}</TableCell>
+                    <TableCell className="text-right">{valueFormatter(row)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </CardContent>
   </Card>
@@ -422,7 +444,32 @@ function TopEntitiesSection({
             <p className="text-sm text-muted-foreground">No results for the current filters.</p>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 md:hidden">
+                {rows.map((row) => (
+                  <div
+                    key={row.userId ?? row.displayName}
+                    className="rounded-lg border bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="font-medium leading-tight">{row.displayName}</div>
+                        {row.userEmail ? (
+                          <div className="text-xs text-muted-foreground">{row.userEmail}</div>
+                        ) : null}
+                      </div>
+                      <div className="text-right text-sm font-medium">
+                        {formatAmount(row.totalAmount)}
+                        <div className="text-xs text-muted-foreground">{amountHeader}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{countHeader}</span>
+                      <span className="font-semibold">{formatCount(row.count)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -456,6 +503,7 @@ function TopEntitiesSection({
                   size="sm"
                   onClick={onLoadMore}
                   disabled={!hasMore || isFetchingNextPage}
+                  className="w-full md:w-auto"
                 >
                   {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All results loaded"}
                 </Button>
@@ -502,7 +550,78 @@ function OrdersListSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {orders.map((order) => {
+              const isSelected = selectedOrderNumber === order.orderNumber;
+
+              return (
+                <div
+                  key={order.id ?? order.orderNumber}
+                  className={cn(
+                    "rounded-lg border bg-card p-4 shadow-sm transition-colors",
+                    isSelected && "border-primary/50 ring-1 ring-primary/30",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">Order</div>
+                      <div className="text-lg font-semibold leading-tight">
+                        {order.orderNumber ?? order.id}
+                      </div>
+                      {order.planName ? (
+                        <div className="text-xs text-muted-foreground">Plan: {order.planName}</div>
+                      ) : null}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">Amount</div>
+                      <div className="text-base font-semibold">
+                        {formatAmount(order.amount, order.currency)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDateOnly(order.createdAt || order.startDate)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Customer</span>
+                      <span className="font-medium text-right">
+                        {order.userName}
+                        {order.userEmail ? (
+                          <span className="block text-xs text-muted-foreground">{order.userEmail}</span>
+                        ) : null}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Order status</span>
+                      <Badge variant="outline">{order.statusLabel || formatStatusLabel(order.status)}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Payment</span>
+                      {order.paymentStatus ? (
+                        <Badge variant="secondary">
+                          {order.paymentStatusLabel || formatStatusLabel(order.paymentStatus)}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Unknown</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={(event) => onSelect(order.orderNumber, event.currentTarget)}
+                    >
+                      View details
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -570,6 +689,7 @@ function OrdersListSection({
               size="sm"
               onClick={onLoadMore}
               disabled={!hasMore || isFetchingNextPage}
+              className="w-full md:w-auto"
             >
               {isFetchingNextPage ? "Loading…" : hasMore ? "Load more" : "All orders loaded"}
             </Button>

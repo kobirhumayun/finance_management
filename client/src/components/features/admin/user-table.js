@@ -45,65 +45,115 @@ export default function UserTable({ users = [], onViewProfile }) {
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Username</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      {!filteredUsers.length ? (
+        <p className="text-sm text-muted-foreground">No users match the current search filter.</p>
+      ) : (
+        <>
+          <div className="space-y-3 md:hidden">
             {filteredUsers.map((user) => (
-              <TableRow key={user.id ?? user.username ?? user.email}>
-                <TableCell className="font-medium">
-                  <div>{user.username || "—"}</div>
-                  {user.fullName ? (
-                    <div className="text-xs text-muted-foreground">{user.fullName}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  {user.email || "—"}
-                  {user.lastLoginAtLabel ? (
-                    <div className="text-xs text-muted-foreground">Last seen {user.lastLoginAtLabel}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  <div>{user.planName || user.plan || "—"}</div>
-                  {user.subscriptionStatusLabel ? (
-                    <div className="text-xs text-muted-foreground">{user.subscriptionStatusLabel}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell>
+              <div
+                key={user.id ?? user.username ?? user.email}
+                className="space-y-3 rounded-lg border bg-card p-4 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium leading-tight">{user.username || "—"}</p>
+                    {user.fullName ? (
+                      <p className="text-xs text-muted-foreground">{user.fullName}</p>
+                    ) : null}
+                    {user.email ? (
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    ) : null}
+                  </div>
                   {user.statusLabel ? (
                     <Badge variant={user.isActive ? "default" : "secondary"}>{user.statusLabel}</Badge>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell>
-                  {user.registeredAtLabel || user.registeredAt || "—"}
-                  {user.isActiveLabel ? (
-                    <div className="text-xs text-muted-foreground">{user.isActiveLabel}</div>
                   ) : null}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="outline" onClick={() => onViewProfile?.(user)}>
-                    View Profile
-                  </Button>
-                </TableCell>
-              </TableRow>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium text-foreground">Plan</p>
+                    <p className="text-sm text-foreground">{user.planName || user.plan || "—"}</p>
+                    {user.subscriptionStatusLabel ? <p>{user.subscriptionStatusLabel}</p> : null}
+                  </div>
+                  <div className="space-y-0.5 text-right">
+                    <p className="text-xs font-medium text-foreground">Joined</p>
+                    <p className="text-sm text-foreground">{user.registeredAtLabel || user.registeredAt || "—"}</p>
+                    {user.isActiveLabel ? <p>{user.isActiveLabel}</p> : null}
+                  </div>
+                  {user.lastLoginAtLabel ? (
+                    <div className="col-span-2 space-y-0.5 border-t pt-3 text-right text-xs">
+                      <p className="text-xs font-medium text-foreground">Last seen</p>
+                      <p className="text-sm text-foreground">{user.lastLoginAtLabel}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <Button className="w-full" variant="outline" onClick={() => onViewProfile?.(user)}>
+                  View Profile
+                </Button>
+              </div>
             ))}
-          </TableBody>
-        </Table>
-        {!filteredUsers.length && (
-          <p className="p-4 text-sm text-muted-foreground">No users match the current search filter.</p>
-        )}
-      </div>
+          </div>
+
+          <div className="hidden rounded-lg border md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id ?? user.username ?? user.email}>
+                    <TableCell className="font-medium">
+                      <div>{user.username || "—"}</div>
+                      {user.fullName ? (
+                        <div className="text-xs text-muted-foreground">{user.fullName}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      {user.email || "—"}
+                      {user.lastLoginAtLabel ? (
+                        <div className="text-xs text-muted-foreground">Last seen {user.lastLoginAtLabel}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      <div>{user.planName || user.plan || "—"}</div>
+                      {user.subscriptionStatusLabel ? (
+                        <div className="text-xs text-muted-foreground">{user.subscriptionStatusLabel}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      {user.statusLabel ? (
+                        <Badge variant={user.isActive ? "default" : "secondary"}>{user.statusLabel}</Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {user.registeredAtLabel || user.registeredAt || "—"}
+                      {user.isActiveLabel ? (
+                        <div className="text-xs text-muted-foreground">{user.isActiveLabel}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => onViewProfile?.(user)}>
+                        View Profile
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

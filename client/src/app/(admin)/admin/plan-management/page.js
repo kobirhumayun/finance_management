@@ -237,7 +237,7 @@ export default function PlanManagementPage() {
           <CardTitle>Available plans</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -292,6 +292,51 @@ export default function PlanManagementPage() {
             </Table>
             {showEmptyState && (
               <p className="p-4 text-sm text-muted-foreground">No plans have been configured.</p>
+            )}
+          </div>
+
+          <div className="space-y-3 md:hidden">
+            {isLoading && <p className="text-sm text-muted-foreground">Loading plans...</p>}
+            {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+            {plansForTable.map((plan) => (
+              <div key={plan.id} className="rounded-lg border bg-card p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold leading-tight">{plan.name}</h3>
+                    <p className="text-sm text-muted-foreground">{plan.slug}</p>
+                  </div>
+                  <Badge variant={plan.isPublic ? "default" : "secondary"}>
+                    {plan.isPublic ? "Public" : "Private"}
+                  </Badge>
+                </div>
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-muted-foreground">Price</dt>
+                    <dd className="font-medium">{formatPlanAmount(plan.price, plan.currency)}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-muted-foreground">Billing</dt>
+                    <dd className="font-medium capitalize">{plan.billingCycle}</dd>
+                  </div>
+                </dl>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" className="flex-1 min-w-[120px]" onClick={() => openEdit(plan)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1 min-w-[120px]"
+                    disabled={isDeletingPlan}
+                    onClick={() => setPlanToDelete(plan)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {showEmptyState && (
+              <p className="text-sm text-muted-foreground">No plans have been configured.</p>
             )}
           </div>
         </CardContent>
