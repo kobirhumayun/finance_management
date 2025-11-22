@@ -4,7 +4,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import Logo from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,12 @@ export default function Sidebar({ links = [], mobileOpen, onMobileOpenChange, fo
   return (
     <>
       <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
-        <SheetContent side="left" className="w-[280px] p-0">
+        <SheetContent
+          side="left"
+          className="w-[280px] p-0"
+          aria-label="Mobile navigation menu"
+        >
+          <SheetTitle className="sr-only">Mobile navigation menu</SheetTitle>
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between px-4 py-3">
               <Logo />
