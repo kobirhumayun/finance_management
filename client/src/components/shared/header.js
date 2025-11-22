@@ -59,7 +59,7 @@ export default function Header({ variant = "public", onMenuClick }) {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <ThemeToggle size="icon" />
           {isAuthenticated ? (
             <Button asChild variant="outline" size="sm">
@@ -69,10 +69,15 @@ export default function Header({ variant = "public", onMenuClick }) {
             </Button>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="inline-flex"
+              >
                 <Link href="/login">Login</Link>
               </Button>
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="inline-flex">
                 <Link href="/register">Sign Up</Link>
               </Button>
             </>

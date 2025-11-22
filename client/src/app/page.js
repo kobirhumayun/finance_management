@@ -157,13 +157,13 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 text-foreground">
       <Header />
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-24 px-4 py-16 sm:px-6 lg:py-24">
-        <section className="relative overflow-hidden rounded-[3rem] border border-border/40 bg-gradient-to-br from-primary/10 via-background to-background p-6 shadow-[0_45px_80px_-40px_rgba(15,23,42,0.45)] lg:p-14">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 py-12 sm:gap-20 sm:px-6 lg:gap-24 lg:py-24">
+        <section className="relative overflow-hidden rounded-[2rem] border border-border/40 bg-gradient-to-br from-primary/10 via-background to-background p-6 shadow-[0_45px_80px_-40px_rgba(15,23,42,0.45)] sm:rounded-[3rem] sm:p-8 lg:p-14">
           <div className="absolute inset-x-20 -top-32 h-64 rounded-full bg-primary/30 blur-[120px]" aria-hidden />
           <div className="absolute -bottom-28 right-16 h-72 w-72 rounded-full bg-primary/20 blur-3xl" aria-hidden />
           <div className="relative grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-            <div className="space-y-8">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="space-y-8 text-center lg:text-left">
+              <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
                 <Badge variant="secondary" className="bg-primary/15 text-primary">
                   Smart finance OS
                 </Badge>
@@ -174,18 +174,18 @@ export default function HomePage() {
               <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
                 Translate every transaction into proactive financial strategy.
               </h1>
-              <p className="max-w-xl text-lg text-muted-foreground">
+              <p className="mx-auto max-w-2xl text-lg text-muted-foreground lg:mx-0">
                 FinTrack pairs flexible subscription plans with hands-on admin and support specialists. Unify project budgets,
                 transaction histories, analytics, subscription oversight, and export-ready reports so every stakeholder steers the
                 business with clarity from day one.
               </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button asChild size="lg">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <Button asChild size="lg" className="w-full sm:w-auto">
                   <Link href="/register" className="flex items-center gap-2">
                     Start a free trial <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="backdrop-blur">
+                <Button asChild size="lg" variant="outline" className="w-full backdrop-blur sm:w-auto">
                   <Link href="/pricing">Compare plans</Link>
                 </Button>
               </div>
@@ -260,7 +260,7 @@ export default function HomePage() {
 
         <section className="space-y-8 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary/80">Trusted by modern finance teams</p>
-          <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {["Arcadia", "Silverline", "Northwind", "Lumina", "Vertex", "Harbor"].map((brand) => (
               <div
                 key={brand}
@@ -303,8 +303,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div className="space-y-5">
+        <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="space-y-5 text-center lg:text-left">
             <h2 className="text-3xl font-semibold">A workflow that supports every stakeholder</h2>
             <p className="text-base text-muted-foreground">
               From first transaction to executive summary, FinTrack connects the dots for finance leads, project managers, and
@@ -312,7 +312,7 @@ export default function HomePage() {
             </p>
           </div>
           <Card className="border-border/60 bg-background/90 shadow-lg">
-            <CardContent className="space-y-6 p-8">
+            <CardContent className="space-y-6 p-6 sm:p-8">
               {workflow.map((step, index) => (
                 <div key={step.title} className="flex gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/40 text-sm font-semibold">
@@ -330,7 +330,7 @@ export default function HomePage() {
 
         <section className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
           <Card className="order-2 border-border/50 bg-background/85 shadow-xl backdrop-blur lg:order-1">
-            <CardContent className="space-y-5 p-8">
+            <CardContent className="space-y-5 p-6 sm:p-8">
               <div className="flex items-center gap-3 text-primary">
                 <FileDown className="h-5 w-5" />
                 <span className="text-sm font-semibold uppercase tracking-wide">{exportFeature.title}</span>
@@ -358,8 +358,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="grid gap-10 rounded-3xl border border-border/40 bg-background/80 p-10 shadow-2xl lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-          <div className="space-y-8">
+        <section className="grid gap-8 rounded-3xl border border-border/40 bg-background/80 p-8 shadow-2xl sm:gap-10 sm:p-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+          <div className="space-y-8 text-center lg:text-left">
             <Badge variant="outline" className="border-primary/40 text-primary">
               Why teams stay
             </Badge>
@@ -396,8 +396,8 @@ export default function HomePage() {
           </Card>
         </section>
 
-        <section className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
-          <div className="space-y-4">
+        <section className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+          <div className="space-y-4 text-center lg:text-left">
             <Badge variant="outline" className="border-primary/40 text-primary">
               Questions, answered
             </Badge>
@@ -420,19 +420,19 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="space-y-8 rounded-3xl border border-primary/30 bg-primary/10 p-12 text-center shadow-lg">
+        <section className="space-y-8 rounded-3xl border border-primary/30 bg-primary/10 p-8 text-center shadow-lg sm:p-12">
           <h2 className="text-3xl font-semibold">Ready to unite finance and delivery?</h2>
           <p className="mx-auto max-w-2xl text-base text-muted-foreground">
             Choose the subscription tier that fits your operation and partner with our admin and support team to give every stakeholder
             a shared source of truth for projects, transactions, analytics, billing, and one-click report exports.
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="w-full sm:w-auto">
               <Link href="/register" className="flex items-center gap-2">
                 Create your workspace <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="border-primary/40 text-primary">
+            <Button asChild size="lg" variant="outline" className="w-full border-primary/40 text-primary sm:w-auto">
               <Link href="/pricing">See pricing tiers</Link>
             </Button>
           </div>
