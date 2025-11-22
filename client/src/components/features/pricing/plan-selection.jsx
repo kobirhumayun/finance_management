@@ -27,6 +27,7 @@ import { createPlanOrder, submitManualPayment } from "@/lib/plans";
 import { formatPlanAmount, resolveNumericValue } from "@/lib/formatters";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { acceptedBanks, acceptedMobileOperators } from "@/config/payment-methods";
 
 const orderSchema = z.object({
   planId: z.string().min(1, "Plan is required"),
@@ -563,6 +564,43 @@ export default function PlanSelection({ plans }) {
             </CardFooter>
           </Card>
         ))}
+      </div>
+      <div className="mt-10 space-y-4 rounded-lg border bg-card/40 p-6">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Accepted providers</p>
+          <h3 className="text-xl font-semibold">Bank & mobile payments</h3>
+          <p className="text-sm text-muted-foreground">
+            We currently support manual payments through the following partner banks and mobile wallet operators.
+          </p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-3 rounded-md border bg-background/60 p-4">
+            <p className="text-sm font-medium text-muted-foreground">Banks</p>
+            <div className="flex flex-wrap gap-2">
+              {acceptedBanks.map((provider) => (
+                <Badge key={provider.id} variant="secondary" className="gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-xs font-semibold uppercase shadow-sm ring-1 ring-border">
+                    {provider.logo}
+                  </span>
+                  {provider.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-3 rounded-md border bg-background/60 p-4">
+            <p className="text-sm font-medium text-muted-foreground">Mobile operators</p>
+            <div className="flex flex-wrap gap-2">
+              {acceptedMobileOperators.map((provider) => (
+                <Badge key={provider.id} variant="outline" className="gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-xs font-semibold uppercase shadow-sm ring-1 ring-border">
+                    {provider.logo}
+                  </span>
+                  {provider.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
         {renderDialogContent()}
