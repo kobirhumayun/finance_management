@@ -366,7 +366,7 @@ export default function AdminDashboardPage() {
           <CardTitle>Recent manual payments</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border md:border-none">
+          <div className="overflow-x-auto rounded-md">
             <Table className="hidden min-w-[720px] md:table">
               <TableHeader>
                 <TableRow>
