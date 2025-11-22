@@ -27,7 +27,11 @@ import { createPlanOrder, submitManualPayment } from "@/lib/plans";
 import { formatPlanAmount, resolveNumericValue } from "@/lib/formatters";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { acceptedBanks, acceptedMobileOperators } from "@/config/payment-methods";
+import {
+  acceptedBanks,
+  acceptedMobileOperators,
+  manualPaymentDetails,
+} from "@/config/payment-methods";
 
 const orderSchema = z.object({
   planId: z.string().min(1, "Plan is required"),
@@ -214,6 +218,14 @@ export default function PlanSelection({ plans }) {
       setIsSubmittingManualPayment(false);
     }
   };
+
+  const providerLookup = useMemo(() => {
+    const providers = [...acceptedBanks, ...acceptedMobileOperators];
+    return providers.reduce((map, provider) => {
+      map.set(provider.id, provider);
+      return map;
+    }, new Map());
+  }, []);
 
   const renderDialogContent = () => {
     if (!selectedPlan) return null;
@@ -409,6 +421,69 @@ export default function PlanSelection({ plans }) {
               this confirmation step.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4 rounded-md border border-primary/40 bg-primary/5 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary">Payment instructions</p>
+              <p className="text-sm text-muted-foreground">
+                Send funds to <span className="font-semibold text-foreground">{manualPaymentDetails.recipientName}</span> using
+                any account below, then share the transaction reference.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 rounded-md border bg-background/50 p-3">
+                <p className="text-sm font-medium text-muted-foreground">Bank accounts</p>
+                <div className="space-y-3 text-sm">
+                  {manualPaymentDetails.bankAccounts.map((account) => {
+                    const provider = providerLookup.get(account.providerId);
+                    return (
+                      <div key={`${account.providerId}-${account.accountNumber}`} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{provider?.name || account.providerId}</p>
+                          <Badge variant="secondary" className="text-xs font-semibold">
+                            {account.accountNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {account.accountName}
+                          {account.notes ? ` · ${account.notes}` : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2 rounded-md border bg-background/50 p-3">
+                <p className="text-sm font-medium text-muted-foreground">Mobile wallets</p>
+                <div className="space-y-3 text-sm">
+                  {manualPaymentDetails.mobileWallets.map((account) => {
+                    const provider = providerLookup.get(account.providerId);
+                    return (
+                      <div key={`${account.providerId}-${account.accountNumber}`} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{provider?.name || account.providerId}</p>
+                          <Badge variant="outline" className="text-xs font-semibold">
+                            {account.accountNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {account.accountName}
+                          {account.notes ? ` · ${account.notes}` : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Steps to follow</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                {manualPaymentDetails.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <p className="font-medium">Order summary</p>
             <p className="text-muted-foreground">
