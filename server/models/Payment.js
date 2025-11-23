@@ -88,8 +88,6 @@ const paymentSchema = new Schema({
      */
     gatewayTransactionId: {
         type: String,
-        unique: true, // Ensures no duplicate records for the same gateway transaction
-        index: true // Essential for webhook processing and lookups
     },
     /**
      * The reason or context for this payment.
@@ -183,6 +181,15 @@ const paymentSchema = new Schema({
 // Optional: Compound index if needed, e.g., to quickly find a user's payments via a specific gateway
 // paymentSchema.index({ userId: 1, paymentGateway: 1 });
 
+paymentSchema.index(
+    { gatewayTransactionId: 1 },
+    {
+        unique: true,
+        // Only enforce uniqueness when a non-null string transaction ID is provided
+        partialFilterExpression: { gatewayTransactionId: { $type: 'string' } },
+    }
+);
+
 const Payment = mongoose.model('Payment', paymentSchema);
 
 module.exports = Payment;
@@ -193,7 +200,7 @@ module.exports = Payment;
  * - `planId`: Links payment to a specific subscription plan (optional).
  * - `amount`/`refundedAmount`: Uses Decimal128 for financial precision. Consider storing amounts in cents (integer) as an alternative if Decimal128 proves complex for your stack.
  * - `status`: Tracks the lifecycle of the payment. Critical for business logic.
- * - `paymentGateway` & `gatewayTransactionId`: Essential for identifying the transaction externally. `gatewayTransactionId` MUST be unique.
+ * - `paymentGateway` & `gatewayTransactionId`: Essential for identifying the transaction externally. `gatewayTransactionId` must be unique when provided (partial unique index allows multiple nulls).
  * - `purpose`: Provides context for the payment, useful for reporting and logic.
  * - `paymentMethodDetails`: Store limited, non-sensitive info (e.g., card last4, brand). NEVER store full card numbers, CVV, etc.
  * - `gatewayResponse`: Useful for debugging but excluded by default (`select: false`).
