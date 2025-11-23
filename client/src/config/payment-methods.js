@@ -1,25 +1,11 @@
-export type PaymentProvider = {
-  id: string;
-  name: string;
-  logo: string;
-  category: "bank" | "mobile";
-};
-
-type PaymentDestination = {
-  providerId: string;
-  accountName: string;
-  accountNumber: string;
-  notes?: string;
-};
-
-export const acceptedBanks: PaymentProvider[] = [
+export const acceptedBanks = [
   { id: "brac-bank", name: "BRAC Bank", logo: "BB", category: "bank" },
   { id: "dbbl", name: "Dutch-Bangla Bank", logo: "DBBL", category: "bank" },
   { id: "city-bank", name: "The City Bank", logo: "CB", category: "bank" },
   { id: "eastern-bank", name: "Eastern Bank", logo: "EBL", category: "bank" },
 ];
 
-export const acceptedMobileOperators: PaymentProvider[] = [
+export const acceptedMobileOperators = [
   { id: "bkash", name: "bKash", logo: "bK", category: "mobile" },
   { id: "nagad", name: "Nagad", logo: "N", category: "mobile" },
   { id: "rocket", name: "Rocket", logo: "R", category: "mobile" },
@@ -52,7 +38,7 @@ export const manualPaymentDetails = {
       accountNumber: "211-110-334455",
       notes: "Preferred for large payments",
     },
-  ] as PaymentDestination[],
+  ],
   mobileWallets: [
     {
       providerId: "bkash",
@@ -66,5 +52,5 @@ export const manualPaymentDetails = {
       accountNumber: "01800-222333",
       notes: "Reference field required",
     },
-  ] as PaymentDestination[],
+  ],
 };
