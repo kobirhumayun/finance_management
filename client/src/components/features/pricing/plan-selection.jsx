@@ -55,6 +55,7 @@ const manualPaymentSchema = z.object({
   currency: z.string().min(1, "Currency is required"),
   paymentGateway: z.literal("manual"),
   paymentId: z.string().min(1, "Payment ID is required"),
+  paymentProvider: z.string().min(1, "Select the payment provider used"),
   gatewayTransactionId: z.string().min(3, "Provide the transaction reference"),
 });
 
@@ -79,6 +80,7 @@ const defaultManualValues = {
   currency: "",
   paymentGateway: "manual",
   paymentId: "",
+  paymentProvider: "",
   gatewayTransactionId: "",
 };
 
@@ -108,6 +110,7 @@ export default function PlanSelection({ plans }) {
   });
 
   const purposeValue = orderForm.watch("purpose");
+  const paymentProviderValue = manualPaymentForm.watch("paymentProvider");
 
   const resetFlow = useCallback(() => {
     setDialogOpen(false);
@@ -166,6 +169,7 @@ export default function PlanSelection({ plans }) {
         currency: orderPayload?.currency ?? selectedPlan?.currency ?? "BDT",
         paymentGateway: "manual",
         paymentId: orderResponse.paymentId ?? "",
+        paymentProvider: "",
         gatewayTransactionId: "",
       });
     }
@@ -202,9 +206,16 @@ export default function PlanSelection({ plans }) {
     if (!orderResponse) return;
     setIsSubmittingManualPayment(true);
     try {
+      const { paymentProvider, gatewayTransactionId, ...restValues } = values;
+      const prefixedTransactionId = paymentProvider
+        ? `${paymentProvider}-${gatewayTransactionId}`
+        : gatewayTransactionId;
+
       const payload = {
-        ...values,
+        ...restValues,
+        paymentGateway: "manual",
         paymentId: orderResponse.paymentId ?? values.paymentId,
+        gatewayTransactionId: prefixedTransactionId,
       };
       const response = await submitManualPayment(payload);
       setManualPaymentResponse(response);
@@ -225,6 +236,11 @@ export default function PlanSelection({ plans }) {
       map.set(provider.id, provider);
       return map;
     }, new Map());
+  }, []);
+
+  const providerOptions = useMemo(() => {
+    const providers = [...acceptedBanks, ...acceptedMobileOperators];
+    return providers.map((provider) => ({ id: provider.id, name: provider.name }));
   }, []);
 
   const renderDialogContent = () => {
@@ -535,6 +551,29 @@ export default function PlanSelection({ plans }) {
               />
               {manualPaymentForm.formState.errors.paymentGateway && (
                 <p className="text-sm text-destructive">{manualPaymentForm.formState.errors.paymentGateway.message}</p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="manual-payment-provider">Payment provider</Label>
+              <Select
+                value={paymentProviderValue}
+                onValueChange={(value) => manualPaymentForm.setValue("paymentProvider", value)}
+                disabled={isSubmittingManualPayment}
+              >
+                <SelectTrigger id="manual-payment-provider">
+                  <SelectValue placeholder="Select bank or mobile wallet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerOptions.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input type="hidden" {...manualPaymentForm.register("paymentProvider")} />
+              {manualPaymentForm.formState.errors.paymentProvider && (
+                <p className="text-sm text-destructive">{manualPaymentForm.formState.errors.paymentProvider.message}</p>
               )}
             </div>
             <div className="grid gap-2">
