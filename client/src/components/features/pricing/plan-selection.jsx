@@ -40,7 +40,11 @@ const orderSchema = z.object({
   paymentGateway: z.literal("manual"),
   paymentMethodDetails: z
     .string()
-    .min(1, "Manual payment instructions are required"),
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim() ?? "";
+      return trimmed.length > 0 ? trimmed : "none";
+    }),
   purpose: z.enum([
     "subscription_initial",
     "subscription_renewal",
@@ -151,12 +155,14 @@ export default function PlanSelection({ plans }) {
 
   useEffect(() => {
     if (dialogOpen && flowStep === "order" && selectedPlan) {
+      const paymentMethodDetailsValue =
+        orderPayload?.paymentMethodDetails === "none" ? "" : orderPayload?.paymentMethodDetails || "";
       orderForm.reset({
         planId: selectedPlan.planId,
         amount: orderPayload?.amount ?? (Number(selectedPlan.price) || 0),
         currency: orderPayload?.currency ?? (selectedPlan.currency || "BDT"),
         paymentGateway: "manual",
-        paymentMethodDetails: orderPayload?.paymentMethodDetails || "",
+        paymentMethodDetails: paymentMethodDetailsValue,
         purpose: orderPayload?.purpose || "subscription_renewal",
       });
     }
