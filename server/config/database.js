@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const Payment = require('../models/Payment');
 
 dotenv.config();
 
@@ -38,6 +39,14 @@ const connectDB = async () => {
             });
 
             console.log(`MongoDB Connected: ${conn.connection.host}`);
+
+            try {
+                await Payment.syncIndexes();
+                console.log('Payment collection indexes synced.');
+            } catch (indexError) {
+                console.error('Failed to sync Payment indexes:', indexError);
+                throw indexError;
+            }
             return conn;
 
         } catch (error) {
