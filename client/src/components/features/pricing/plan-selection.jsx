@@ -312,7 +312,7 @@ export default function PlanSelection({ plans }) {
 
     if (flowStep === "order") {
       return (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Order management</DialogTitle>
             <DialogDescription>
@@ -429,7 +429,7 @@ export default function PlanSelection({ plans }) {
 
     if (flowStep === "manual-payment") {
       return (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manual payment</DialogTitle>
             <DialogDescription>
