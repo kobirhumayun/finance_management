@@ -185,7 +185,8 @@ paymentSchema.index(
     { gatewayTransactionId: 1 },
     {
         unique: true,
-        partialFilterExpression: { gatewayTransactionId: { $exists: true, $ne: null } },
+        // Only enforce uniqueness when a non-null string transaction ID is provided
+        partialFilterExpression: { gatewayTransactionId: { $type: 'string' } },
     }
 );
 
