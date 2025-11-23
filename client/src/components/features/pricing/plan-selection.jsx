@@ -406,7 +406,7 @@ export default function PlanSelection({ plans }) {
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="plan-order-payment-method-details">Manual payment instructions</Label>
+              <Label htmlFor="plan-order-payment-method-details">Manual payment instructions (optional)</Label>
               <Textarea
                 id="plan-order-payment-method-details"
                 placeholder="Provide instructions for submitting manual payment details"
