@@ -256,14 +256,14 @@ export default function PlanSelection({ plans }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Card className="border-dashed">
+            <Card>
               <CardHeader className="py-4">
                 <CardTitle className="text-lg">Automatic payment</CardTitle>
                 <CardDescription>Let us process renewals automatically for you.</CardDescription>
               </CardHeader>
               <CardFooter>
                 <Button className="w-full" variant="outline" onClick={() => setFlowStep("automatic-coming-soon") }>
-                  Continue with automatic payment
+                  Continue
                 </Button>
               </CardFooter>
             </Card>
@@ -274,7 +274,7 @@ export default function PlanSelection({ plans }) {
               </CardHeader>
               <CardFooter>
                 <Button className="w-full" onClick={() => setFlowStep("order")}>
-                  Continue with manual payment
+                  Continue
                 </Button>
               </CardFooter>
             </Card>
