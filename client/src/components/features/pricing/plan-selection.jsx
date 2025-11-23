@@ -608,6 +608,8 @@ export default function PlanSelection({ plans }) {
       );
       const currencyValue = paymentDetails?.currency ?? orderPayload?.currency ?? selectedPlan?.currency;
       const gatewayValue = paymentDetails?.paymentGateway ?? orderPayload?.paymentGateway;
+      const orderNumber =
+        orderResponse?.orderId || paymentDetails?.orderNumber || paymentDetails?.order || "-";
       return (
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -624,7 +626,7 @@ export default function PlanSelection({ plans }) {
             {manualPaymentResponse?.payment?.gatewayTransactionId && (
               <p>Reference: {manualPaymentResponse.payment.gatewayTransactionId}</p>
             )}
-            {manualPaymentResponse?.payment?.order && <p>Order ID: {manualPaymentResponse.payment.order}</p>}
+            <p>Order number: {orderNumber}</p>
           </div>
           <DialogFooter>
             <Button onClick={resetFlow}>Done</Button>
