@@ -27,7 +27,11 @@ import { createPlanOrder, submitManualPayment } from "@/lib/plans";
 import { formatPlanAmount, resolveNumericValue } from "@/lib/formatters";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { acceptedBanks, acceptedMobileOperators } from "@/config/payment-methods";
+import {
+  acceptedBanks,
+  acceptedMobileOperators,
+  manualPaymentDetails,
+} from "@/config/payment-methods";
 
 const orderSchema = z.object({
   planId: z.string().min(1, "Plan is required"),
@@ -36,7 +40,11 @@ const orderSchema = z.object({
   paymentGateway: z.literal("manual"),
   paymentMethodDetails: z
     .string()
-    .min(1, "Manual payment instructions are required"),
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim() ?? "";
+      return trimmed.length > 0 ? trimmed : "none";
+    }),
   purpose: z.enum([
     "subscription_initial",
     "subscription_renewal",
@@ -51,6 +59,7 @@ const manualPaymentSchema = z.object({
   currency: z.string().min(1, "Currency is required"),
   paymentGateway: z.literal("manual"),
   paymentId: z.string().min(1, "Payment ID is required"),
+  paymentProvider: z.string().min(1, "Select the payment provider used"),
   gatewayTransactionId: z.string().min(3, "Provide the transaction reference"),
 });
 
@@ -75,6 +84,7 @@ const defaultManualValues = {
   currency: "",
   paymentGateway: "manual",
   paymentId: "",
+  paymentProvider: "",
   gatewayTransactionId: "",
 };
 
@@ -104,6 +114,7 @@ export default function PlanSelection({ plans }) {
   });
 
   const purposeValue = orderForm.watch("purpose");
+  const paymentProviderValue = manualPaymentForm.watch("paymentProvider");
 
   const resetFlow = useCallback(() => {
     setDialogOpen(false);
@@ -144,12 +155,14 @@ export default function PlanSelection({ plans }) {
 
   useEffect(() => {
     if (dialogOpen && flowStep === "order" && selectedPlan) {
+      const paymentMethodDetailsValue =
+        orderPayload?.paymentMethodDetails === "none" ? "" : orderPayload?.paymentMethodDetails || "";
       orderForm.reset({
         planId: selectedPlan.planId,
         amount: orderPayload?.amount ?? (Number(selectedPlan.price) || 0),
         currency: orderPayload?.currency ?? (selectedPlan.currency || "BDT"),
         paymentGateway: "manual",
-        paymentMethodDetails: orderPayload?.paymentMethodDetails || "",
+        paymentMethodDetails: paymentMethodDetailsValue,
         purpose: orderPayload?.purpose || "subscription_renewal",
       });
     }
@@ -162,6 +175,7 @@ export default function PlanSelection({ plans }) {
         currency: orderPayload?.currency ?? selectedPlan?.currency ?? "BDT",
         paymentGateway: "manual",
         paymentId: orderResponse.paymentId ?? "",
+        paymentProvider: "",
         gatewayTransactionId: "",
       });
     }
@@ -198,9 +212,16 @@ export default function PlanSelection({ plans }) {
     if (!orderResponse) return;
     setIsSubmittingManualPayment(true);
     try {
+      const { paymentProvider, gatewayTransactionId, ...restValues } = values;
+      const prefixedTransactionId = paymentProvider
+        ? `${paymentProvider}-${gatewayTransactionId}`
+        : gatewayTransactionId;
+
       const payload = {
-        ...values,
+        ...restValues,
+        paymentGateway: "manual",
         paymentId: orderResponse.paymentId ?? values.paymentId,
+        gatewayTransactionId: prefixedTransactionId,
       };
       const response = await submitManualPayment(payload);
       setManualPaymentResponse(response);
@@ -215,12 +236,25 @@ export default function PlanSelection({ plans }) {
     }
   };
 
+  const providerLookup = useMemo(() => {
+    const providers = [...acceptedBanks, ...acceptedMobileOperators];
+    return providers.reduce((map, provider) => {
+      map.set(provider.id, provider);
+      return map;
+    }, new Map());
+  }, []);
+
+  const providerOptions = useMemo(() => {
+    const providers = [...acceptedBanks, ...acceptedMobileOperators];
+    return providers.map((provider) => ({ id: provider.id, name: provider.name }));
+  }, []);
+
   const renderDialogContent = () => {
     if (!selectedPlan) return null;
 
     if (flowStep === "payment-mode") {
       return (
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-full max-w-[min(100vw-32px,420px)] max-h-[90vh] overflow-y-auto overflow-x-hidden sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Select payment option</DialogTitle>
             <DialogDescription>
@@ -228,14 +262,14 @@ export default function PlanSelection({ plans }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Card className="border-dashed">
+            <Card>
               <CardHeader className="py-4">
                 <CardTitle className="text-lg">Automatic payment</CardTitle>
                 <CardDescription>Let us process renewals automatically for you.</CardDescription>
               </CardHeader>
               <CardFooter>
                 <Button className="w-full" variant="outline" onClick={() => setFlowStep("automatic-coming-soon") }>
-                  Continue with automatic payment
+                  Continue
                 </Button>
               </CardFooter>
             </Card>
@@ -246,7 +280,7 @@ export default function PlanSelection({ plans }) {
               </CardHeader>
               <CardFooter>
                 <Button className="w-full" onClick={() => setFlowStep("order")}>
-                  Continue with manual payment
+                  Continue
                 </Button>
               </CardFooter>
             </Card>
@@ -284,7 +318,7 @@ export default function PlanSelection({ plans }) {
 
     if (flowStep === "order") {
       return (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Order management</DialogTitle>
             <DialogDescription>
@@ -372,7 +406,7 @@ export default function PlanSelection({ plans }) {
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="plan-order-payment-method-details">Manual payment instructions</Label>
+              <Label htmlFor="plan-order-payment-method-details">Manual payment instructions (optional)</Label>
               <Textarea
                 id="plan-order-payment-method-details"
                 placeholder="Provide instructions for submitting manual payment details"
@@ -401,7 +435,7 @@ export default function PlanSelection({ plans }) {
 
     if (flowStep === "manual-payment") {
       return (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manual payment</DialogTitle>
             <DialogDescription>
@@ -409,6 +443,69 @@ export default function PlanSelection({ plans }) {
               this confirmation step.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4 rounded-md border border-primary/40 bg-primary/5 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary">Payment instructions</p>
+              <p className="text-sm text-muted-foreground">
+                Send funds to <span className="font-semibold text-foreground">{manualPaymentDetails.recipientName}</span> using
+                any account below, then share the transaction reference.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 rounded-md border bg-background/50 p-3">
+                <p className="text-sm font-medium text-muted-foreground">Bank accounts</p>
+                <div className="space-y-3 text-sm">
+                  {manualPaymentDetails.bankAccounts.map((account) => {
+                    const provider = providerLookup.get(account.providerId);
+                    return (
+                      <div key={`${account.providerId}-${account.accountNumber}`} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{provider?.name || account.providerId}</p>
+                          <Badge variant="secondary" className="text-xs font-semibold">
+                            {account.accountNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {account.accountName}
+                          {account.notes ? ` · ${account.notes}` : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2 rounded-md border bg-background/50 p-3">
+                <p className="text-sm font-medium text-muted-foreground">Mobile wallets</p>
+                <div className="space-y-3 text-sm">
+                  {manualPaymentDetails.mobileWallets.map((account) => {
+                    const provider = providerLookup.get(account.providerId);
+                    return (
+                      <div key={`${account.providerId}-${account.accountNumber}`} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{provider?.name || account.providerId}</p>
+                          <Badge variant="outline" className="text-xs font-semibold">
+                            {account.accountNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {account.accountName}
+                          {account.notes ? ` · ${account.notes}` : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Steps to follow</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                {manualPaymentDetails.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <p className="font-medium">Order summary</p>
             <p className="text-muted-foreground">
@@ -463,6 +560,29 @@ export default function PlanSelection({ plans }) {
               )}
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="manual-payment-provider">Payment provider</Label>
+              <Select
+                value={paymentProviderValue}
+                onValueChange={(value) => manualPaymentForm.setValue("paymentProvider", value)}
+                disabled={isSubmittingManualPayment}
+              >
+                <SelectTrigger id="manual-payment-provider">
+                  <SelectValue placeholder="Select bank or mobile wallet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerOptions.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input type="hidden" {...manualPaymentForm.register("paymentProvider")} />
+              {manualPaymentForm.formState.errors.paymentProvider && (
+                <p className="text-sm text-destructive">{manualPaymentForm.formState.errors.paymentProvider.message}</p>
+              )}
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="manual-payment-reference">Gateway transaction ID</Label>
               <Input
                 id="manual-payment-reference"
@@ -494,6 +614,8 @@ export default function PlanSelection({ plans }) {
       );
       const currencyValue = paymentDetails?.currency ?? orderPayload?.currency ?? selectedPlan?.currency;
       const gatewayValue = paymentDetails?.paymentGateway ?? orderPayload?.paymentGateway;
+      const orderNumber =
+        orderResponse?.orderId || paymentDetails?.orderNumber || paymentDetails?.order || "-";
       return (
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -510,7 +632,7 @@ export default function PlanSelection({ plans }) {
             {manualPaymentResponse?.payment?.gatewayTransactionId && (
               <p>Reference: {manualPaymentResponse.payment.gatewayTransactionId}</p>
             )}
-            {manualPaymentResponse?.payment?.order && <p>Order ID: {manualPaymentResponse.payment.order}</p>}
+            <p>Order number: {orderNumber}</p>
           </div>
           <DialogFooter>
             <Button onClick={resetFlow}>Done</Button>
