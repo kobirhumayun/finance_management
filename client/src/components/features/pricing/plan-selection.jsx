@@ -248,7 +248,7 @@ export default function PlanSelection({ plans }) {
 
     if (flowStep === "payment-mode") {
       return (
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Select payment option</DialogTitle>
             <DialogDescription>
