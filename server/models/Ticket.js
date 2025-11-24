@@ -27,6 +27,9 @@ const attachmentSchema = new Schema({
     size: {
         type: Number
     },
+    path: {
+        type: String
+    },
     uploadedAt: {
         type: Date,
         default: Date.now
@@ -35,7 +38,7 @@ const attachmentSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'User'
     }
-}, { _id: false });
+});
 
 const activityLogSchema = new Schema({
     actor: {
@@ -85,6 +88,10 @@ const ticketSchema = new Schema({
         type: String,
         enum: ['low', 'medium', 'high', 'urgent'],
         default: 'medium'
+    },
+    staleSince: {
+        type: Date,
+        index: true,
     },
     status: {
         type: String,

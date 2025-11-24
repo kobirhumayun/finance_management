@@ -13,9 +13,11 @@ const invoiceRoutes = require('./routes/invoice');
 const adminUserRoutes = require('./routes/adminUsers');
 const projectRoutes = require('./routes/project');
 const reportRoutes = require('./routes/report');
+const ticketRoutes = require('./routes/ticket');
 const { initializeEnforcer } = require('./services/casbin');
 const { initializePlaywright } = require('./services/playwrightPool');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
+const { scheduleStaleTicketScan } = require('./jobs/ticketJobs');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./middleware/errorHandler');
 const morgan = require('morgan');
@@ -62,6 +64,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 
 // Handle 404 Not Found for any routes not matched above
@@ -82,6 +85,7 @@ const startServer = async () => {
         await initializePlaywright();
         console.log('Playwright pool initialized');
         scheduleSubscriptionExpiryCheck();
+        scheduleStaleTicketScan();
 
         // 2. Start Listening for Requests
         const server = app.listen(port, () => {
