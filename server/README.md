@@ -14,6 +14,11 @@ Create a `.env` file in this directory using [`.env.example`](./.env.example) as
 
 Update the values to match your environment before starting the server.
 
+## Uploads
+
+- Uploaded assets are stored under `UPLOADS_ROOT` (defaults to `server/uploads`) and are exposed through `GET /api/uploads/*` via Express static middleware. The same path is referenced by URLs returned from upload endpoints (e.g., ticket and transaction attachments).
+- The upload service accepts PNG, JPG, and WebP files only and enforces a maximum size defined by `UPLOAD_MAX_BYTES` (default: 5 MB) and an image resize cap controlled by `UPLOAD_MAX_DIMENSION` (default: 1600px). Keep these values aligned with the client UI, which tells users to upload PNG/JPG/WebP files up to 5 MB.
+
 ## Report summary exports
 
 The summary report supports streaming exports in addition to the JSON API:
