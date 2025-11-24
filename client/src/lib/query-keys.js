@@ -45,6 +45,10 @@ export const qk = {
     summaryFilters: () => ["reports", "summary", "filters"],
     summaryTable: (params) => ["reports", "summary-table", normalizeParams(params)],
   },
+  tickets: {
+    list: (params) => ["tickets", "list", normalizeParams(params)],
+    detail: (ticketId) => ["tickets", "detail", ticketId ? String(ticketId) : "unknown"],
+  },
   plans: {
     all: () => ["plans", "all"],
     current: () => ["plans", "current"],
