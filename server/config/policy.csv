@@ -2,9 +2,11 @@
 
 # Admin Role: Has access to everything, regardless of plan/domain ('*' matches any domain)
 p, admin, *, *, (read|write|update|delete), allow
+p, admin, *, tickets, (read|write|update|delete), allow
 
 # Support role: Read access to order resources across all plans
 p, support, *, orders, read, allow
+p, support, *, tickets, (read|write|update|delete), allow
 
 # Consumer Role Policies based on Plan (Domain)
 
@@ -19,6 +21,7 @@ p, consumer, basic, professional, read, allow
 p, consumer, professional, professional, (read|write|update|delete), allow
 p, consumer, business, professional, (read|write|update|delete), allow
 p, consumer, enterprise, professional, (read|write|update|delete), allow
+p, consumer, *, tickets, (read|write|update|delete), allow
 
 # business: basic=no access, professional=read only, others=full
 # No rule for 'basic' plan on business means no access
