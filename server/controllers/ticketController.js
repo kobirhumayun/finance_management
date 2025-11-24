@@ -173,11 +173,7 @@ const listTickets = async (req, res, next) => {
 const getTicket = async (req, res, next) => {
     try {
         const { ticketId } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(ticketId)) {
-            return res.status(400).json({ message: 'Invalid ticket identifier.' });
-        }
-
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -201,7 +197,7 @@ const addComment = async (req, res, next) => {
             return res.status(400).json({ message: 'Comment is required.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -234,7 +230,7 @@ const updateStatus = async (req, res, next) => {
             return res.status(400).json({ message: 'Invalid ticket status.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -267,7 +263,7 @@ const updateAssignee = async (req, res, next) => {
             return res.status(403).json({ message: 'Only support or admin can reassign tickets.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -300,7 +296,7 @@ const uploadAttachment = async (req, res, next) => {
             return res.status(400).json({ message: 'No attachment provided.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -330,7 +326,7 @@ const deleteAttachment = async (req, res, next) => {
     try {
         const { ticketId, attachmentId } = req.params;
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
