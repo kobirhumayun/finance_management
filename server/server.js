@@ -17,6 +17,7 @@ const ticketRoutes = require('./routes/ticket');
 const { initializeEnforcer } = require('./services/casbin');
 const { initializePlaywright } = require('./services/playwrightPool');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
+const { scheduleStaleTicketScan } = require('./jobs/ticketJobs');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./middleware/errorHandler');
 const morgan = require('morgan');
@@ -84,6 +85,7 @@ const startServer = async () => {
         await initializePlaywright();
         console.log('Playwright pool initialized');
         scheduleSubscriptionExpiryCheck();
+        scheduleStaleTicketScan();
 
         // 2. Start Listening for Requests
         const server = app.listen(port, () => {

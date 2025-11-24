@@ -3,6 +3,7 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
+const { getUserNameById, notifyTicketParticipants } = require('../services/ticketNotificationService');
 const { ensureUploadsRoot, getUploadFileSizeLimit, getUploadsRoot } = require('../services/imageService');
 const { sanitizeFilename } = require('../utils/storageStreamer');
 
@@ -93,6 +94,11 @@ const createTicket = async (req, res, next) => {
             ],
         });
 
+        const actorName = await getUserNameById(req.user._id);
+        const subjectLine = `Ticket created: ${ticket.subject}`;
+        const message = `Ticket "${ticket.subject}" was created by ${actorName}. We will notify you on further updates.`;
+        await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
+
         res.status(201).json({ ticket });
     } catch (error) {
         next(error);
@@ -173,11 +179,7 @@ const listTickets = async (req, res, next) => {
 const getTicket = async (req, res, next) => {
     try {
         const { ticketId } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(ticketId)) {
-            return res.status(400).json({ message: 'Invalid ticket identifier.' });
-        }
-
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -201,7 +203,7 @@ const addComment = async (req, res, next) => {
             return res.status(400).json({ message: 'Comment is required.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -215,6 +217,8 @@ const addComment = async (req, res, next) => {
             action: 'comment',
             message: comment.trim(),
         });
+
+        ticket.staleSince = undefined;
 
         await ticket.save();
 
@@ -234,7 +238,7 @@ const updateStatus = async (req, res, next) => {
             return res.status(400).json({ message: 'Invalid ticket status.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -244,6 +248,7 @@ const updateStatus = async (req, res, next) => {
         }
 
         ticket.status = status;
+        ticket.staleSince = undefined;
         ticket.activityLog.push({
             actor: req.user._id,
             action: 'status_change',
@@ -251,6 +256,11 @@ const updateStatus = async (req, res, next) => {
         });
 
         await ticket.save();
+
+        const actorName = await getUserNameById(req.user._id);
+        const subjectLine = `Ticket status updated: ${ticket.subject}`;
+        const message = `Status for ticket "${ticket.subject}" updated to ${status} by ${actorName}.`;
+        await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
         res.status(200).json({ ticket });
     } catch (error) {
@@ -267,7 +277,7 @@ const updateAssignee = async (req, res, next) => {
             return res.status(403).json({ message: 'Only support or admin can reassign tickets.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -285,6 +295,8 @@ const updateAssignee = async (req, res, next) => {
             message: assigneeId ? `Assigned to ${assigneeId.toString()}` : 'Assignee cleared',
         });
 
+        ticket.staleSince = undefined;
+
         await ticket.save();
 
         res.status(200).json({ ticket });
@@ -300,7 +312,7 @@ const uploadAttachment = async (req, res, next) => {
             return res.status(400).json({ message: 'No attachment provided.' });
         }
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -318,6 +330,8 @@ const uploadAttachment = async (req, res, next) => {
             message: attachment.filename,
         });
 
+        ticket.staleSince = undefined;
+
         await ticket.save();
 
         res.status(201).json({ attachment });
@@ -330,7 +344,7 @@ const deleteAttachment = async (req, res, next) => {
     try {
         const { ticketId, attachmentId } = req.params;
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found.' });
         }
@@ -360,6 +374,8 @@ const deleteAttachment = async (req, res, next) => {
             action: 'attachment_removed',
             message: attachment.filename,
         });
+
+        ticket.staleSince = undefined;
 
         await ticket.save();
 
