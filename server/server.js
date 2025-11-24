@@ -14,7 +14,7 @@ const adminUserRoutes = require('./routes/adminUsers');
 const projectRoutes = require('./routes/project');
 const reportRoutes = require('./routes/report');
 const ticketRoutes = require('./routes/ticket');
-const { getUploadsRoot } = require('./services/imageService');
+const { ensureUploadsRoot, getUploadsRoot } = require('./services/imageService');
 const { initializeEnforcer } = require('./services/casbin');
 const { initializePlaywright } = require('./services/playwrightPool');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
@@ -66,7 +66,12 @@ app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/tickets', ticketRoutes);
-app.use('/api/uploads', express.static(getUploadsRoot()));
+
+ensureUploadsRoot().catch((error) => {
+    console.error('Failed to initialize uploads directory', error);
+});
+
+app.use('/api/uploads', express.static(getUploadsRoot(), { fallthrough: false }));
 
 
 // Handle 404 Not Found for any routes not matched above
