@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const reportController = require('../controllers/reportController');
+const { getTicketReport } = require('../controllers/ticketReportController');
 const { authenticate } = require('../middleware/authMiddleware');
 const {
     summaryListValidationRules,
@@ -42,5 +43,7 @@ router.get(
 );
 
 router.get('/summary/filters', reportController.getSummaryFilters);
+
+router.get('/tickets', getTicketReport);
 
 module.exports = router;
