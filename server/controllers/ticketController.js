@@ -3,6 +3,7 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
+const { getUserNameById, notifyTicketParticipants } = require('../services/ticketNotificationService');
 const { ensureUploadsRoot, getUploadFileSizeLimit, getUploadsRoot } = require('../services/imageService');
 const { sanitizeFilename } = require('../utils/storageStreamer');
 
@@ -92,6 +93,11 @@ const createTicket = async (req, res, next) => {
                 },
             ],
         });
+
+        const actorName = await getUserNameById(req.user._id);
+        const subjectLine = `Ticket created: ${ticket.subject}`;
+        const message = `Ticket "${ticket.subject}" was created by ${actorName}. We will notify you on further updates.`;
+        await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
         res.status(201).json({ ticket });
     } catch (error) {
@@ -212,6 +218,8 @@ const addComment = async (req, res, next) => {
             message: comment.trim(),
         });
 
+        ticket.staleSince = undefined;
+
         await ticket.save();
 
         res.status(200).json({ ticket });
@@ -240,6 +248,7 @@ const updateStatus = async (req, res, next) => {
         }
 
         ticket.status = status;
+        ticket.staleSince = undefined;
         ticket.activityLog.push({
             actor: req.user._id,
             action: 'status_change',
@@ -247,6 +256,11 @@ const updateStatus = async (req, res, next) => {
         });
 
         await ticket.save();
+
+        const actorName = await getUserNameById(req.user._id);
+        const subjectLine = `Ticket status updated: ${ticket.subject}`;
+        const message = `Status for ticket "${ticket.subject}" updated to ${status} by ${actorName}.`;
+        await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
         res.status(200).json({ ticket });
     } catch (error) {
@@ -281,6 +295,8 @@ const updateAssignee = async (req, res, next) => {
             message: assigneeId ? `Assigned to ${assigneeId.toString()}` : 'Assignee cleared',
         });
 
+        ticket.staleSince = undefined;
+
         await ticket.save();
 
         res.status(200).json({ ticket });
@@ -313,6 +329,8 @@ const uploadAttachment = async (req, res, next) => {
             action: 'attachment_added',
             message: attachment.filename,
         });
+
+        ticket.staleSince = undefined;
 
         await ticket.save();
 
@@ -356,6 +374,8 @@ const deleteAttachment = async (req, res, next) => {
             action: 'attachment_removed',
             message: attachment.filename,
         });
+
+        ticket.staleSince = undefined;
 
         await ticket.save();
 

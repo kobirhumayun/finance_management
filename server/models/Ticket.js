@@ -89,6 +89,10 @@ const ticketSchema = new Schema({
         enum: ['low', 'medium', 'high', 'urgent'],
         default: 'medium'
     },
+    staleSince: {
+        type: Date,
+        index: true,
+    },
     status: {
         type: String,
         enum: ['open', 'pending', 'resolved', 'closed'],
