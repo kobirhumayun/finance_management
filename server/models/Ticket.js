@@ -21,11 +21,20 @@ const attachmentSchema = new Schema({
         type: String,
         required: true
     },
+    mimeType: {
+        type: String,
+    },
     contentType: {
         type: String
     },
     size: {
         type: Number
+    },
+    width: {
+        type: Number,
+    },
+    height: {
+        type: Number,
     },
     path: {
         type: String

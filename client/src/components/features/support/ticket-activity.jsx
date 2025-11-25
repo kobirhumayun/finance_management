@@ -3,7 +3,8 @@ import { MessageSquare, Paperclip, RefreshCcw, UserRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/formatters";
-import { cn, formatFileSize } from "@/lib/utils";
+import { formatFileSize } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { TicketStatusBadge } from "./ticket-status-badge";
 
 const actionLabels = {
@@ -72,7 +73,7 @@ export function TicketActivity({ activity = [] }) {
   );
 }
 
-export function TicketAttachmentList({ attachments = [], onDownload, actions = null }) {
+export function TicketAttachmentList({ attachments = [], onView, actions = null }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -87,26 +88,29 @@ export function TicketAttachmentList({ attachments = [], onDownload, actions = n
             {attachments.map((attachment) => (
               <li
                 key={attachment.id || attachment.url}
-                className="flex items-center justify-between rounded-md border bg-card px-3 py-2"
+                className="flex items-center justify-between gap-4 rounded-md border bg-card px-3 py-2"
               >
-                <div>
+                <div className="space-y-1">
                   <p className="text-sm font-medium leading-none">{attachment.filename}</p>
                   <p className="text-xs text-muted-foreground">
                     {formatFileSize(attachment.size, { fallback: "" }) || "Unknown size"}
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    Dimensions: {attachment.width && attachment.height ? `${attachment.width} × ${attachment.height}px` : "—"}
+                  </p>
                 </div>
-                <a
-                  href={attachment.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={cn(
-                    "text-sm font-medium text-primary underline-offset-4 hover:underline",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  )}
-                  onClick={(event) => onDownload?.(event, attachment)}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="whitespace-nowrap"
+                  disabled={!attachment.url && !attachment.resolvedUrl}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onView?.(attachment);
+                  }}
                 >
-                  View
-                </a>
+                  View image
+                </Button>
               </li>
             ))}
           </ul>

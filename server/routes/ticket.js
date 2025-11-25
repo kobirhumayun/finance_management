@@ -14,6 +14,12 @@ router.get('/:ticketId', authorize('tickets', 'read'), ensureTicketAccess, ticke
 router.post('/:ticketId/comments', authorize('tickets', 'update'), ensureTicketAccess, ticketController.addComment);
 router.patch('/:ticketId/status', authorize('tickets', 'update'), ensureTicketAccess, ticketController.updateStatus);
 router.patch('/:ticketId/assignee', authorize('tickets', 'update'), ensureTicketAccess, ticketController.updateAssignee);
+router.get(
+    '/:ticketId/attachments/:attachmentId/stream',
+    authorize('tickets', 'read'),
+    ensureTicketAccess,
+    ticketController.streamTicketAttachment,
+);
 router.post(
     '/:ticketId/attachments',
     authorize('tickets', 'update'),

@@ -1,7 +1,7 @@
 // File: src/components/features/support/ticket-detail-page.jsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Paperclip, Send } from "lucide-react";
@@ -18,7 +18,9 @@ import { toast } from "@/components/ui/sonner";
 import { qk } from "@/lib/query-keys";
 import { addTicketComment, fetchTicketDetail, updateTicketStatus, uploadTicketAttachment } from "@/lib/queries/tickets";
 import { formatDate } from "@/lib/formatters";
-import { formatFileSize } from "@/lib/utils";
+import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
+import TransactionAttachmentDialog from "@/components/features/projects/transaction-attachment-dialog";
+import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open" },
@@ -26,9 +28,6 @@ const STATUS_OPTIONS = [
   { value: "resolved", label: "Resolved" },
   { value: "closed", label: "Closed" },
 ];
-
-const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp", "application/pdf"];
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
@@ -53,6 +52,8 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   const [comment, setComment] = useState("");
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentError, setAttachmentError] = useState(null);
+  const [selectedAttachment, setSelectedAttachment] = useState(null);
+  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
 
   const ticketQuery = useQuery({
     queryKey: qk.tickets.detail(ticketId),
@@ -60,9 +61,14 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     enabled: Boolean(ticketId),
   });
 
-  const ticket = ticketQuery.data;
+  const ticketResponse = ticketQuery.data;
+  const ticket = ticketResponse?.ticket ?? ticketResponse;
   const isLoading = ticketQuery.isLoading;
   const isFetching = ticketQuery.isFetching;
+  const resolvedMaxAttachmentBytes = useMemo(
+    () => resolveMaxAttachmentBytes(ticketResponse?.attachmentLimitBytes),
+    [ticketResponse?.attachmentLimitBytes]
+  );
 
   const invalidateTicketQueries = () => {
     queryClient.invalidateQueries({ queryKey: qk.tickets.detail(ticketId) });
@@ -97,16 +103,12 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     },
   });
 
-  const validateAttachment = (file) => {
-    if (!file) return null;
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      return `File is too large. Max size is ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`;
-    }
-    if (file.type && !ACCEPTED_TYPES.includes(file.type)) {
-      return "Unsupported file type. Upload an image or PDF.";
-    }
-    return null;
-  };
+  const validateAttachment = (file) =>
+    validateImageAttachment(
+      file,
+      resolvedMaxAttachmentBytes,
+      (value) => formatFileSize(value, { fallback: "unknown size" })
+    );
 
   const attachmentMutation = useMutation({
     mutationFn: (file) => uploadTicketAttachment({ ticketId, file }),
@@ -120,6 +122,28 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
       setAttachmentError(getErrorMessage(error, "Unable to upload attachment"));
     },
   });
+
+  const attachments = useMemo(() => {
+    if (!Array.isArray(ticket?.attachments)) return [];
+    return ticket.attachments.map((attachment) => ({
+      ...attachment,
+      resolvedUrl: resolveAssetUrl(attachment?.url, attachment?.uploadedAt ?? attachment?.updatedAt),
+    }));
+  }, [ticket?.attachments]);
+
+  const handleViewAttachment = (attachment) => {
+    if (!attachment) return;
+    setSelectedAttachment({
+      id: attachment.id,
+      subcategory: ticket?.subject || "Support ticket",
+      description: ticket?.description || "",
+      attachment: {
+        ...attachment,
+        url: attachment.resolvedUrl || attachment.url || "",
+      },
+    });
+    setIsAttachmentDialogOpen(true);
+  };
 
   const handleAttachmentChange = (event) => {
     const file = event.target.files?.[0];
@@ -145,6 +169,12 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     }
     attachmentMutation.mutate(attachmentFile);
   };
+
+  useEffect(() => {
+    if (!isAttachmentDialogOpen) {
+      setSelectedAttachment(null);
+    }
+  }, [isAttachmentDialogOpen]);
 
   const activity = useMemo(() => {
     const events = Array.isArray(ticket?.activityLog) ? [...ticket.activityLog] : [];
@@ -277,7 +307,8 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
             </Card>
 
             <TicketAttachmentList
-              attachments={ticket.attachments}
+              attachments={attachments}
+              onView={handleViewAttachment}
               actions={
                 <Button
                   size="sm"
@@ -302,19 +333,32 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
             <Card>
               <CardContent className="space-y-2">
                 <Label htmlFor="ticket-attachment" className="text-sm">Attach a file</Label>
-                <Input id="ticket-attachment" type="file" accept={ACCEPTED_TYPES.join(",")} onChange={handleAttachmentChange} />
+                <Input
+                  id="ticket-attachment"
+                  type="file"
+                  accept={IMAGE_ATTACHMENT_TYPES.join(",")}
+                  onChange={handleAttachmentChange}
+                />
                 <p className="text-xs text-muted-foreground">
                   {attachmentFile
                     ? `${attachmentFile.name} (${formatFileSize(attachmentFile.size, { fallback: "unknown size" })})`
                     : "No file selected"}
                 </p>
-                <p className="text-xs text-muted-foreground">Accepted: images or PDF up to {formatFileSize(MAX_ATTACHMENT_BYTES)}.</p>
+                <p className="text-xs text-muted-foreground">
+                  Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)}.
+                </p>
                 {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
               </CardContent>
             </Card>
           </div>
         </div>
       ) : null}
+
+      <TransactionAttachmentDialog
+        open={isAttachmentDialogOpen}
+        onOpenChange={setIsAttachmentDialogOpen}
+        transaction={selectedAttachment}
+      />
     </div>
   );
 }

@@ -1,11 +1,8 @@
-const fs = require('fs/promises');
-const path = require('path');
-const { randomUUID } = require('crypto');
 const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
 const { getUserNameById, notifyTicketParticipants } = require('../services/ticketNotificationService');
-const { ensureUploadsRoot, getUploadFileSizeLimit, getUploadsRoot } = require('../services/imageService');
-const { sanitizeFilename } = require('../utils/storageStreamer');
+const { getUploadFileSizeLimit, saveTicketAttachment, discardDescriptor } = require('../services/imageService');
+const { streamStoredFile } = require('../utils/storageStreamer');
 
 const isAdmin = (user) => user?.role === 'admin';
 const isSupport = (user) => user?.role === 'support';
@@ -15,15 +12,6 @@ const toObjectId = (value) => {
         return null;
     }
     return new mongoose.Types.ObjectId(value);
-};
-
-const sanitizeSegment = (value) => {
-    if (!value) {
-        return 'common';
-    }
-    const stringValue = value.toString();
-    const sanitized = stringValue.replace(/[^a-zA-Z0-9-_]/g, '');
-    return sanitized || 'common';
 };
 
 const hasTicketAccess = (ticket, userId, userRole) => {
@@ -36,15 +24,62 @@ const hasTicketAccess = (ticket, userId, userRole) => {
     return ticket.requester?.toString() === userId || ticket.assignee?.toString() === userId;
 };
 
-const buildAttachmentRecord = ({ file, storedPath, relativePath, userId }) => ({
-    filename: file.originalname || 'attachment',
-    url: `/api/uploads/${relativePath.split(path.sep).join('/')}`,
-    contentType: file.mimetype || 'application/octet-stream',
-    size: file.size || 0,
-    uploadedAt: new Date(),
-    uploadedBy: userId,
-    path: storedPath,
-});
+const buildTicketAttachmentUrl = (ticketId, attachmentId) => {
+    if (!ticketId || !attachmentId) {
+        return '';
+    }
+    return `/api/tickets/${ticketId}/attachments/${attachmentId}/stream`;
+};
+
+const mapTicketAttachment = (attachment, ticketId) => {
+    if (!attachment || typeof attachment !== 'object') {
+        return null;
+    }
+
+    const attachmentId = attachment._id ? attachment._id.toString() : null;
+    const uploadedAt = attachment.uploadedAt instanceof Date
+        ? attachment.uploadedAt.toISOString()
+        : attachment.uploadedAt || null;
+
+    const url = (attachment.path && ticketId && attachmentId)
+        ? buildTicketAttachmentUrl(ticketId, attachmentId)
+        : (attachment.url || '');
+
+    return {
+        id: attachmentId,
+        filename: attachment.filename || 'Attachment',
+        mimeType: attachment.mimeType || attachment.contentType || '',
+        size: typeof attachment.size === 'number' ? attachment.size : null,
+        width: typeof attachment.width === 'number' ? attachment.width : null,
+        height: typeof attachment.height === 'number' ? attachment.height : null,
+        url,
+        uploadedAt,
+        uploadedBy: attachment.uploadedBy || null,
+    };
+};
+
+const mapTicketForResponse = (ticket) => {
+    if (!ticket) {
+        return ticket;
+    }
+
+    const plainTicket = typeof ticket.toObject === 'function' ? ticket.toObject() : { ...ticket };
+    const ticketId = plainTicket._id ? plainTicket._id.toString() : plainTicket.id;
+
+    return {
+        ...plainTicket,
+        id: ticketId,
+        attachments: Array.isArray(plainTicket.attachments)
+            ? plainTicket.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
+            : [],
+        activityLog: Array.isArray(plainTicket.activityLog)
+            ? plainTicket.activityLog.map((entry) => ({
+                ...entry,
+                at: entry.at || entry.createdAt || entry.updatedAt || null,
+            }))
+            : [],
+    };
+};
 
 const storeAttachment = async ({ file, ticketId, userId }) => {
     if (!file?.buffer || !file.buffer.length) {
@@ -52,24 +87,26 @@ const storeAttachment = async ({ file, ticketId, userId }) => {
         error.statusCode = 400;
         throw error;
     }
-    if (file.size && file.size > getUploadFileSizeLimit()) {
-        const error = new Error('File exceeds allowed size.');
-        error.statusCode = 400;
+
+    try {
+        const descriptor = await saveTicketAttachment({ file, userId, ticketId });
+        const attachmentId = new mongoose.Types.ObjectId();
+        return {
+            _id: attachmentId,
+            filename: descriptor.filename || file.originalname || 'attachment',
+            mimeType: descriptor.mimeType || 'image/webp',
+            size: descriptor.size ?? file.size ?? 0,
+            width: descriptor.width ?? null,
+            height: descriptor.height ?? null,
+            url: buildTicketAttachmentUrl(ticketId, attachmentId),
+            uploadedAt: descriptor.uploadedAt || new Date(),
+            uploadedBy: userId,
+            path: descriptor.path,
+        };
+    } catch (error) {
+        error.statusCode = error.statusCode || 400;
         throw error;
     }
-
-    const uploadsRoot = getUploadsRoot();
-    const safeUser = sanitizeSegment(userId);
-    const safeTicket = sanitizeSegment(ticketId);
-    const uniqueName = `${randomUUID()}-${sanitizeFilename(file.originalname || 'attachment')}`;
-    const relativePath = path.join('tickets', safeUser, safeTicket, uniqueName);
-    const absolutePath = path.join(uploadsRoot, relativePath);
-
-    await ensureUploadsRoot();
-    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fs.writeFile(absolutePath, file.buffer);
-
-    return buildAttachmentRecord({ file, storedPath: absolutePath, relativePath, userId });
 };
 
 const createTicket = async (req, res, next) => {
@@ -99,7 +136,7 @@ const createTicket = async (req, res, next) => {
         const message = `Ticket "${ticket.subject}" was created by ${actorName}. We will notify you on further updates.`;
         await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
-        res.status(201).json({ ticket });
+        res.status(201).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -163,13 +200,14 @@ const listTickets = async (req, res, next) => {
         ]);
 
         res.status(200).json({
-            tickets,
+            tickets: tickets.map(mapTicketForResponse),
             pagination: {
                 page: safePage,
                 limit: safeLimit,
                 total,
                 totalPages: Math.ceil(total / safeLimit) || 1,
             },
+            attachmentLimitBytes: getUploadFileSizeLimit(),
         });
     } catch (error) {
         next(error);
@@ -188,7 +226,7 @@ const getTicket = async (req, res, next) => {
             return res.status(403).json({ message: 'You are not allowed to access this ticket.' });
         }
 
-        res.status(200).json({ ticket });
+        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -222,7 +260,7 @@ const addComment = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(200).json({ ticket });
+        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -262,7 +300,7 @@ const updateStatus = async (req, res, next) => {
         const message = `Status for ticket "${ticket.subject}" updated to ${status} by ${actorName}.`;
         await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
-        res.status(200).json({ ticket });
+        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -299,7 +337,7 @@ const updateAssignee = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(200).json({ ticket });
+        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -334,8 +372,47 @@ const uploadAttachment = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(201).json({ attachment });
+        res.status(201).json({ attachment: mapTicketAttachment(attachment, ticket._id) });
     } catch (error) {
+        next(error);
+    }
+};
+
+const streamTicketAttachment = async (req, res, next) => {
+    try {
+        const { ticketId, attachmentId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(attachmentId)) {
+            return res.status(400).json({ message: 'Invalid attachment identifier.' });
+        }
+
+        const ticket = req.ticket || await Ticket.findById(ticketId).select({ attachments: 1, requester: 1, assignee: 1 });
+        if (!ticket) {
+            return res.status(404).json({ message: 'Ticket not found.' });
+        }
+
+        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
+            return res.status(403).json({ message: 'You are not allowed to access this ticket.' });
+        }
+
+        const attachment = ticket.attachments?.find((item) => item._id?.toString() === attachmentId);
+        if (!attachment?.path) {
+            return res.status(404).json({ message: 'Attachment not found.' });
+        }
+
+        await streamStoredFile({
+            descriptor: attachment,
+            res,
+            fallbackFilename: attachment.filename || `ticket-${attachmentId}`,
+            disposition: 'inline',
+        });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(404).json({ message: 'Attachment file is no longer available.' });
+        }
+        if (error.code === 'ERR_INVALID_PATH') {
+            return res.status(404).json({ message: 'Attachment could not be located.' });
+        }
         next(error);
     }
 };
@@ -359,9 +436,9 @@ const deleteAttachment = async (req, res, next) => {
         }
 
         const [attachment] = ticket.attachments.splice(attachmentIndex, 1);
-        if (attachment?.path) {
+        if (attachment) {
             try {
-                await fs.unlink(path.resolve(attachment.path));
+                await discardDescriptor(attachment);
             } catch (unlinkError) {
                 if (unlinkError.code !== 'ENOENT') {
                     console.error('Failed to remove attachment from disk:', unlinkError);
@@ -379,7 +456,7 @@ const deleteAttachment = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(200).json({ message: 'Attachment removed.' });
+        res.status(200).json({ message: 'Attachment removed.', ticket: mapTicketForResponse(ticket) });
     } catch (error) {
         next(error);
     }
@@ -393,5 +470,6 @@ module.exports = {
     updateStatus,
     updateAssignee,
     uploadAttachment,
+    streamTicketAttachment,
     deleteAttachment,
 };

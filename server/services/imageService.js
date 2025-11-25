@@ -119,6 +119,12 @@ const saveTransactionAttachment = async ({ file, userId, projectId }) => saveIma
     maxDimension: DEFAULT_MAX_DIMENSION,
 });
 
+const saveTicketAttachment = async ({ file, userId, ticketId }) => saveImage({
+    file,
+    scopeSegments: ['tickets', sanitizeSegment(userId), sanitizeSegment(ticketId)],
+    maxDimension: DEFAULT_MAX_DIMENSION,
+});
+
 const saveProfileImage = async ({ file, userId }) => saveImage({
     file,
     scopeSegments: ['profile', sanitizeSegment(userId)],
@@ -154,6 +160,7 @@ const getUploadFileSizeLimit = () => UPLOAD_FILE_SIZE_LIMIT;
 
 module.exports = {
     saveTransactionAttachment,
+    saveTicketAttachment,
     saveProfileImage,
     deleteStoredFile,
     discardDescriptor,

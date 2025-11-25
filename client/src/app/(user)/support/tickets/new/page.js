@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { formatFileSize } from "@/lib/utils";
 import { createTicket, uploadTicketAttachment } from "@/lib/queries/tickets";
+import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
 
 const schema = z.object({
   subject: z.string().trim().min(3, "Subject must be at least 3 characters"),
@@ -25,9 +26,6 @@ const schema = z.object({
   category: z.string().trim().optional().or(z.literal("")),
   priority: z.enum(["low", "medium", "high", "urgent"], { required_error: "Choose a priority" }),
 });
-
-const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp", "application/pdf"];
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
@@ -48,6 +46,7 @@ export default function NewTicketPage() {
   const queryClient = useQueryClient();
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentError, setAttachmentError] = useState(null);
+  const resolvedMaxAttachmentBytes = useMemo(() => resolveMaxAttachmentBytes(), []);
 
   const form = useForm({
     resolver: zodResolver(schema),
@@ -82,16 +81,12 @@ export default function NewTicketPage() {
     },
   });
 
-  const validateAttachment = (file) => {
-    if (!file) return null;
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      return `File is too large. Max size is ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`;
-    }
-    if (file.type && !ACCEPTED_TYPES.includes(file.type)) {
-      return "Unsupported file type. Upload an image or PDF.";
-    }
-    return null;
-  };
+  const validateAttachment = (file) =>
+    validateImageAttachment(
+      file,
+      resolvedMaxAttachmentBytes,
+      (value) => formatFileSize(value, { fallback: "unknown size" })
+    );
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -209,9 +204,11 @@ export default function NewTicketPage() {
                 />
                 <div className="space-y-2">
                   <FormLabel>Attachment (optional)</FormLabel>
-                  <Input type="file" accept={ACCEPTED_TYPES.join(",")} onChange={handleFileChange} />
+                  <Input type="file" accept={IMAGE_ATTACHMENT_TYPES.join(",")} onChange={handleFileChange} />
                   <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
-                  <p className="text-xs text-muted-foreground">Accepted: images or PDF up to {formatFileSize(MAX_ATTACHMENT_BYTES)}.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)}.
+                  </p>
                   {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
                 </div>
               </div>
