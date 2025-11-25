@@ -24,8 +24,11 @@ const normalizeAttachment = (attachment) => {
     id: attachment._id || attachment.id || null,
     filename: attachment.filename || "Attachment",
     url: attachment.url || "",
+    mimeType: attachment.mimeType || attachment.contentType || "",
     contentType: attachment.contentType || "",
     size: typeof attachment.size === "number" ? attachment.size : null,
+    width: typeof attachment.width === "number" ? attachment.width : null,
+    height: typeof attachment.height === "number" ? attachment.height : null,
     uploadedAt: attachment.uploadedAt || attachment.createdAt || null,
     uploadedBy: attachment.uploadedBy || null,
   };
@@ -84,7 +87,10 @@ export async function fetchTickets({ status, priority, category, search, page, l
     totalPages: response?.pagination?.totalPages ?? 1,
   };
 
-  return { tickets, pagination };
+  const attachmentLimitBytes =
+    typeof response?.attachmentLimitBytes === "number" ? response.attachmentLimitBytes : null;
+
+  return { tickets, pagination, attachmentLimitBytes };
 }
 
 export async function fetchTicketDetail({ ticketId, signal }) {
@@ -97,7 +103,9 @@ export async function fetchTicketDetail({ ticketId, signal }) {
   if (!ticket) {
     throw new Error("Ticket not found");
   }
-  return ticket;
+  const attachmentLimitBytes =
+    typeof response?.attachmentLimitBytes === "number" ? response.attachmentLimitBytes : null;
+  return { ticket, attachmentLimitBytes };
 }
 
 export async function createTicket(input, { signal } = {}) {

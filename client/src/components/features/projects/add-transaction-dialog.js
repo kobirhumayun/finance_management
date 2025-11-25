@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
 import { cn, formatFileSize, resolveAssetUrl } from "@/lib/utils";
+import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -30,17 +31,6 @@ const schema = z.object({
   subcategory: z.string().min(2, "Subcategory is required"),
   description: z.string().min(3, "Provide a short description"),
 });
-
-const ACCEPTED_ATTACHMENT_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const DEFAULT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-
-const resolveMaxAttachmentBytes = (value) => {
-  const parsed = Number(value);
-  if (Number.isFinite(parsed) && parsed > 0) {
-    return parsed;
-  }
-  return DEFAULT_MAX_ATTACHMENT_BYTES;
-};
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
@@ -77,16 +67,12 @@ export default function AddTransactionDialog({
     [maxAttachmentBytes]
   );
   const validateAttachment = useCallback(
-    (file) => {
-      if (!file) return null;
-      if (file.size > resolvedMaxAttachmentBytes) {
-        return `File is too large. Max size is ${formatFileSize(resolvedMaxAttachmentBytes)}.`;
-      }
-      if (file.type && !ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
-        return "Unsupported image format. Upload a PNG, JPG, or WebP file.";
-      }
-      return null;
-    },
+    (file) =>
+      validateImageAttachment(
+        file,
+        resolvedMaxAttachmentBytes,
+        (size) => formatFileSize(size)
+      ),
     [resolvedMaxAttachmentBytes]
   );
   const form = useForm({
@@ -270,7 +256,7 @@ export default function AddTransactionDialog({
             <input
               ref={fileInputRef}
               type="file"
-              accept={ACCEPTED_ATTACHMENT_TYPES.join(",")}
+              accept={IMAGE_ATTACHMENT_TYPES.join(",")}
               className="hidden"
               onChange={handleAttachmentChange}
               disabled={isSaving || !attachmentsFeatureEnabled}
