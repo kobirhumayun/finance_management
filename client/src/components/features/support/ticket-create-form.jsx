@@ -29,6 +29,8 @@ import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachm
 import { qk } from "@/lib/query-keys";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
 
+const REQUESTER_SELF_VALUE = "__self";
+
 const baseSchema = {
   subject: z.string().trim().min(3, "Subject must be at least 3 characters"),
   description: z.string().trim().min(10, "Describe the issue with at least 10 characters"),
@@ -89,7 +91,7 @@ export default function TicketCreateForm({
       description: "",
       category: "",
       priority: "medium",
-      requester: defaultRequester || "",
+      requester: defaultRequester || REQUESTER_SELF_VALUE,
     },
   });
 
@@ -100,8 +102,9 @@ export default function TicketCreateForm({
 
   const createTicketMutation = useMutation({
     mutationFn: async (values) => {
+      const requesterValue = values.requester === REQUESTER_SELF_VALUE ? "" : values.requester;
       const payload = showRequesterSelector
-        ? { ...values, requester: values.requester || undefined }
+        ? { ...values, requester: requesterValue || undefined }
         : values;
       const { ticket } = await createTicket(payload);
       if (!ticket?.id) {
@@ -233,7 +236,7 @@ export default function TicketCreateForm({
                       <FormLabel>Requester (optional)</FormLabel>
                       <Select
                         value={field.value || ""}
-                        onValueChange={(value) => field.onChange(value || "")}
+                        onValueChange={(value) => field.onChange(value || REQUESTER_SELF_VALUE)}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -241,7 +244,7 @@ export default function TicketCreateForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Use my account</SelectItem>
+                          <SelectItem value={REQUESTER_SELF_VALUE}>Use my account</SelectItem>
                           {requesterOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
