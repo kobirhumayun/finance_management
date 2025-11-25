@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -17,8 +17,9 @@ import { toast } from "@/components/ui/sonner";
 import { useForm } from "react-hook-form";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { formatFileSize } from "@/lib/utils";
-import { createTicket, uploadTicketAttachment } from "@/lib/queries/tickets";
+import { createTicket, fetchTickets, uploadTicketAttachment } from "@/lib/queries/tickets";
 import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
+import { qk } from "@/lib/query-keys";
 
 const schema = z.object({
   subject: z.string().trim().min(3, "Subject must be at least 3 characters"),
@@ -46,7 +47,17 @@ export default function NewTicketPage() {
   const queryClient = useQueryClient();
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentError, setAttachmentError] = useState(null);
-  const resolvedMaxAttachmentBytes = useMemo(() => resolveMaxAttachmentBytes(), []);
+
+  const ticketMetaQuery = useQuery({
+    queryKey: qk.tickets.list({ limit: 1 }),
+    queryFn: ({ signal }) => fetchTickets({ limit: 1, signal }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const resolvedMaxAttachmentBytes = useMemo(
+    () => resolveMaxAttachmentBytes(ticketMetaQuery.data?.attachmentLimitBytes),
+    [ticketMetaQuery.data?.attachmentLimitBytes]
+  );
 
   const form = useForm({
     resolver: zodResolver(schema),
