@@ -3,6 +3,31 @@ import { apiJSON } from "@/lib/api";
 
 const TICKETS_ENDPOINT = "/api/tickets";
 
+const normalizeUserLookup = (users) => {
+  if (!users || typeof users !== "object") {
+    return {};
+  }
+
+  return Object.entries(users).reduce((lookup, [key, user]) => {
+    const id = user?.id || key;
+    if (!id) return lookup;
+
+    lookup[id] = {
+      id,
+      displayName: user?.displayName || user?.name || user?.username || "",
+      email: user?.email || "",
+      role: user?.role || "",
+    };
+    return lookup;
+  }, {});
+};
+
+const resolveUserDetails = (userId, users = {}) => {
+  if (!userId) return null;
+  const id = typeof userId === "object" && userId.id ? userId.id : userId;
+  return users[id] || null;
+};
+
 const buildQueryString = (params = {}) => {
   const searchParams = new URLSearchParams();
 
@@ -15,10 +40,16 @@ const buildQueryString = (params = {}) => {
   return query ? `?${query}` : "";
 };
 
-const normalizeAttachment = (attachment) => {
+const normalizeAttachment = (attachment, users) => {
   if (!attachment || typeof attachment !== "object") {
     return null;
   }
+
+  const uploadedBy =
+    typeof attachment.uploadedBy === "object" && attachment.uploadedBy !== null
+      ? attachment.uploadedBy.id || attachment.uploadedBy._id || attachment.uploadedBy
+      : attachment.uploadedBy || null;
+  const uploaderDetails = resolveUserDetails(uploadedBy, users);
 
   return {
     id: attachment._id || attachment.id || null,
@@ -30,27 +61,42 @@ const normalizeAttachment = (attachment) => {
     width: typeof attachment.width === "number" ? attachment.width : null,
     height: typeof attachment.height === "number" ? attachment.height : null,
     uploadedAt: attachment.uploadedAt || attachment.createdAt || null,
-    uploadedBy: attachment.uploadedBy || null,
+    uploadedBy,
+    uploadedByName: uploaderDetails?.displayName || null,
+    uploadedByDetails: uploaderDetails,
   };
 };
 
-const normalizeActivity = (activity) => {
+const normalizeActivity = (activity, users) => {
   if (!activity || typeof activity !== "object") {
     return null;
   }
 
+  const actor =
+    typeof activity.actor === "object" && activity.actor !== null
+      ? activity.actor.id || activity.actor._id || activity.actor
+      : activity.actor;
+  const actorDetails = resolveUserDetails(actor, users);
+
   return {
-    actor: activity.actor || null,
+    actor: actor || null,
+    actorName: actorDetails?.displayName || null,
+    actorDetails,
     action: activity.action || "comment",
     message: activity.message || "",
     at: activity.at || activity.createdAt || null,
   };
 };
 
-const normalizeTicket = (ticket) => {
+const normalizeTicket = (ticket, users = {}) => {
   if (!ticket || typeof ticket !== "object") {
     return null;
   }
+
+  const requester = ticket.requester || null;
+  const assignee = ticket.assignee || null;
+  const requesterDetails = resolveUserDetails(requester, users);
+  const assigneeDetails = resolveUserDetails(assignee, users);
 
   return {
     id: ticket._id || ticket.id || null,
@@ -59,16 +105,19 @@ const normalizeTicket = (ticket) => {
     category: ticket.category || "",
     priority: ticket.priority || "medium",
     status: ticket.status || "open",
-    requester: ticket.requester || null,
-    assignee: ticket.assignee || null,
+    requester,
+    requesterName: requesterDetails?.displayName || null,
+    assignee,
+    assigneeName: assigneeDetails?.displayName || null,
     createdAt: ticket.createdAt || null,
     updatedAt: ticket.updatedAt || null,
     attachments: Array.isArray(ticket.attachments)
-      ? ticket.attachments.map(normalizeAttachment).filter(Boolean)
+      ? ticket.attachments.map((attachment) => normalizeAttachment(attachment, users)).filter(Boolean)
       : [],
     activityLog: Array.isArray(ticket.activityLog)
-      ? ticket.activityLog.map(normalizeActivity).filter(Boolean)
+      ? ticket.activityLog.map((entry) => normalizeActivity(entry, users)).filter(Boolean)
       : [],
+    users,
   };
 };
 
@@ -76,8 +125,10 @@ export async function fetchTickets({ status, priority, category, search, page, l
   const queryString = buildQueryString({ status, priority, category, search, page, limit });
   const response = await apiJSON(`${TICKETS_ENDPOINT}${queryString}`, { method: "GET", signal });
 
+  const users = normalizeUserLookup(response?.users);
+
   const tickets = Array.isArray(response?.tickets)
-    ? response.tickets.map(normalizeTicket).filter(Boolean)
+    ? response.tickets.map((ticket) => normalizeTicket(ticket, users)).filter(Boolean)
     : [];
 
   const pagination = {
@@ -90,7 +141,7 @@ export async function fetchTickets({ status, priority, category, search, page, l
   const attachmentLimitBytes =
     typeof response?.attachmentLimitBytes === "number" ? response.attachmentLimitBytes : null;
 
-  return { tickets, pagination, attachmentLimitBytes };
+  return { tickets, pagination, attachmentLimitBytes, users };
 }
 
 export async function fetchTicketDetail({ ticketId, signal }) {
@@ -99,13 +150,14 @@ export async function fetchTicketDetail({ ticketId, signal }) {
   }
 
   const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}`, { method: "GET", signal });
-  const ticket = normalizeTicket(response?.ticket);
+  const users = normalizeUserLookup(response?.users);
+  const ticket = normalizeTicket(response?.ticket, users);
   if (!ticket) {
     throw new Error("Ticket not found");
   }
   const attachmentLimitBytes =
     typeof response?.attachmentLimitBytes === "number" ? response.attachmentLimitBytes : null;
-  return { ticket, attachmentLimitBytes };
+  return { ticket, attachmentLimitBytes, users };
 }
 
 export async function createTicket(input, { signal } = {}) {
@@ -117,7 +169,8 @@ export async function createTicket(input, { signal } = {}) {
   };
 
   const response = await apiJSON(TICKETS_ENDPOINT, { method: "POST", body, signal });
-  return { ticket: normalizeTicket(response?.ticket) };
+  const users = normalizeUserLookup(response?.users);
+  return { ticket: normalizeTicket(response?.ticket, users), users };
 }
 
 export async function addTicketComment({ ticketId, comment }, { signal } = {}) {
@@ -126,7 +179,8 @@ export async function addTicketComment({ ticketId, comment }, { signal } = {}) {
   }
   const body = { comment: comment?.toString() || "" };
   const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}/comments`, { method: "POST", body, signal });
-  return { ticket: normalizeTicket(response?.ticket) };
+  const users = normalizeUserLookup(response?.users);
+  return { ticket: normalizeTicket(response?.ticket, users), users };
 }
 
 export async function updateTicketStatus({ ticketId, status }, { signal } = {}) {
@@ -135,7 +189,8 @@ export async function updateTicketStatus({ ticketId, status }, { signal } = {}) 
   }
   const body = { status };
   const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}/status`, { method: "PATCH", body, signal });
-  return { ticket: normalizeTicket(response?.ticket) };
+  const users = normalizeUserLookup(response?.users);
+  return { ticket: normalizeTicket(response?.ticket, users), users };
 }
 
 export async function uploadTicketAttachment({ ticketId, file }, { signal } = {}) {
@@ -154,5 +209,6 @@ export async function uploadTicketAttachment({ ticketId, file }, { signal } = {}
     body: formData,
     signal,
   });
-  return { attachment: normalizeAttachment(response?.attachment) };
+  const users = normalizeUserLookup(response?.users);
+  return { attachment: normalizeAttachment(response?.attachment, users), users };
 }

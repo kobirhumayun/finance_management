@@ -48,6 +48,7 @@ export function TicketActivity({ activity = [] }) {
         {activity.map((item, index) => {
           const Icon = actionIcons[item.action] || MessageSquare;
           const label = actionLabels[item.action] || "Update";
+          const actorName = item.actorName || item.actorDetails?.displayName || "System";
           const showDivider = index < activity.length - 1;
 
           return (
@@ -61,7 +62,10 @@ export function TicketActivity({ activity = [] }) {
                   {item.message ? (
                     <p className="text-sm text-muted-foreground whitespace-pre-line">{item.message}</p>
                   ) : null}
-                  <p className="text-xs text-muted-foreground">{formatDate(item.at)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">{actorName}</span>
+                    {item.at ? ` • ${formatDate(item.at)}` : ""}
+                  </p>
                 </div>
               </div>
               {showDivider ? <Separator /> : null}
@@ -97,6 +101,12 @@ export function TicketAttachmentList({ attachments = [], onView, actions = null 
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Dimensions: {attachment.width && attachment.height ? `${attachment.width} × ${attachment.height}px` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {attachment.uploadedByName || attachment.uploadedByDetails?.displayName
+                      ? `Uploaded by ${attachment.uploadedByName || attachment.uploadedByDetails?.displayName}`
+                      : "Uploader unknown"}
+                    {attachment.uploadedAt ? ` • ${formatDate(attachment.uploadedAt)}` : ""}
                   </p>
                 </div>
                 <Button
