@@ -15,6 +15,14 @@ const toObjectId = (value) => {
     return new mongoose.Types.ObjectId(value);
 };
 
+const resolveActorName = async (user) => {
+    if (user) {
+        return formatUserName(user);
+    }
+
+    return getUserNameById(user?._id);
+};
+
 const buildTicketAttachmentUrl = (ticketId, attachmentId) => {
     if (!ticketId || !attachmentId) {
         return '';
@@ -204,7 +212,7 @@ const createTicket = async (req, res, next) => {
 
         await ticket.save();
 
-        const actorName = await getUserNameById(req.user._id);
+        const actorName = await resolveActorName(req.user);
         const subjectLine = `Ticket created: ${ticket.subject}`;
         const message = `Ticket "${ticket.subject}" was created by ${actorName}. We will notify you on further updates.`;
         await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
@@ -365,7 +373,7 @@ const updateStatus = async (req, res, next) => {
 
         await ticket.save();
 
-        const actorName = await getUserNameById(req.user._id);
+        const actorName = await resolveActorName(req.user);
         const subjectLine = `Ticket status updated: ${ticket.subject}`;
         const message = `Status for ticket "${ticket.subject}" updated to ${status} by ${actorName}.`;
         await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
