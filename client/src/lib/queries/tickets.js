@@ -78,6 +78,10 @@ const normalizeActivity = (activity, users) => {
       : activity.actor;
   const actorDetails = resolveUserDetails(actor, users);
 
+  const attachments = Array.isArray(activity.attachments)
+    ? activity.attachments.map((item) => normalizeAttachment(item, users)).filter(Boolean)
+    : [];
+
   return {
     actor: actor || null,
     actorName: actorDetails?.displayName || null,
@@ -85,6 +89,7 @@ const normalizeActivity = (activity, users) => {
     action: activity.action || "comment",
     message: activity.message || "",
     at: activity.at || activity.createdAt || null,
+    attachments,
   };
 };
 
