@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Paperclip, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import PageHeader from "@/components/shared/page-header";
 import { TicketAttachmentList, TicketConversation, TicketSummary } from "@/components/features/support/ticket-activity";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
@@ -16,11 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
 import { qk } from "@/lib/query-keys";
-import { addTicketComment, fetchTicketDetail, updateTicketStatus, uploadTicketAttachment } from "@/lib/queries/tickets";
+import { addTicketComment, fetchTicketDetail, updateTicketStatus } from "@/lib/queries/tickets";
 import { formatDate } from "@/lib/formatters";
 import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
 import TransactionAttachmentDialog from "@/components/features/projects/transaction-attachment-dialog";
-import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
+import { resolveMaxAttachmentBytes } from "@/lib/attachments";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open" },
@@ -50,7 +50,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   const ticketId = useMemo(() => (Array.isArray(params?.ticketId) ? params.ticketId[0] : params?.ticketId), [params]);
 
   const [comment, setComment] = useState("");
-  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [pendingAttachments, setPendingAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
@@ -77,15 +77,17 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   };
 
   const commentMutation = useMutation({
-    mutationFn: async (message) => {
-      if (!message || !message.trim()) {
+    mutationFn: async ({ message, attachments }) => {
+      if ((!message || !message.trim()) && (!attachments || attachments.length === 0)) {
         throw new Error("Comment cannot be empty");
       }
-      return addTicketComment({ ticketId, comment: message });
+      return addTicketComment({ ticketId, comment: message, attachments });
     },
     onSuccess: () => {
       toast.success("Comment added");
       setComment("");
+      setPendingAttachments([]);
+      setAttachmentError(null);
       invalidateTicketQueries();
     },
     onError: (error) => {
@@ -104,25 +106,12 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     },
   });
 
-  const validateAttachment = (file) =>
-    validateImageAttachment(
-      file,
-      resolvedMaxAttachmentBytes,
-      (value) => formatFileSize(value, { fallback: "unknown size" })
-    );
-
-  const attachmentMutation = useMutation({
-    mutationFn: (file) => uploadTicketAttachment({ ticketId, file }),
-    onSuccess: () => {
-      toast.success("Attachment uploaded");
-      setAttachmentFile(null);
-      setAttachmentError(null);
-      invalidateTicketQueries();
-    },
-    onError: (error) => {
-      setAttachmentError(getErrorMessage(error, "Unable to upload attachment"));
-    },
-  });
+  const validateAttachment = (file) => {
+    if (resolvedMaxAttachmentBytes && file.size > resolvedMaxAttachmentBytes) {
+      return `Attachments must be smaller than ${formatFileSize(resolvedMaxAttachmentBytes, { fallback: "the limit" })}.`;
+    }
+    return null;
+  };
 
   const attachments = useMemo(() => {
     if (!Array.isArray(ticket?.attachments)) return [];
@@ -153,28 +142,30 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   };
 
   const handleAttachmentChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setAttachmentFile(null);
-      setAttachmentError(null);
-      return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const validFiles = [];
+    let firstError = null;
+
+    files.forEach((file) => {
+      const error = validateAttachment(file);
+      if (error && !firstError) {
+        firstError = error;
+      }
+      if (!error) {
+        validFiles.push(file);
+      }
+    });
+
+    setAttachmentError(firstError);
+    if (validFiles.length) {
+      setPendingAttachments((current) => [...current, ...validFiles]);
     }
-    const error = validateAttachment(file);
-    if (error) {
-      setAttachmentFile(null);
-      setAttachmentError(error);
-      return;
-    }
-    setAttachmentFile(file);
-    setAttachmentError(null);
   };
 
-  const handleUpload = () => {
-    if (!attachmentFile) {
-      setAttachmentError("Select a file to upload");
-      return;
-    }
-    attachmentMutation.mutate(attachmentFile);
+  const handleRemoveAttachment = (indexToRemove) => {
+    setPendingAttachments((current) => current.filter((_, index) => index !== indexToRemove));
   };
 
   useEffect(() => {
@@ -212,6 +203,18 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     };
 
     const assignedAttachmentIds = new Set();
+    const hydrateAttachment = (attachment) => {
+      if (!attachment) return null;
+      const hydrated = {
+        ...attachment,
+        resolvedUrl: resolveAssetUrl(attachment?.url, attachment?.uploadedAt ?? attachment?.updatedAt),
+      };
+      if (hydrated.id) {
+        assignedAttachmentIds.add(hydrated.id);
+      }
+      return hydrated;
+    };
+
     const matchAttachments = (event) => {
       const timestamp = parseTimestamp(event?.at);
       const normalizedMessage = event?.message?.toLowerCase?.().trim?.() || "";
@@ -231,10 +234,24 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
       });
     };
 
-    const sortedEvents = events
-      .map((entry) => ({ ...entry, actorDetails: entry.actorDetails || resolveUser(entry.actor) }))
+    const eventsWithActors = events.map((entry) => ({
+      ...entry,
+      actorDetails: entry.actorDetails || resolveUser(entry.actor),
+    }));
+
+    const sortedEvents = eventsWithActors
       .sort((a, b) => parseTimestamp(a?.at) - parseTimestamp(b?.at))
-      .map((entry) => ({ ...entry, attachments: matchAttachments(entry) }));
+      .map((entry) => {
+        const providedAttachments = Array.isArray(entry.attachments)
+          ? entry.attachments.map(hydrateAttachment).filter(Boolean)
+          : [];
+
+        const resolvedAttachments = providedAttachments.length
+          ? providedAttachments
+          : matchAttachments(entry);
+
+        return { ...entry, attachments: resolvedAttachments };
+      });
 
     return [
       {
@@ -293,7 +310,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                   onViewAttachment={handleViewAttachment}
                   onDownloadAttachment={handleDownloadAttachment}
                 />
-                <div className="space-y-2 border-t pt-4">
+                <div className="space-y-3 border-t pt-4">
                   <Label htmlFor="comment">Reply</Label>
                   <Textarea
                     id="comment"
@@ -302,6 +319,48 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                     placeholder="Type your reply"
                     rows={4}
                   />
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-attachment" className="text-sm">
+                      Attach files (optional)
+                    </Label>
+                    <Input
+                      id="ticket-attachment"
+                      type="file"
+                      multiple
+                      onChange={handleAttachmentChange}
+                    />
+                    {pendingAttachments.length ? (
+                      <ul className="space-y-2 text-sm">
+                        {pendingAttachments.map((file, index) => (
+                          <li
+                            key={`${file.name}-${file.size}-${file.lastModified}`}
+                            className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size, { fallback: "unknown size" })}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleRemoveAttachment(index)}
+                            >
+                              ×
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">You can attach multiple files to this reply.</p>
+                    )}
+                    {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
+                    <p className="text-xs text-muted-foreground">
+                      Max file size {formatFileSize(resolvedMaxAttachmentBytes)} per attachment.
+                    </p>
+                  </div>
                   <div className="flex items-center justify-end gap-2">
                     <Button
                       type="button"
@@ -315,8 +374,12 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                     <Button
                       type="button"
                       size="sm"
-                      disabled={commentMutation.isPending || !comment.trim()}
-                      onClick={() => commentMutation.mutate(comment)}
+                      disabled={
+                        commentMutation.isPending || (!comment.trim() && pendingAttachments.length === 0)
+                      }
+                      onClick={() =>
+                        commentMutation.mutate({ message: comment, attachments: pendingAttachments })
+                      }
                     >
                       {commentMutation.isPending ? (
                         <span className="inline-flex items-center gap-2">
@@ -369,47 +432,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
               attachments={attachments}
               onView={handleViewAttachment}
               onDownload={handleDownloadAttachment}
-              actions={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleUpload}
-                  disabled={attachmentMutation.isPending || !attachmentFile}
-                >
-                  {attachmentMutation.isPending ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Uploading
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2">
-                      <UploadIcon />
-                      Upload
-                    </span>
-                  )}
-                </Button>
-              }
             />
-            <Card>
-              <CardContent className="space-y-2">
-                <Label htmlFor="ticket-attachment" className="text-sm">Attach a file</Label>
-                <Input
-                  id="ticket-attachment"
-                  type="file"
-                  accept={IMAGE_ATTACHMENT_TYPES.join(",")}
-                  onChange={handleAttachmentChange}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {attachmentFile
-                    ? `${attachmentFile.name} (${formatFileSize(attachmentFile.size, { fallback: "unknown size" })})`
-                    : "No file selected"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)}.
-                </p>
-                {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
-              </CardContent>
-            </Card>
           </div>
         </div>
       ) : null}
@@ -422,8 +445,3 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     </div>
   );
 }
-
-function UploadIcon() {
-  return <Paperclip className="h-4 w-4" />;
-}
-

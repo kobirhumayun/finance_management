@@ -174,12 +174,23 @@ export async function createTicket(input, { signal } = {}) {
   return { ticket: normalizeTicket(response?.ticket, users), users };
 }
 
-export async function addTicketComment({ ticketId, comment }, { signal } = {}) {
+export async function addTicketComment({ ticketId, comment, attachments }, { signal } = {}) {
   if (!ticketId) {
     throw new Error("ticketId is required to comment on a ticket");
   }
-  const body = { comment: comment?.toString() || "" };
-  const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}/comments`, { method: "POST", body, signal });
+  const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+  const body = hasAttachments ? new FormData() : { comment: comment?.toString() || "" };
+
+  if (hasAttachments) {
+    body.append("comment", comment?.toString() || "");
+    attachments.forEach((file) => body.append("attachments", file));
+  }
+
+  const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}/comments`, {
+    method: "POST",
+    body,
+    signal,
+  });
   const users = normalizeUserLookup(response?.users);
   return { ticket: normalizeTicket(response?.ticket, users), users };
 }
