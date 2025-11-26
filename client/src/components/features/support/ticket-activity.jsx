@@ -39,8 +39,6 @@ const actionIcons = {
   attachment_removed: Paperclip,
 };
 
-const PREVIEWABLE_MIME_PREFIXES = ["image/", "application/pdf"];
-
 const getInitials = (value) => {
   if (!value) return "?";
   const [first = "", second = ""] = value.split(" ");
@@ -71,12 +69,6 @@ const formatDayLabel = (value) => {
   });
 };
 
-const isPreviewable = (attachment) => {
-  if (!attachment?.mimeType && !attachment?.contentType) return false;
-  const mime = attachment.mimeType || attachment.contentType;
-  return PREVIEWABLE_MIME_PREFIXES.some((prefix) => mime?.startsWith(prefix));
-};
-
 const getFileIcon = (attachment) => {
   if (attachment?.mimeType?.startsWith("image/")) return ImageIcon;
   if (attachment?.mimeType === "application/pdf") return FileText;
@@ -93,9 +85,8 @@ const buildRoleLabel = (event, ticket) => {
   return "Collaborator";
 };
 
-const AttachmentCard = ({ attachment, onView, onDownload, compact = false }) => {
+const AttachmentCard = ({ attachment, onDownload, compact = false }) => {
   const Icon = getFileIcon(attachment);
-  const previewable = isPreviewable(attachment);
   const url = attachment?.resolvedUrl || attachment?.url || "";
 
   const handleDownload = () => {
@@ -111,7 +102,6 @@ const AttachmentCard = ({ attachment, onView, onDownload, compact = false }) => 
       <div className="flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2 text-sm font-medium leading-none">
           <span className="break-all">{attachment.filename || "Attachment"}</span>
-          {previewable ? <Badge variant="outline">Previewable</Badge> : null}
         </div>
         <p className="text-xs text-muted-foreground">
           {formatFileSize(attachment.size, { fallback: "Unknown size" })}
@@ -123,54 +113,27 @@ const AttachmentCard = ({ attachment, onView, onDownload, compact = false }) => 
         {attachment.width && attachment.height ? (
           <p className="text-xs text-muted-foreground">{attachment.width} × {attachment.height}px</p>
         ) : null}
-        {previewable && url ? (
-          <div className="overflow-hidden rounded-md border bg-muted">
-            <img
-              src={url}
-              alt={attachment.filename || "Attachment preview"}
-              className={`max-h-48 w-full object-cover ${compact ? "max-h-32" : ""}`}
-            />
-          </div>
-        ) : null}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button
             type="button"
             size="sm"
-            variant={previewable ? "secondary" : "outline"}
+            variant="outline"
             disabled={!url}
             onClick={(event) => {
               event.preventDefault();
-              if (previewable) {
-                onView?.(attachment);
-              } else {
-                handleDownload();
-              }
+              handleDownload();
             }}
           >
-            {previewable ? "View" : "Download"}
+            <Download className="mr-2 h-4 w-4" />
+            Download
           </Button>
-          {previewable ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={!url}
-              onClick={(event) => {
-                event.preventDefault();
-                handleDownload();
-              }}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
-          ) : null}
         </div>
       </div>
     </div>
   );
 };
 
-const ConversationMessage = ({ event, ticket, onViewAttachment, onDownloadAttachment }) => {
+const ConversationMessage = ({ event, ticket, onDownloadAttachment }) => {
   const Icon = actionIcons[event.action] || MessageSquare;
   const label = actionLabels[event.action] || "Update";
   const actorName = event.actorDetails?.displayName || event.actorName || (event.actor ? "User" : "System");
@@ -214,7 +177,6 @@ const ConversationMessage = ({ event, ticket, onViewAttachment, onDownloadAttach
               <AttachmentCard
                 key={attachment.id || attachment.url}
                 attachment={attachment}
-                onView={onViewAttachment}
                 onDownload={onDownloadAttachment}
               />
             ))}
@@ -225,7 +187,7 @@ const ConversationMessage = ({ event, ticket, onViewAttachment, onDownloadAttach
   );
 };
 
-export function TicketConversation({ activity = [], ticket, onViewAttachment, onDownloadAttachment }) {
+export function TicketConversation({ activity = [], ticket, onDownloadAttachment }) {
   if (!activity.length) {
     return <p className="text-sm text-muted-foreground">No messages yet.</p>;
   }
@@ -255,7 +217,6 @@ export function TicketConversation({ activity = [], ticket, onViewAttachment, on
                 key={`${event.action}-${event.at}-${event.actor}-${event.message}`}
                 event={event}
                 ticket={ticket}
-                onViewAttachment={onViewAttachment}
                 onDownloadAttachment={onDownloadAttachment}
               />
             ))}
@@ -268,7 +229,7 @@ export function TicketConversation({ activity = [], ticket, onViewAttachment, on
 
 export const TicketActivity = TicketConversation;
 
-export function TicketAttachmentList({ attachments = [], onView, onDownload, actions = null }) {
+export function TicketAttachmentList({ attachments = [], onDownload, actions = null }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -284,7 +245,6 @@ export function TicketAttachmentList({ attachments = [], onView, onDownload, act
               <li key={attachment.id || attachment.url}>
                 <AttachmentCard
                   attachment={attachment}
-                  onView={onView}
                   onDownload={onDownload}
                   compact
                 />

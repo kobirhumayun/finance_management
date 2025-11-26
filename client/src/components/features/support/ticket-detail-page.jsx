@@ -1,7 +1,7 @@
 // File: src/components/features/support/ticket-detail-page.jsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Files, Loader2, Paperclip, Send, X } from "lucide-react";
@@ -18,7 +18,6 @@ import { qk } from "@/lib/query-keys";
 import { addTicketComment, fetchTicketDetail, updateTicketStatus } from "@/lib/queries/tickets";
 import { formatDate } from "@/lib/formatters";
 import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
-import TransactionAttachmentDialog from "@/components/features/projects/transaction-attachment-dialog";
 import { resolveMaxAttachmentBytes } from "@/lib/attachments";
 
 const STATUS_OPTIONS = [
@@ -51,8 +50,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   const [comment, setComment] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
-  const [selectedAttachment, setSelectedAttachment] = useState(null);
-  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const ticketQuery = useQuery({
@@ -131,20 +128,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     }));
   }, [ticket?.attachments]);
 
-  const handleViewAttachment = (attachment) => {
-    if (!attachment) return;
-    setSelectedAttachment({
-      id: attachment.id,
-      subcategory: ticket?.subject || "Support ticket",
-      description: ticket?.description || "",
-      attachment: {
-        ...attachment,
-        url: attachment.resolvedUrl || attachment.url || "",
-      },
-    });
-    setIsAttachmentDialogOpen(true);
-  };
-
   const handleDownloadAttachment = (attachment) => {
     const url = attachment?.resolvedUrl || attachment?.url;
     if (!url) return;
@@ -198,12 +181,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   const handleRemoveAttachment = (indexToRemove) => {
     setPendingAttachments((current) => current.filter((_, index) => index !== indexToRemove));
   };
-
-  useEffect(() => {
-    if (!isAttachmentDialogOpen) {
-      setSelectedAttachment(null);
-    }
-  }, [isAttachmentDialogOpen]);
 
   const conversation = useMemo(() => {
     if (!ticket) return [];
@@ -342,7 +319,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                 <TicketConversation
                   activity={conversation}
                   ticket={ticket}
-                  onViewAttachment={handleViewAttachment}
                   onDownloadAttachment={handleDownloadAttachment}
                 />
                 <div className="space-y-3 border-t pt-4">
@@ -489,12 +465,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
           </div>
         </div>
       ) : null}
-
-      <TransactionAttachmentDialog
-        open={isAttachmentDialogOpen}
-        onOpenChange={setIsAttachmentDialogOpen}
-        transaction={selectedAttachment}
-      />
     </div>
   );
 }
