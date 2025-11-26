@@ -312,87 +312,86 @@ export default function TicketCreateForm({
                 )}
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category (optional)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Billing, integrations, onboarding..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="space-y-2">
-                  <FormLabel>Attachments (optional)</FormLabel>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      id="ticket-attachments"
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2"
-                    >
-                      <Paperclip className="h-4 w-4" aria-hidden />
-                      <span>Add files</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="sm:hidden"
-                      aria-label="Attach multiple files"
-                    >
-                      <Files className="h-4 w-4" aria-hidden />
-                    </Button>
-                    <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
-                  </div>
-                  {attachmentFiles.length ? (
-                    <ul className="space-y-2 text-sm">
-                      {attachmentFiles.map((file, index) => (
-                        <li
-                          key={`${file.name}-${file.size}-${file.lastModified}`}
-                          className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(file.size, { fallback: "unknown size" })}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleRemoveAttachment(index)}
-                            aria-label={`Remove ${file.name}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
-                      fallback: "the upload limit",
-                    })}
-                    {" "}
-                    each.
-                  </p>
-                  {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category (optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Billing, integrations, onboarding..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-2">
+                <FormLabel>Attachments (optional)</FormLabel>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    id="ticket-attachments"
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Paperclip className="h-4 w-4" aria-hidden />
+                    <span>Add files</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="sm:hidden"
+                    aria-label="Attach multiple files"
+                  >
+                    <Files className="h-4 w-4" aria-hidden />
+                  </Button>
+                  <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
                 </div>
+                {attachmentFiles.length ? (
+                  <ul className="space-y-2 text-sm">
+                    {attachmentFiles.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size, { fallback: "unknown size" })}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemoveAttachment(index)}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
+                    fallback: "the upload limit",
+                  })}
+                  {" "}
+                  each.
+                </p>
+                {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
               </div>
 
               <div className="flex items-center justify-end gap-3">
