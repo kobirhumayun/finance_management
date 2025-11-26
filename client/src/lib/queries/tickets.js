@@ -166,6 +166,7 @@ export async function createTicket(input, { signal } = {}) {
     description: input?.description?.trim() || "",
     category: input?.category?.trim() || undefined,
     priority: input?.priority || undefined,
+    requester: input?.requester || undefined,
   };
 
   const response = await apiJSON(TICKETS_ENDPOINT, { method: "POST", body, signal });

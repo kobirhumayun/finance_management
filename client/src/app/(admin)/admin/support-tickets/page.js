@@ -9,7 +9,7 @@ export default function AdminSupportTicketsPage() {
       title="Support Tickets"
       description="Monitor and manage all customer support requests."
       ticketLinkPrefix="/admin/support-tickets"
-      createLink="/support/tickets/new"
+      createLink="/admin/support-tickets/new"
     />
   );
 }
