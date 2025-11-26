@@ -93,7 +93,7 @@ const mapTicketForResponse = (ticket) => {
     };
 };
 
-const buildUserLookupFromTickets = async (tickets = []) => {
+const buildUserLookupFromTickets = async (tickets = [], { includeAttachmentsAndActivity = true } = {}) => {
     const ticketList = Array.isArray(tickets) ? tickets : [tickets];
     const userIds = new Set();
 
@@ -111,6 +111,10 @@ const buildUserLookupFromTickets = async (tickets = []) => {
     ticketList.filter(Boolean).forEach((ticket) => {
         addId(ticket.requester);
         addId(ticket.assignee);
+
+        if (!includeAttachmentsAndActivity) {
+            return;
+        }
 
         if (Array.isArray(ticket.attachments)) {
             ticket.attachments.forEach((attachment) => addId(attachment?.uploadedBy));
@@ -148,11 +152,11 @@ const buildUserLookupFromTickets = async (tickets = []) => {
     }, {});
 };
 
-const mapTicketsWithUsers = async (tickets) => {
+const mapTicketsWithUsers = async (tickets, { includeAttachmentsAndActivity = true } = {}) => {
     const mappedTickets = (Array.isArray(tickets) ? tickets : [tickets])
         .map(mapTicketForResponse)
         .filter(Boolean);
-    const users = await buildUserLookupFromTickets(mappedTickets);
+    const users = await buildUserLookupFromTickets(mappedTickets, { includeAttachmentsAndActivity });
     return { tickets: mappedTickets, users };
 };
 
@@ -302,7 +306,7 @@ const listTickets = async (req, res, next) => {
             Ticket.countDocuments(filters),
         ]);
 
-        const { tickets: mappedTickets, users } = await mapTicketsWithUsers(tickets);
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers(tickets, { includeAttachmentsAndActivity: false });
 
         res.status(200).json({
             tickets: mappedTickets,
