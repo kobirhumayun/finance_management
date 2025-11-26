@@ -1,16 +1,15 @@
 // File: src/components/features/support/ticket-detail-page.jsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Send } from "lucide-react";
+import { Files, Loader2, Paperclip, Send, X } from "lucide-react";
 import PageHeader from "@/components/shared/page-header";
 import { TicketConversation, TicketSummary } from "@/components/features/support/ticket-activity";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +53,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   const [attachmentError, setAttachmentError] = useState(null);
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
   const ticketQuery = useQuery({
     queryKey: qk.tickets.detail(ticketId),
@@ -113,6 +113,16 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     return null;
   };
 
+  const attachmentLabel = useMemo(() => {
+    if (!pendingAttachments.length) return "No files selected";
+    if (pendingAttachments.length === 1) {
+      const [file] = pendingAttachments;
+      return `${file.name} (${formatFileSize(file.size, { fallback: "unknown size" })})`;
+    }
+    const totalSize = pendingAttachments.reduce((sum, file) => sum + (file?.size || 0), 0);
+    return `${pendingAttachments.length} files selected (${formatFileSize(totalSize, { fallback: "unknown size" })})`;
+  }, [pendingAttachments]);
+
   const attachments = useMemo(() => {
     if (!Array.isArray(ticket?.attachments)) return [];
     return ticket.attachments.map((attachment) => ({
@@ -143,24 +153,45 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
 
   const handleAttachmentChange = (event) => {
     const files = Array.from(event.target.files || []);
-    if (!files.length) return;
+    const existing = Array.isArray(pendingAttachments) ? [...pendingAttachments] : [];
 
-    const validFiles = [];
-    let firstError = null;
+    if (!files.length && !existing.length) {
+      setPendingAttachments([]);
+      setAttachmentError(null);
+      return;
+    }
 
-    files.forEach((file) => {
+    const firstErrorRef = { current: null };
+    const dedupeKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+    const seen = new Set(existing.map(dedupeKey));
+
+    const validatedExisting = existing.filter((file) => {
       const error = validateAttachment(file);
-      if (error && !firstError) {
-        firstError = error;
+      if (error && !firstErrorRef.current) {
+        firstErrorRef.current = error;
       }
-      if (!error) {
-        validFiles.push(file);
-      }
+      return !error;
     });
 
-    setAttachmentError(firstError);
-    if (validFiles.length) {
-      setPendingAttachments((current) => [...current, ...validFiles]);
+    const validNewFiles = files.reduce((list, file) => {
+      const key = dedupeKey(file);
+      if (seen.has(key)) return list;
+      const error = validateAttachment(file);
+      if (error && !firstErrorRef.current) {
+        firstErrorRef.current = error;
+      }
+      if (!error) {
+        seen.add(key);
+        list.push(file);
+      }
+      return list;
+    }, []);
+
+    setPendingAttachments([...validatedExisting, ...validNewFiles]);
+    setAttachmentError(firstErrorRef.current);
+
+    if (event.target) {
+      event.target.value = "";
     }
   };
 
@@ -324,15 +355,37 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                     rows={4}
                   />
                   <div className="space-y-2">
-                    <Label htmlFor="ticket-attachment" className="text-sm">
-                      Attach files (optional)
-                    </Label>
-                    <Input
-                      id="ticket-attachment"
-                      type="file"
-                      multiple
-                      onChange={handleAttachmentChange}
-                    />
+                    <Label className="text-sm">Attachments (optional)</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        id="reply-attachments"
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleAttachmentChange}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-2"
+                      >
+                        <Paperclip className="h-4 w-4" aria-hidden />
+                        <span>Add files</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="sm:hidden"
+                        aria-label="Attach multiple files"
+                      >
+                        <Files className="h-4 w-4" aria-hidden />
+                      </Button>
+                      <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
+                    </div>
                     {pendingAttachments.length ? (
                       <ul className="space-y-2 text-sm">
                         {pendingAttachments.map((file, index) => (
@@ -351,19 +404,21 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                               size="icon"
                               variant="ghost"
                               onClick={() => handleRemoveAttachment(index)}
+                              aria-label={`Remove ${file.name}`}
                             >
-                              ×
+                              <X className="h-4 w-4" />
                             </Button>
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">You can attach multiple files to this reply.</p>
-                    )}
-                    {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
+                    ) : null}
                     <p className="text-xs text-muted-foreground">
-                      Max file size {formatFileSize(resolvedMaxAttachmentBytes)} per attachment.
+                      You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
+                        fallback: "the upload limit",
+                      })}{" "}
+                      each.
                     </p>
+                    {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     <Button
