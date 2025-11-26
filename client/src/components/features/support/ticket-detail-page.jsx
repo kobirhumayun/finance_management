@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Send } from "lucide-react";
 import PageHeader from "@/components/shared/page-header";
-import { TicketAttachmentList, TicketConversation, TicketSummary } from "@/components/features/support/ticket-activity";
+import { TicketConversation, TicketSummary } from "@/components/features/support/ticket-activity";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -427,12 +427,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                 <p className="text-xs text-muted-foreground">All changes are logged to the activity history.</p>
               </CardContent>
             </Card>
-
-            <TicketAttachmentList
-              attachments={attachments}
-              onView={handleViewAttachment}
-              onDownload={handleDownloadAttachment}
-            />
           </div>
         </div>
       ) : null}
