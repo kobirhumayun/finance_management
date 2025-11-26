@@ -1,7 +1,7 @@
 // File: src/components/features/support/ticket-create-form.jsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -24,10 +24,11 @@ import { toast } from "@/components/ui/sonner";
 import { useForm } from "react-hook-form";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { formatFileSize } from "@/lib/utils";
-import { createTicket, fetchTickets, uploadTicketAttachment } from "@/lib/queries/tickets";
-import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
+import { createTicket, fetchTickets } from "@/lib/queries/tickets";
+import { resolveMaxAttachmentBytes } from "@/lib/attachments";
 import { qk } from "@/lib/query-keys";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
+import { Files, Paperclip, X } from "lucide-react";
 
 const REQUESTER_SELF_VALUE = "__self";
 
@@ -65,8 +66,9 @@ export default function TicketCreateForm({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const ticketMetaQuery = useQuery({
     queryKey: qk.tickets.list({ limit: 1 }),
@@ -96,9 +98,14 @@ export default function TicketCreateForm({
   });
 
   const attachmentLabel = useMemo(() => {
-    if (!attachmentFile) return "No file selected";
-    return `${attachmentFile.name} (${formatFileSize(attachmentFile.size, { fallback: "unknown size" })})`;
-  }, [attachmentFile]);
+    if (!attachmentFiles.length) return "No files selected";
+    if (attachmentFiles.length === 1) {
+      const [file] = attachmentFiles;
+      return `${file.name} (${formatFileSize(file.size, { fallback: "unknown size" })})`;
+    }
+    const totalSize = attachmentFiles.reduce((sum, file) => sum + (file?.size || 0), 0);
+    return `${attachmentFiles.length} files selected (${formatFileSize(totalSize, { fallback: "unknown size" })})`;
+  }, [attachmentFiles]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (values) => {
@@ -106,12 +113,9 @@ export default function TicketCreateForm({
       const payload = showRequesterSelector
         ? { ...values, requester: requesterValue || undefined }
         : values;
-      const { ticket } = await createTicket(payload);
+      const { ticket } = await createTicket({ ...payload, attachments: attachmentFiles });
       if (!ticket?.id) {
         throw new Error("Ticket could not be created");
-      }
-      if (attachmentFile) {
-        await uploadTicketAttachment({ ticketId: ticket.id, file: attachmentFile });
       }
       return ticket;
     },
@@ -127,28 +131,60 @@ export default function TicketCreateForm({
     },
   });
 
-  const validateAttachment = (file) =>
-    validateImageAttachment(
-      file,
-      resolvedMaxAttachmentBytes,
-      (value) => formatFileSize(value, { fallback: "unknown size" })
-    );
+  const validateAttachment = (file) => {
+    if (!file) return null;
+    if (resolvedMaxAttachmentBytes && file.size > resolvedMaxAttachmentBytes) {
+      return `File is too large. Max size is ${formatFileSize(resolvedMaxAttachmentBytes, { fallback: "the upload limit" })}.`;
+    }
+    return null;
+  };
 
   const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setAttachmentFile(null);
+    const files = Array.from(event.target.files || []);
+    const existing = Array.isArray(attachmentFiles) ? [...attachmentFiles] : [];
+
+    if (!files.length && !existing.length) {
+      setAttachmentFiles([]);
       setAttachmentError(null);
       return;
     }
-    const error = validateAttachment(file);
-    if (error) {
-      setAttachmentFile(null);
-      setAttachmentError(error);
-      return;
+
+    const firstErrorRef = { current: null };
+    const dedupeKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+    const seen = new Set(existing.map(dedupeKey));
+
+    const validatedExisting = existing.filter((file) => {
+      const error = validateAttachment(file);
+      if (error && !firstErrorRef.current) {
+        firstErrorRef.current = error;
+      }
+      return !error;
+    });
+
+    const validNewFiles = files.reduce((list, file) => {
+      const key = dedupeKey(file);
+      if (seen.has(key)) return list;
+      const error = validateAttachment(file);
+      if (error && !firstErrorRef.current) {
+        firstErrorRef.current = error;
+      }
+      if (!error) {
+        seen.add(key);
+        list.push(file);
+      }
+      return list;
+    }, []);
+
+    setAttachmentFiles([...validatedExisting, ...validNewFiles]);
+    setAttachmentError(firstErrorRef.current);
+
+    if (event.target) {
+      event.target.value = "";
     }
-    setAttachmentFile(file);
-    setAttachmentError(null);
+  };
+
+  const handleRemoveAttachment = (indexToRemove) => {
+    setAttachmentFiles((current) => current.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = async (values) => {
@@ -276,29 +312,86 @@ export default function TicketCreateForm({
                 )}
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category (optional)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Billing, integrations, onboarding..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="space-y-2">
-                  <FormLabel>Attachment (optional)</FormLabel>
-                  <Input type="file" accept={IMAGE_ATTACHMENT_TYPES.join(",")} onChange={handleFileChange} />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category (optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Billing, integrations, onboarding..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-2">
+                <FormLabel>Attachments (optional)</FormLabel>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    id="ticket-attachments"
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Paperclip className="h-4 w-4" aria-hidden />
+                    <span>Add files</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="sm:hidden"
+                    aria-label="Attach multiple files"
+                  >
+                    <Files className="h-4 w-4" aria-hidden />
+                  </Button>
                   <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)}.
-                  </p>
-                  {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
                 </div>
+                {attachmentFiles.length ? (
+                  <ul className="space-y-2 text-sm">
+                    {attachmentFiles.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size, { fallback: "unknown size" })}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemoveAttachment(index)}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
+                    fallback: "the upload limit",
+                  })}
+                  {" "}
+                  each.
+                </p>
+                {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
               </div>
 
               <div className="flex items-center justify-end gap-3">

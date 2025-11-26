@@ -80,6 +80,9 @@ const mapTicketForResponse = (ticket) => {
                 ...entry,
                 actor: entry.actor ? entry.actor.toString() : null,
                 at: entry.at || entry.createdAt || entry.updatedAt || null,
+                attachments: Array.isArray(entry.attachments)
+                    ? entry.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
+                    : [],
             }))
             : [],
     };
@@ -110,6 +113,11 @@ const buildUserLookupFromTickets = async (tickets = []) => {
 
         if (Array.isArray(ticket.activityLog)) {
             ticket.activityLog.forEach((entry) => addId(entry?.actor));
+            ticket.activityLog.forEach((entry) => {
+                if (Array.isArray(entry?.attachments)) {
+                    entry.attachments.forEach((attachment) => addId(attachment?.uploadedBy));
+                }
+            });
         }
     });
 
@@ -174,6 +182,7 @@ const storeAttachment = async ({ file, ticketId, userId }) => {
 const createTicket = async (req, res, next) => {
     try {
         const { subject, description, category, priority, requester: requesterInput } = req.body;
+        const files = Array.isArray(req.files) ? req.files : [];
         if (!subject || !description) {
             return res.status(400).json({ message: 'Subject and description are required.' });
         }
@@ -187,20 +196,23 @@ const createTicket = async (req, res, next) => {
             requesterId = parsedRequester;
         }
 
-        const ticket = await Ticket.create({
+        const ticket = new Ticket({
             requester: requesterId,
             subject: subject.trim(),
             description: description.trim(),
             category: category?.trim() || undefined,
             priority: priority || undefined,
-            activityLog: [
-                {
-                    actor: req.user._id,
-                    action: 'created',
-                    message: 'Ticket created',
-                },
-            ],
+            activityLog: [],
         });
+
+        if (files.length) {
+            const attachments = await Promise.all(
+                files.map((file) => storeAttachment({ file, ticketId: ticket._id, userId: req.user._id })),
+            );
+            ticket.attachments.push(...attachments);
+        }
+
+        await ticket.save();
 
         const actorName = await getUserNameById(req.user._id);
         const subjectLine = `Ticket created: ${ticket.subject}`;
@@ -313,8 +325,9 @@ const addComment = async (req, res, next) => {
     try {
         const { ticketId } = req.params;
         const { comment } = req.body;
+        const files = Array.isArray(req.files) ? req.files : [];
 
-        if (!comment || !comment.trim()) {
+        if ((!comment || !comment.trim()) && files.length === 0) {
             return res.status(400).json({ message: 'Comment is required.' });
         }
 
@@ -327,10 +340,21 @@ const addComment = async (req, res, next) => {
             return res.status(403).json({ message: 'You are not allowed to comment on this ticket.' });
         }
 
+        const savedAttachments = [];
+
+        if (files.length) {
+            const attachments = await Promise.all(
+                files.map((file) => storeAttachment({ file, ticketId, userId: req.user._id })),
+            );
+            ticket.attachments.push(...attachments);
+            savedAttachments.push(...attachments);
+        }
+
         ticket.activityLog.push({
             actor: req.user._id,
             action: 'comment',
-            message: comment.trim(),
+            message: comment?.trim?.() || undefined,
+            attachments: savedAttachments,
         });
 
         ticket.staleSince = undefined;
@@ -449,6 +473,7 @@ const uploadAttachment = async (req, res, next) => {
             actor: req.user._id,
             action: 'attachment_added',
             message: attachment.filename,
+            attachments: [attachment],
         });
 
         ticket.staleSince = undefined;

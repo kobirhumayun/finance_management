@@ -78,6 +78,10 @@ const normalizeActivity = (activity, users) => {
       : activity.actor;
   const actorDetails = resolveUserDetails(actor, users);
 
+  const attachments = Array.isArray(activity.attachments)
+    ? activity.attachments.map((item) => normalizeAttachment(item, users)).filter(Boolean)
+    : [];
+
   return {
     actor: actor || null,
     actorName: actorDetails?.displayName || null,
@@ -85,6 +89,7 @@ const normalizeActivity = (activity, users) => {
     action: activity.action || "comment",
     message: activity.message || "",
     at: activity.at || activity.createdAt || null,
+    attachments,
   };
 };
 
@@ -161,25 +166,48 @@ export async function fetchTicketDetail({ ticketId, signal }) {
 }
 
 export async function createTicket(input, { signal } = {}) {
-  const body = {
-    subject: input?.subject?.trim() || "",
-    description: input?.description?.trim() || "",
-    category: input?.category?.trim() || undefined,
-    priority: input?.priority || undefined,
-    requester: input?.requester || undefined,
-  };
+  const hasAttachments = Array.isArray(input?.attachments) && input.attachments.length > 0;
+  const body = hasAttachments
+    ? new FormData()
+    : {
+        subject: input?.subject?.trim() || "",
+        description: input?.description?.trim() || "",
+        category: input?.category?.trim() || undefined,
+        priority: input?.priority || undefined,
+        requester: input?.requester || undefined,
+      };
+
+  if (hasAttachments) {
+    body.append("subject", input?.subject?.trim() || "");
+    body.append("description", input?.description?.trim() || "");
+    if (input?.category) body.append("category", input.category.trim());
+    if (input?.priority) body.append("priority", input.priority);
+    if (input?.requester) body.append("requester", input.requester);
+    input.attachments.forEach((file) => body.append("attachments", file));
+  }
 
   const response = await apiJSON(TICKETS_ENDPOINT, { method: "POST", body, signal });
   const users = normalizeUserLookup(response?.users);
   return { ticket: normalizeTicket(response?.ticket, users), users };
 }
 
-export async function addTicketComment({ ticketId, comment }, { signal } = {}) {
+export async function addTicketComment({ ticketId, comment, attachments }, { signal } = {}) {
   if (!ticketId) {
     throw new Error("ticketId is required to comment on a ticket");
   }
-  const body = { comment: comment?.toString() || "" };
-  const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}/comments`, { method: "POST", body, signal });
+  const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+  const body = hasAttachments ? new FormData() : { comment: comment?.toString() || "" };
+
+  if (hasAttachments) {
+    body.append("comment", comment?.toString() || "");
+    attachments.forEach((file) => body.append("attachments", file));
+  }
+
+  const response = await apiJSON(`${TICKETS_ENDPOINT}/${ticketId}/comments`, {
+    method: "POST",
+    body,
+    signal,
+  });
   const users = normalizeUserLookup(response?.users);
   return { ticket: normalizeTicket(response?.ticket, users), users };
 }

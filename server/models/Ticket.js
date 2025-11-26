@@ -62,6 +62,7 @@ const activityLogSchema = new Schema({
     message: {
         type: String
     },
+    attachments: [attachmentSchema],
     at: {
         type: Date,
         default: Date.now

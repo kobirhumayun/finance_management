@@ -8,10 +8,21 @@ const { ensureTicketAccess } = require('../middleware/ticketAccessMiddleware');
 
 router.use(authenticate);
 
-router.post('/', authorize('tickets', 'write'), ticketController.createTicket);
+router.post(
+    '/',
+    authorize('tickets', 'write'),
+    upload.array('attachments'),
+    ticketController.createTicket,
+);
 router.get('/', authorize('tickets', 'read'), ticketController.listTickets);
 router.get('/:ticketId', authorize('tickets', 'read'), ensureTicketAccess, ticketController.getTicket);
-router.post('/:ticketId/comments', authorize('tickets', 'update'), ensureTicketAccess, ticketController.addComment);
+router.post(
+    '/:ticketId/comments',
+    authorize('tickets', 'update'),
+    ensureTicketAccess,
+    upload.array('attachments'),
+    ticketController.addComment,
+);
 router.patch('/:ticketId/status', authorize('tickets', 'update'), ensureTicketAccess, ticketController.updateStatus);
 router.patch('/:ticketId/assignee', authorize('tickets', 'update'), ensureTicketAccess, ticketController.updateAssignee);
 router.get(

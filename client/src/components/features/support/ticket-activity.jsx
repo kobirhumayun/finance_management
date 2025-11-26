@@ -1,15 +1,29 @@
 // File: src/components/features/support/ticket-activity.jsx
-import { MessageSquare, Paperclip, RefreshCcw, UserRound } from "lucide-react";
+import {
+  CalendarClock,
+  Download,
+  ExternalLink,
+  File,
+  FileText,
+  Image as ImageIcon,
+  MessageSquare,
+  Paperclip,
+  RefreshCcw,
+  UserRound,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/formatters";
 import { formatFileSize } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TicketStatusBadge } from "./ticket-status-badge";
 
 const actionLabels = {
+  description: "Ticket details",
   created: "Ticket created",
-  comment: "Commented",
+  comment: "Comment",
   status_change: "Status updated",
   assignee_change: "Assignee updated",
   attachment_added: "Attachment added",
@@ -17,6 +31,7 @@ const actionLabels = {
 };
 
 const actionIcons = {
+  description: UserRound,
   created: UserRound,
   comment: MessageSquare,
   status_change: RefreshCcw,
@@ -25,59 +40,222 @@ const actionIcons = {
   attachment_removed: Paperclip,
 };
 
-export function TicketActivity({ activity = [] }) {
-  if (!activity.length) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">No activity yet.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+const getInitials = (value) => {
+  if (!value) return "?";
+  const [first = "", second = ""] = value.split(" ");
+  return `${first[0] || ""}${second[0] || ""}`.toUpperCase() || "?";
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatDayLabel = (value) => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const getFileIcon = (attachment) => {
+  if (attachment?.mimeType?.startsWith("image/")) return ImageIcon;
+  if (attachment?.mimeType === "application/pdf") return FileText;
+  return File;
+};
+
+const buildRoleLabel = (event, ticket) => {
+  if (!event?.actor && event?.action !== "comment") return "System";
+  if (ticket?.requester && ticket.requester === event.actor) return "Requester";
+  if (ticket?.assignee && ticket.assignee === event.actor) return "Assignee";
+  const role = event.actorDetails?.role?.toLowerCase?.() || "";
+  if (role.includes("support")) return "Support";
+  if (role.includes("admin")) return "Admin";
+  return "Collaborator";
+};
+
+const AttachmentCard = ({ attachment, onDownload, onView, compact = false }) => {
+  const Icon = getFileIcon(attachment);
+  const url = attachment?.resolvedUrl || attachment?.url || "";
+
+  const handleDownload = () => {
+    if (!url) return;
+    onDownload?.(attachment);
+  };
+
+  const handleView = () => {
+    if (!url) return;
+    onView?.(attachment);
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Activity</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {activity.map((item, index) => {
-          const Icon = actionIcons[item.action] || MessageSquare;
-          const label = actionLabels[item.action] || "Update";
-          const actorName = item.actorName || item.actorDetails?.displayName || "System";
-          const showDivider = index < activity.length - 1;
+    <div className="flex gap-3 rounded-md border bg-card/60 p-3">
+      <div className="mt-0.5">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+      </div>
+      <div className="flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2 text-sm font-medium leading-none">
+          <span className="break-all">{attachment.filename || "Attachment"}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {formatFileSize(attachment.size, { fallback: "Unknown size" })}
+          {attachment.uploadedByName || attachment.uploadedByDetails?.displayName
+            ? ` • Uploaded by ${attachment.uploadedByName || attachment.uploadedByDetails?.displayName}`
+            : ""}
+          {attachment.uploadedAt ? ` • ${formatDateTime(attachment.uploadedAt)}` : ""}
+        </p>
+        {attachment.width && attachment.height ? (
+          <p className="text-xs text-muted-foreground">{attachment.width} × {attachment.height}px</p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!url}
+            onClick={(event) => {
+              event.preventDefault();
+              handleView();
+            }}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            View
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={!url}
+            onClick={(event) => {
+              event.preventDefault();
+              handleDownload();
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-          return (
-            <div key={`${item.action}-${item.at}-${index}`} className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="rounded-md bg-muted p-2 text-muted-foreground">
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">{label}</p>
-                  {item.message ? (
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">{item.message}</p>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-medium">{actorName}</span>
-                    {item.at ? ` • ${formatDate(item.at)}` : ""}
-                  </p>
-                </div>
-              </div>
-              {showDivider ? <Separator /> : null}
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttachment }) => {
+  const Icon = actionIcons[event.action] || MessageSquare;
+  const label = actionLabels[event.action] || "Update";
+  const actorName = event.actorDetails?.displayName || event.actorName || (event.actor ? "User" : "System");
+  const roleLabel = buildRoleLabel(event, ticket);
+  const attachments = Array.isArray(event.attachments) ? event.attachments : [];
+
+  return (
+    <div className="flex gap-3">
+      <Avatar className="mt-1 h-9 w-9">
+        <AvatarFallback>{getInitials(actorName)}</AvatarFallback>
+      </Avatar>
+      <div className="flex-1 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold leading-none text-foreground">{actorName}</p>
+          <Badge variant="secondary" className="text-[11px] capitalize">
+            {roleLabel}
+          </Badge>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5" />
+            {formatDateTime(event.at)}
+          </span>
+        </div>
+        <div className="rounded-lg border bg-muted/40 p-3">
+          <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Icon className="h-4 w-4" />
+            {label}
+          </div>
+          {event.message ? (
+            <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">{event.message}</p>
+          ) : null}
+          {event.action === "description" ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Category: {ticket?.category || "Not set"} • Priority: {ticket?.priority || "Unknown"}
+              {ticket?.updatedAt ? ` • Last updated ${formatDate(ticket.updatedAt)}` : ""}
+            </p>
+          ) : null}
+        </div>
+        {attachments.length ? (
+          <div className="space-y-2">
+            {attachments.map((attachment) => (
+              <AttachmentCard
+                key={attachment.id || attachment.url}
+                attachment={attachment}
+                onDownload={onDownloadAttachment}
+                onView={onViewAttachment}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
+export function TicketConversation({
+  activity = [],
+  ticket,
+  onDownloadAttachment,
+  onViewAttachment,
+}) {
+  if (!activity.length) {
+    return <p className="text-sm text-muted-foreground">No messages yet.</p>;
+  }
+
+  const groupedByDay = activity.reduce((groups, event) => {
+    const dateKey = event.at ? new Date(event.at).toDateString() : "Unknown";
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(event);
+    return groups;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {Object.entries(groupedByDay).map(([dateKey, items]) => (
+        <div key={dateKey} className="space-y-3">
+          <div className="relative flex items-center justify-center">
+            <Separator className="absolute inset-x-0 top-1/2 -translate-y-1/2" />
+            <span className="relative z-10 bg-card px-3 text-xs font-semibold uppercase text-muted-foreground">
+              {dateKey === "Unknown" ? "Updates" : formatDayLabel(items[0]?.at || dateKey)}
+            </span>
+          </div>
+          <div className="space-y-5">
+            {items.map((event) => (
+              <ConversationMessage
+                key={`${event.action}-${event.at}-${event.actor}-${event.message}`}
+                event={event}
+                ticket={ticket}
+                onDownloadAttachment={onDownloadAttachment}
+                onViewAttachment={onViewAttachment}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
-export function TicketAttachmentList({ attachments = [], onView, actions = null }) {
+export const TicketActivity = TicketConversation;
+
+export function TicketAttachmentList({ attachments = [], onDownload, onView, actions = null }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -90,37 +268,13 @@ export function TicketAttachmentList({ attachments = [], onView, actions = null 
         ) : (
           <ul className="space-y-3">
             {attachments.map((attachment) => (
-              <li
-                key={attachment.id || attachment.url}
-                className="flex items-center justify-between gap-4 rounded-md border bg-card px-3 py-2"
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium leading-none">{attachment.filename}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(attachment.size, { fallback: "" }) || "Unknown size"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Dimensions: {attachment.width && attachment.height ? `${attachment.width} × ${attachment.height}px` : "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {attachment.uploadedByName || attachment.uploadedByDetails?.displayName
-                      ? `Uploaded by ${attachment.uploadedByName || attachment.uploadedByDetails?.displayName}`
-                      : "Uploader unknown"}
-                    {attachment.uploadedAt ? ` • ${formatDate(attachment.uploadedAt)}` : ""}
-                  </p>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="whitespace-nowrap"
-                  disabled={!attachment.url && !attachment.resolvedUrl}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    onView?.(attachment);
-                  }}
-                >
-                  View image
-                </Button>
+              <li key={attachment.id || attachment.url}>
+                <AttachmentCard
+                  attachment={attachment}
+                  onDownload={onDownload}
+                  onView={onView}
+                  compact
+                />
               </li>
             ))}
           </ul>
