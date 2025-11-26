@@ -178,11 +178,29 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
 
   const activity = useMemo(() => {
     const events = Array.isArray(ticket?.activityLog) ? [...ticket.activityLog] : [];
-    return events.sort((a, b) => {
-      const aTime = a?.at ? new Date(a.at).getTime() : 0;
-      const bTime = b?.at ? new Date(b.at).getTime() : 0;
-      return bTime - aTime;
-    });
+
+    const parseTimestamp = (value) => {
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.getTime();
+      }
+
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        const parsed = Date.parse(trimmed);
+        if (!Number.isNaN(parsed)) return parsed;
+
+        const numericFallback = Number(trimmed);
+        if (Number.isFinite(numericFallback)) return numericFallback;
+      }
+
+      return 0;
+    };
+
+    return events.sort((a, b) => parseTimestamp(a?.at) - parseTimestamp(b?.at));
   }, [ticket?.activityLog]);
 
   return (

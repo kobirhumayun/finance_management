@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
-const { getUserNameById, notifyTicketParticipants } = require('../services/ticketNotificationService');
+const User = require('../models/User');
+const { formatUserName, getUserNameById, notifyTicketParticipants } = require('../services/ticketNotificationService');
 const { getUploadFileSizeLimit, saveTicketAttachment, discardDescriptor } = require('../services/imageService');
 const { streamStoredFile } = require('../utils/storageStreamer');
 
@@ -54,7 +55,7 @@ const mapTicketAttachment = (attachment, ticketId) => {
         height: typeof attachment.height === 'number' ? attachment.height : null,
         url,
         uploadedAt,
-        uploadedBy: attachment.uploadedBy || null,
+        uploadedBy: attachment.uploadedBy ? attachment.uploadedBy.toString() : null,
     };
 };
 
@@ -69,16 +70,77 @@ const mapTicketForResponse = (ticket) => {
     return {
         ...plainTicket,
         id: ticketId,
+        requester: plainTicket.requester ? plainTicket.requester.toString() : plainTicket.requester,
+        assignee: plainTicket.assignee ? plainTicket.assignee.toString() : plainTicket.assignee,
         attachments: Array.isArray(plainTicket.attachments)
             ? plainTicket.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
             : [],
         activityLog: Array.isArray(plainTicket.activityLog)
             ? plainTicket.activityLog.map((entry) => ({
                 ...entry,
+                actor: entry.actor ? entry.actor.toString() : null,
                 at: entry.at || entry.createdAt || entry.updatedAt || null,
             }))
             : [],
     };
+};
+
+const buildUserLookupFromTickets = async (tickets = []) => {
+    const ticketList = Array.isArray(tickets) ? tickets : [tickets];
+    const userIds = new Set();
+
+    const addId = (value) => {
+        if (!value) {
+            return;
+        }
+
+        const idString = typeof value === 'string' ? value : value.toString?.();
+        if (idString && mongoose.Types.ObjectId.isValid(idString)) {
+            userIds.add(idString);
+        }
+    };
+
+    ticketList.filter(Boolean).forEach((ticket) => {
+        addId(ticket.requester);
+        addId(ticket.assignee);
+
+        if (Array.isArray(ticket.attachments)) {
+            ticket.attachments.forEach((attachment) => addId(attachment?.uploadedBy));
+        }
+
+        if (Array.isArray(ticket.activityLog)) {
+            ticket.activityLog.forEach((entry) => addId(entry?.actor));
+        }
+    });
+
+    if (userIds.size === 0) {
+        return {};
+    }
+
+    const users = await User.find({ _id: { $in: [...userIds].map((id) => new mongoose.Types.ObjectId(id)) } }).lean();
+
+    return users.reduce((lookup, user) => {
+        const id = user._id?.toString();
+        if (!id) {
+            return lookup;
+        }
+
+        lookup[id] = {
+            id,
+            displayName: formatUserName(user),
+            email: user.email || '',
+            role: user.role || 'user',
+        };
+        return lookup;
+    }, {});
+};
+
+const mapTicketsWithUsers = async (tickets) => {
+    const mappedTickets = (Array.isArray(tickets) ? tickets : [tickets])
+        .map(mapTicketForResponse)
+        .filter(Boolean);
+    const users = await buildUserLookupFromTickets(mappedTickets);
+    return { tickets: mappedTickets, users };
 };
 
 const storeAttachment = async ({ file, ticketId, userId }) => {
@@ -111,13 +173,22 @@ const storeAttachment = async ({ file, ticketId, userId }) => {
 
 const createTicket = async (req, res, next) => {
     try {
-        const { subject, description, category, priority } = req.body;
+        const { subject, description, category, priority, requester: requesterInput } = req.body;
         if (!subject || !description) {
             return res.status(400).json({ message: 'Subject and description are required.' });
         }
 
+        let requesterId = req.user._id;
+        if (requesterInput && (isAdmin(req.user) || isSupport(req.user))) {
+            const parsedRequester = toObjectId(requesterInput);
+            if (!parsedRequester) {
+                return res.status(400).json({ message: 'Invalid requester provided.' });
+            }
+            requesterId = parsedRequester;
+        }
+
         const ticket = await Ticket.create({
-            requester: req.user._id,
+            requester: requesterId,
             subject: subject.trim(),
             description: description.trim(),
             category: category?.trim() || undefined,
@@ -136,7 +207,8 @@ const createTicket = async (req, res, next) => {
         const message = `Ticket "${ticket.subject}" was created by ${actorName}. We will notify you on further updates.`;
         await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
-        res.status(201).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
+        res.status(201).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -199,14 +271,17 @@ const listTickets = async (req, res, next) => {
             Ticket.countDocuments(filters),
         ]);
 
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers(tickets);
+
         res.status(200).json({
-            tickets: tickets.map(mapTicketForResponse),
+            tickets: mappedTickets,
             pagination: {
                 page: safePage,
                 limit: safeLimit,
                 total,
                 totalPages: Math.ceil(total / safeLimit) || 1,
             },
+            users,
             attachmentLimitBytes: getUploadFileSizeLimit(),
         });
     } catch (error) {
@@ -226,7 +301,9 @@ const getTicket = async (req, res, next) => {
             return res.status(403).json({ message: 'You are not allowed to access this ticket.' });
         }
 
-        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
+
+        res.status(200).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -260,7 +337,9 @@ const addComment = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
+
+        res.status(200).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -300,7 +379,9 @@ const updateStatus = async (req, res, next) => {
         const message = `Status for ticket "${ticket.subject}" updated to ${status} by ${actorName}.`;
         await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
-        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
+
+        res.status(200).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -337,7 +418,9 @@ const updateAssignee = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(200).json({ ticket: mapTicketForResponse(ticket), attachmentLimitBytes: getUploadFileSizeLimit() });
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
+
+        res.status(200).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });
     } catch (error) {
         next(error);
     }
@@ -372,7 +455,10 @@ const uploadAttachment = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(201).json({ attachment: mapTicketAttachment(attachment, ticket._id) });
+        const mappedAttachment = mapTicketAttachment(attachment, ticket._id);
+        const users = await buildUserLookupFromTickets([{ attachments: [mappedAttachment] }]);
+
+        res.status(201).json({ attachment: mappedAttachment, users });
     } catch (error) {
         next(error);
     }
@@ -456,7 +542,9 @@ const deleteAttachment = async (req, res, next) => {
 
         await ticket.save();
 
-        res.status(200).json({ message: 'Attachment removed.', ticket: mapTicketForResponse(ticket) });
+        const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
+
+        res.status(200).json({ message: 'Attachment removed.', ticket: mappedTickets[0], users });
     } catch (error) {
         next(error);
     }
