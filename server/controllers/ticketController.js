@@ -182,6 +182,7 @@ const storeAttachment = async ({ file, ticketId, userId }) => {
 const createTicket = async (req, res, next) => {
     try {
         const { subject, description, category, priority, requester: requesterInput } = req.body;
+        const files = Array.isArray(req.files) ? req.files : [];
         if (!subject || !description) {
             return res.status(400).json({ message: 'Subject and description are required.' });
         }
@@ -195,20 +196,23 @@ const createTicket = async (req, res, next) => {
             requesterId = parsedRequester;
         }
 
-        const ticket = await Ticket.create({
+        const ticket = new Ticket({
             requester: requesterId,
             subject: subject.trim(),
             description: description.trim(),
             category: category?.trim() || undefined,
             priority: priority || undefined,
-            activityLog: [
-                {
-                    actor: req.user._id,
-                    action: 'created',
-                    message: 'Ticket created',
-                },
-            ],
+            activityLog: [],
         });
+
+        if (files.length) {
+            const attachments = await Promise.all(
+                files.map((file) => storeAttachment({ file, ticketId: ticket._id, userId: req.user._id })),
+            );
+            ticket.attachments.push(...attachments);
+        }
+
+        await ticket.save();
 
         const actorName = await getUserNameById(req.user._id);
         const subjectLine = `Ticket created: ${ticket.subject}`;

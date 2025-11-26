@@ -253,6 +253,10 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
         return { ...entry, attachments: resolvedAttachments };
       });
 
+    const unassignedAttachments = attachments.filter(
+      (attachment) => attachment && !assignedAttachmentIds.has(attachment.id)
+    );
+
     return [
       {
         id: "description",
@@ -261,7 +265,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
         actorDetails: resolveUser(ticket.requester),
         at: ticket.createdAt,
         message: ticket.description || "No description provided.",
-        attachments: [],
+        attachments: unassignedAttachments,
       },
       ...sortedEvents,
     ];

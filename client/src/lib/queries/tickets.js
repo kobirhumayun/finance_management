@@ -166,13 +166,25 @@ export async function fetchTicketDetail({ ticketId, signal }) {
 }
 
 export async function createTicket(input, { signal } = {}) {
-  const body = {
-    subject: input?.subject?.trim() || "",
-    description: input?.description?.trim() || "",
-    category: input?.category?.trim() || undefined,
-    priority: input?.priority || undefined,
-    requester: input?.requester || undefined,
-  };
+  const hasAttachments = Array.isArray(input?.attachments) && input.attachments.length > 0;
+  const body = hasAttachments
+    ? new FormData()
+    : {
+        subject: input?.subject?.trim() || "",
+        description: input?.description?.trim() || "",
+        category: input?.category?.trim() || undefined,
+        priority: input?.priority || undefined,
+        requester: input?.requester || undefined,
+      };
+
+  if (hasAttachments) {
+    body.append("subject", input?.subject?.trim() || "");
+    body.append("description", input?.description?.trim() || "");
+    if (input?.category) body.append("category", input.category.trim());
+    if (input?.priority) body.append("priority", input.priority);
+    if (input?.requester) body.append("requester", input.requester);
+    input.attachments.forEach((file) => body.append("attachments", file));
+  }
 
   const response = await apiJSON(TICKETS_ENDPOINT, { method: "POST", body, signal });
   const users = normalizeUserLookup(response?.users);

@@ -24,7 +24,7 @@ import { toast } from "@/components/ui/sonner";
 import { useForm } from "react-hook-form";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { formatFileSize } from "@/lib/utils";
-import { createTicket, fetchTickets, uploadTicketAttachment } from "@/lib/queries/tickets";
+import { createTicket, fetchTickets } from "@/lib/queries/tickets";
 import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
 import { qk } from "@/lib/query-keys";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
@@ -65,7 +65,7 @@ export default function TicketCreateForm({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
 
   const ticketMetaQuery = useQuery({
@@ -96,9 +96,14 @@ export default function TicketCreateForm({
   });
 
   const attachmentLabel = useMemo(() => {
-    if (!attachmentFile) return "No file selected";
-    return `${attachmentFile.name} (${formatFileSize(attachmentFile.size, { fallback: "unknown size" })})`;
-  }, [attachmentFile]);
+    if (!attachmentFiles.length) return "No files selected";
+    if (attachmentFiles.length === 1) {
+      const [file] = attachmentFiles;
+      return `${file.name} (${formatFileSize(file.size, { fallback: "unknown size" })})`;
+    }
+    const totalSize = attachmentFiles.reduce((sum, file) => sum + (file?.size || 0), 0);
+    return `${attachmentFiles.length} files selected (${formatFileSize(totalSize, { fallback: "unknown size" })})`;
+  }, [attachmentFiles]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (values) => {
@@ -106,12 +111,9 @@ export default function TicketCreateForm({
       const payload = showRequesterSelector
         ? { ...values, requester: requesterValue || undefined }
         : values;
-      const { ticket } = await createTicket(payload);
+      const { ticket } = await createTicket({ ...payload, attachments: attachmentFiles });
       if (!ticket?.id) {
         throw new Error("Ticket could not be created");
-      }
-      if (attachmentFile) {
-        await uploadTicketAttachment({ ticketId: ticket.id, file: attachmentFile });
       }
       return ticket;
     },
@@ -135,20 +137,32 @@ export default function TicketCreateForm({
     );
 
   const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setAttachmentFile(null);
+    const files = Array.from(event.target.files || []);
+    if (!files.length) {
+      setAttachmentFiles([]);
       setAttachmentError(null);
       return;
     }
-    const error = validateAttachment(file);
-    if (error) {
-      setAttachmentFile(null);
-      setAttachmentError(error);
-      return;
-    }
-    setAttachmentFile(file);
-    setAttachmentError(null);
+
+    const validFiles = [];
+    let firstError = null;
+
+    files.forEach((file) => {
+      const error = validateAttachment(file);
+      if (error && !firstError) {
+        firstError = error;
+      }
+      if (!error) {
+        validFiles.push(file);
+      }
+    });
+
+    setAttachmentFiles(validFiles);
+    setAttachmentError(firstError);
+  };
+
+  const handleRemoveAttachment = (indexToRemove) => {
+    setAttachmentFiles((current) => current.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = async (values) => {
@@ -291,11 +305,42 @@ export default function TicketCreateForm({
                   )}
                 />
                 <div className="space-y-2">
-                  <FormLabel>Attachment (optional)</FormLabel>
-                  <Input type="file" accept={IMAGE_ATTACHMENT_TYPES.join(",")} onChange={handleFileChange} />
+                  <FormLabel>Attachments (optional)</FormLabel>
+                  <Input
+                    type="file"
+                    multiple
+                    accept={IMAGE_ATTACHMENT_TYPES.join(",")}
+                    onChange={handleFileChange}
+                  />
                   <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
+                  {attachmentFiles.length ? (
+                    <ul className="space-y-2 text-sm">
+                      {attachmentFiles.map((file, index) => (
+                        <li
+                          key={`${file.name}-${file.size}-${file.lastModified}`}
+                          className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.size, { fallback: "unknown size" })}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleRemoveAttachment(index)}
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            ×
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
-                    Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)}.
+                    Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)} per file.
                   </p>
                   {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
                 </div>
