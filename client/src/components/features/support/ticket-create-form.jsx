@@ -402,6 +402,7 @@ export default function TicketCreateForm({
                     id="ticket-attachments"
                     type="file"
                     multiple
+                    accept="image/*,.pdf"
                     className="hidden"
                     onChange={handleFileChange}
                   />
