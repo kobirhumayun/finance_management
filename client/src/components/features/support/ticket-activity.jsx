@@ -2,6 +2,7 @@
 import {
   CalendarClock,
   Download,
+  ExternalLink,
   File,
   FileText,
   Image as ImageIcon,
@@ -85,13 +86,18 @@ const buildRoleLabel = (event, ticket) => {
   return "Collaborator";
 };
 
-const AttachmentCard = ({ attachment, onDownload, compact = false }) => {
+const AttachmentCard = ({ attachment, onDownload, onView, compact = false }) => {
   const Icon = getFileIcon(attachment);
   const url = attachment?.resolvedUrl || attachment?.url || "";
 
   const handleDownload = () => {
     if (!url) return;
     onDownload?.(attachment);
+  };
+
+  const handleView = () => {
+    if (!url) return;
+    onView?.(attachment);
   };
 
   return (
@@ -121,6 +127,19 @@ const AttachmentCard = ({ attachment, onDownload, compact = false }) => {
             disabled={!url}
             onClick={(event) => {
               event.preventDefault();
+              handleView();
+            }}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            View
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={!url}
+            onClick={(event) => {
+              event.preventDefault();
               handleDownload();
             }}
           >
@@ -133,7 +152,7 @@ const AttachmentCard = ({ attachment, onDownload, compact = false }) => {
   );
 };
 
-const ConversationMessage = ({ event, ticket, onDownloadAttachment }) => {
+const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttachment }) => {
   const Icon = actionIcons[event.action] || MessageSquare;
   const label = actionLabels[event.action] || "Update";
   const actorName = event.actorDetails?.displayName || event.actorName || (event.actor ? "User" : "System");
@@ -178,6 +197,7 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment }) => {
                 key={attachment.id || attachment.url}
                 attachment={attachment}
                 onDownload={onDownloadAttachment}
+                onView={onViewAttachment}
               />
             ))}
           </div>
@@ -187,7 +207,12 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment }) => {
   );
 };
 
-export function TicketConversation({ activity = [], ticket, onDownloadAttachment }) {
+export function TicketConversation({
+  activity = [],
+  ticket,
+  onDownloadAttachment,
+  onViewAttachment,
+}) {
   if (!activity.length) {
     return <p className="text-sm text-muted-foreground">No messages yet.</p>;
   }
@@ -218,6 +243,7 @@ export function TicketConversation({ activity = [], ticket, onDownloadAttachment
                 event={event}
                 ticket={ticket}
                 onDownloadAttachment={onDownloadAttachment}
+                onViewAttachment={onViewAttachment}
               />
             ))}
           </div>
@@ -229,7 +255,7 @@ export function TicketConversation({ activity = [], ticket, onDownloadAttachment
 
 export const TicketActivity = TicketConversation;
 
-export function TicketAttachmentList({ attachments = [], onDownload, actions = null }) {
+export function TicketAttachmentList({ attachments = [], onDownload, onView, actions = null }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -246,6 +272,7 @@ export function TicketAttachmentList({ attachments = [], onDownload, actions = n
                 <AttachmentCard
                   attachment={attachment}
                   onDownload={onDownload}
+                  onView={onView}
                   compact
                 />
               </li>

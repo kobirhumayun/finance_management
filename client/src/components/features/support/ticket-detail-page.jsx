@@ -128,10 +128,24 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     }));
   }, [ticket?.attachments]);
 
-  const handleDownloadAttachment = (attachment) => {
+  const handleViewAttachment = (attachment) => {
     const url = attachment?.resolvedUrl || attachment?.url;
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDownloadAttachment = (attachment) => {
+    const url = attachment?.resolvedUrl || attachment?.url;
+    if (!url) return;
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    if (attachment?.filename) {
+      link.download = attachment.filename;
+    }
+    link.click();
   };
 
   const handleAttachmentChange = (event) => {
@@ -319,6 +333,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                 <TicketConversation
                   activity={conversation}
                   ticket={ticket}
+                  onViewAttachment={handleViewAttachment}
                   onDownloadAttachment={handleDownloadAttachment}
                 />
                 <div className="space-y-3 border-t pt-4">
