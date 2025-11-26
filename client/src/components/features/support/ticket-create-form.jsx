@@ -1,7 +1,7 @@
 // File: src/components/features/support/ticket-create-form.jsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -25,9 +25,10 @@ import { useForm } from "react-hook-form";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { formatFileSize } from "@/lib/utils";
 import { createTicket, fetchTickets } from "@/lib/queries/tickets";
-import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
+import { resolveMaxAttachmentBytes } from "@/lib/attachments";
 import { qk } from "@/lib/query-keys";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
+import { Files, Paperclip, X } from "lucide-react";
 
 const REQUESTER_SELF_VALUE = "__self";
 
@@ -67,6 +68,7 @@ export default function TicketCreateForm({
   const queryClient = useQueryClient();
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const ticketMetaQuery = useQuery({
     queryKey: qk.tickets.list({ limit: 1 }),
@@ -129,36 +131,56 @@ export default function TicketCreateForm({
     },
   });
 
-  const validateAttachment = (file) =>
-    validateImageAttachment(
-      file,
-      resolvedMaxAttachmentBytes,
-      (value) => formatFileSize(value, { fallback: "unknown size" })
-    );
+  const validateAttachment = (file) => {
+    if (!file) return null;
+    if (resolvedMaxAttachmentBytes && file.size > resolvedMaxAttachmentBytes) {
+      return `File is too large. Max size is ${formatFileSize(resolvedMaxAttachmentBytes, { fallback: "the upload limit" })}.`;
+    }
+    return null;
+  };
 
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files || []);
-    if (!files.length) {
+    const existing = Array.isArray(attachmentFiles) ? [...attachmentFiles] : [];
+
+    if (!files.length && !existing.length) {
       setAttachmentFiles([]);
       setAttachmentError(null);
       return;
     }
 
-    const validFiles = [];
-    let firstError = null;
+    const firstErrorRef = { current: null };
+    const dedupeKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+    const seen = new Set(existing.map(dedupeKey));
 
-    files.forEach((file) => {
+    const validatedExisting = existing.filter((file) => {
       const error = validateAttachment(file);
-      if (error && !firstError) {
-        firstError = error;
+      if (error && !firstErrorRef.current) {
+        firstErrorRef.current = error;
       }
-      if (!error) {
-        validFiles.push(file);
-      }
+      return !error;
     });
 
-    setAttachmentFiles(validFiles);
-    setAttachmentError(firstError);
+    const validNewFiles = files.reduce((list, file) => {
+      const key = dedupeKey(file);
+      if (seen.has(key)) return list;
+      const error = validateAttachment(file);
+      if (error && !firstErrorRef.current) {
+        firstErrorRef.current = error;
+      }
+      if (!error) {
+        seen.add(key);
+        list.push(file);
+      }
+      return list;
+    }, []);
+
+    setAttachmentFiles([...validatedExisting, ...validNewFiles]);
+    setAttachmentError(firstErrorRef.current);
+
+    if (event.target) {
+      event.target.value = "";
+    }
   };
 
   const handleRemoveAttachment = (indexToRemove) => {
@@ -306,13 +328,36 @@ export default function TicketCreateForm({
                 />
                 <div className="space-y-2">
                   <FormLabel>Attachments (optional)</FormLabel>
-                  <Input
-                    type="file"
-                    multiple
-                    accept={IMAGE_ATTACHMENT_TYPES.join(",")}
-                    onChange={handleFileChange}
-                  />
-                  <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      id="ticket-attachments"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-2"
+                    >
+                      <Paperclip className="h-4 w-4" aria-hidden />
+                      <span>Add files</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="sm:hidden"
+                      aria-label="Attach multiple files"
+                    >
+                      <Files className="h-4 w-4" aria-hidden />
+                    </Button>
+                    <p className="text-xs text-muted-foreground">{attachmentLabel}</p>
+                  </div>
                   {attachmentFiles.length ? (
                     <ul className="space-y-2 text-sm">
                       {attachmentFiles.map((file, index) => (
@@ -333,14 +378,18 @@ export default function TicketCreateForm({
                             onClick={() => handleRemoveAttachment(index)}
                             aria-label={`Remove ${file.name}`}
                           >
-                            ×
+                            <X className="h-4 w-4" />
                           </Button>
                         </li>
                       ))}
                     </ul>
                   ) : null}
                   <p className="text-xs text-muted-foreground">
-                    Accepted: PNG, JPG, or WebP images up to {formatFileSize(resolvedMaxAttachmentBytes)} per file.
+                    You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
+                      fallback: "the upload limit",
+                    })}
+                    {" "}
+                    each.
                   </p>
                   {attachmentError ? <p className="text-xs text-destructive">{attachmentError}</p> : null}
                 </div>
