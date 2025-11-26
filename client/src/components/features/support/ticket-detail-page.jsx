@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Paperclip, Send } from "lucide-react";
 import PageHeader from "@/components/shared/page-header";
-import { TicketActivity, TicketAttachmentList, TicketSummary } from "@/components/features/support/ticket-activity";
+import { TicketAttachmentList, TicketConversation, TicketSummary } from "@/components/features/support/ticket-activity";
 import { TicketStatusBadge } from "@/components/features/support/ticket-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +63,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
 
   const ticketResponse = ticketQuery.data;
   const ticket = ticketResponse?.ticket ?? ticketResponse;
+  const users = ticketResponse?.users || {};
   const isLoading = ticketQuery.isLoading;
   const isFetching = ticketQuery.isFetching;
   const resolvedMaxAttachmentBytes = useMemo(
@@ -145,6 +146,12 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     setIsAttachmentDialogOpen(true);
   };
 
+  const handleDownloadAttachment = (attachment) => {
+    const url = attachment?.resolvedUrl || attachment?.url;
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const handleAttachmentChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -176,18 +183,17 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
     }
   }, [isAttachmentDialogOpen]);
 
-  const activity = useMemo(() => {
-    const events = Array.isArray(ticket?.activityLog) ? [...ticket.activityLog] : [];
+  const conversation = useMemo(() => {
+    if (!ticket) return [];
 
+    const events = Array.isArray(ticket?.activityLog) ? [...ticket.activityLog] : [];
     const parseTimestamp = (value) => {
       if (value instanceof Date && !Number.isNaN(value.getTime())) {
         return value.getTime();
       }
-
       if (typeof value === "number" && Number.isFinite(value)) {
         return value;
       }
-
       if (typeof value === "string") {
         const trimmed = value.trim();
         const parsed = Date.parse(trimmed);
@@ -196,12 +202,53 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
         const numericFallback = Number(trimmed);
         if (Number.isFinite(numericFallback)) return numericFallback;
       }
-
       return 0;
     };
 
-    return events.sort((a, b) => parseTimestamp(a?.at) - parseTimestamp(b?.at));
-  }, [ticket?.activityLog]);
+    const resolveUser = (userId) => {
+      if (!userId) return null;
+      const id = typeof userId === "object" && userId.id ? userId.id : userId;
+      return users?.[id] || null;
+    };
+
+    const assignedAttachmentIds = new Set();
+    const matchAttachments = (event) => {
+      const timestamp = parseTimestamp(event?.at);
+      const normalizedMessage = event?.message?.toLowerCase?.().trim?.() || "";
+      return attachments.filter((attachment) => {
+        if (!attachment || assignedAttachmentIds.has(attachment.id)) return false;
+        const uploadedAt = parseTimestamp(attachment.uploadedAt);
+        const nameMatch =
+          normalizedMessage && attachment.filename?.toLowerCase?.() === normalizedMessage;
+        const timeMatch =
+          uploadedAt && timestamp && Math.abs(uploadedAt - timestamp) <= 5 * 60 * 1000;
+
+        if (nameMatch || timeMatch) {
+          assignedAttachmentIds.add(attachment.id);
+          return true;
+        }
+        return false;
+      });
+    };
+
+    const sortedEvents = events
+      .map((entry) => ({ ...entry, actorDetails: entry.actorDetails || resolveUser(entry.actor) }))
+      .sort((a, b) => parseTimestamp(a?.at) - parseTimestamp(b?.at))
+      .map((entry) => ({ ...entry, attachments: matchAttachments(entry) }));
+
+    return [
+      {
+        id: "description",
+        action: "description",
+        actor: ticket.requester,
+        actorDetails: resolveUser(ticket.requester),
+        at: ticket.createdAt,
+        message: ticket.description || "No description provided.",
+        attachments: [],
+      },
+      ...sortedEvents,
+    ];
+  }, [attachments, ticket, ticket?.activityLog, ticket?.createdAt, ticket?.description, ticket?.requester, users]);
 
   return (
     <div className="space-y-8">
@@ -239,19 +286,15 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                 <CardTitle className="text-lg">Conversation</CardTitle>
                 <p className="text-sm text-muted-foreground">Share updates or clarifications with our support team.</p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
-                  <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
-                    {ticket.description || "No description provided."}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    <span className="font-medium">Category: {ticket.category || "Not set"}</span>
-                    <span className="font-medium">Priority: {ticket.priority}</span>
-                    <span>Last updated {formatDate(ticket.updatedAt)}</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="comment">Add a comment</Label>
+              <CardContent className="space-y-6">
+                <TicketConversation
+                  activity={conversation}
+                  ticket={ticket}
+                  onViewAttachment={handleViewAttachment}
+                  onDownloadAttachment={handleDownloadAttachment}
+                />
+                <div className="space-y-2 border-t pt-4">
+                  <Label htmlFor="comment">Reply</Label>
                   <Textarea
                     id="comment"
                     value={comment}
@@ -289,8 +332,6 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                     </Button>
                   </div>
                 </div>
-
-                <TicketActivity activity={activity} />
               </CardContent>
             </Card>
           </div>
@@ -327,6 +368,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
             <TicketAttachmentList
               attachments={attachments}
               onView={handleViewAttachment}
+              onDownload={handleDownloadAttachment}
               actions={
                 <Button
                   size="sm"
