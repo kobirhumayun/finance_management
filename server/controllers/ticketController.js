@@ -65,14 +65,21 @@ const mapTicketForResponse = (ticket) => {
     const plainTicket = typeof ticket.toObject === 'function' ? ticket.toObject() : { ...ticket };
     const ticketId = plainTicket._id ? plainTicket._id.toString() : plainTicket.id;
 
+    const mappedAttachments = Array.isArray(plainTicket.attachments)
+        ? plainTicket.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
+        : [];
+
+    const attachmentsCount = typeof plainTicket.attachmentsCount === 'number'
+        ? plainTicket.attachmentsCount
+        : mappedAttachments.length;
+
     return {
         ...plainTicket,
         id: ticketId,
         requester: plainTicket.requester ? plainTicket.requester.toString() : plainTicket.requester,
         assignee: plainTicket.assignee ? plainTicket.assignee.toString() : plainTicket.assignee,
-        attachments: Array.isArray(plainTicket.attachments)
-            ? plainTicket.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
-            : [],
+        attachments: mappedAttachments,
+        attachmentsCount,
         activityLog: Array.isArray(plainTicket.activityLog)
             ? plainTicket.activityLog.map((entry) => ({
                 ...entry,
@@ -273,11 +280,25 @@ const listTickets = async (req, res, next) => {
         const skip = (safePage - 1) * safeLimit;
 
         const [tickets, total] = await Promise.all([
-            Ticket.find(filters)
-                .sort({ updatedAt: -1 })
-                .skip(skip)
-                .limit(safeLimit)
-                .lean(),
+            Ticket.aggregate([
+                { $match: filters },
+                { $sort: { updatedAt: -1 } },
+                { $skip: skip },
+                { $limit: safeLimit },
+                {
+                    $project: {
+                        subject: 1,
+                        status: 1,
+                        priority: 1,
+                        category: 1,
+                        updatedAt: 1,
+                        requester: 1,
+                        assignee: 1,
+                        description: 1,
+                        attachmentsCount: { $size: { $ifNull: ['$attachments', []] } },
+                    },
+                },
+            ]),
             Ticket.countDocuments(filters),
         ]);
 

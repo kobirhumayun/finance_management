@@ -103,6 +103,12 @@ const normalizeTicket = (ticket, users = {}) => {
   const requesterDetails = resolveUserDetails(requester, users);
   const assigneeDetails = resolveUserDetails(assignee, users);
 
+  const attachments = Array.isArray(ticket.attachments)
+    ? ticket.attachments.map((attachment) => normalizeAttachment(attachment, users)).filter(Boolean)
+    : [];
+  const attachmentsCount =
+    typeof ticket.attachmentsCount === "number" ? ticket.attachmentsCount : attachments.length;
+
   return {
     id: ticket._id || ticket.id || null,
     subject: ticket.subject || "(no subject)",
@@ -116,9 +122,8 @@ const normalizeTicket = (ticket, users = {}) => {
     assigneeName: assigneeDetails?.displayName || null,
     createdAt: ticket.createdAt || null,
     updatedAt: ticket.updatedAt || null,
-    attachments: Array.isArray(ticket.attachments)
-      ? ticket.attachments.map((attachment) => normalizeAttachment(attachment, users)).filter(Boolean)
-      : [],
+    attachments,
+    attachmentsCount,
     activityLog: Array.isArray(ticket.activityLog)
       ? ticket.activityLog.map((entry) => normalizeActivity(entry, users)).filter(Boolean)
       : [],

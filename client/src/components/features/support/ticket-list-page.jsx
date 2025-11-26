@@ -33,6 +33,11 @@ const priorityOptions = [
 ];
 
 function TicketListItem({ ticket, ticketLinkPrefix }) {
+  const attachmentCount =
+    typeof ticket.attachmentsCount === "number"
+      ? ticket.attachmentsCount
+      : ticket.attachments?.length || 0;
+
   return (
     <Link
       href={`${ticketLinkPrefix}/${ticket.id}`}
@@ -49,10 +54,10 @@ function TicketListItem({ ticket, ticketLinkPrefix }) {
             <span className="font-medium capitalize">Priority: {ticket.priority}</span>
             {ticket.category ? <span>Category: {ticket.category}</span> : null}
             <span>Updated {formatDate(ticket.updatedAt)}</span>
-            {ticket.attachments?.length ? (
+            {attachmentCount ? (
               <span className="inline-flex items-center gap-1">
                 <Paperclip className="h-3 w-3" />
-                {ticket.attachments.length} attachment{ticket.attachments.length === 1 ? "" : "s"}
+                {attachmentCount} attachment{attachmentCount === 1 ? "" : "s"}
               </span>
             ) : null}
           </div>
