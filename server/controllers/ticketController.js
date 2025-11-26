@@ -15,16 +15,6 @@ const toObjectId = (value) => {
     return new mongoose.Types.ObjectId(value);
 };
 
-const hasTicketAccess = (ticket, userId, userRole) => {
-    if (!ticket || !userId) {
-        return false;
-    }
-    if (isAdmin({ role: userRole }) || isSupport({ role: userRole })) {
-        return true;
-    }
-    return ticket.requester?.toString() === userId || ticket.assignee?.toString() === userId;
-};
-
 const buildTicketAttachmentUrl = (ticketId, attachmentId) => {
     if (!ticketId || !attachmentId) {
         return '';
@@ -303,15 +293,7 @@ const listTickets = async (req, res, next) => {
 
 const getTicket = async (req, res, next) => {
     try {
-        const { ticketId } = req.params;
-        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
-
-        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
-            return res.status(403).json({ message: 'You are not allowed to access this ticket.' });
-        }
+        const ticket = req.ticket;
 
         const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
 
@@ -331,14 +313,7 @@ const addComment = async (req, res, next) => {
             return res.status(400).json({ message: 'Comment is required.' });
         }
 
-        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
-
-        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
-            return res.status(403).json({ message: 'You are not allowed to comment on this ticket.' });
-        }
+        const ticket = req.ticket;
 
         const savedAttachments = [];
 
@@ -371,7 +346,6 @@ const addComment = async (req, res, next) => {
 
 const updateStatus = async (req, res, next) => {
     try {
-        const { ticketId } = req.params;
         const { status } = req.body;
         const allowedStatuses = ['open', 'pending', 'resolved', 'closed'];
 
@@ -379,14 +353,7 @@ const updateStatus = async (req, res, next) => {
             return res.status(400).json({ message: 'Invalid ticket status.' });
         }
 
-        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
-
-        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
-            return res.status(403).json({ message: 'You are not allowed to update this ticket.' });
-        }
+        const ticket = req.ticket;
 
         ticket.status = status;
         ticket.staleSince = undefined;
@@ -413,17 +380,13 @@ const updateStatus = async (req, res, next) => {
 
 const updateAssignee = async (req, res, next) => {
     try {
-        const { ticketId } = req.params;
         const { assignee } = req.body;
 
         if (!isAdmin(req.user) && !isSupport(req.user)) {
             return res.status(403).json({ message: 'Only support or admin can reassign tickets.' });
         }
 
-        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
+        const ticket = req.ticket;
 
         const assigneeId = toObjectId(assignee);
         if (!assigneeId) {
@@ -457,14 +420,7 @@ const uploadAttachment = async (req, res, next) => {
             return res.status(400).json({ message: 'No attachment provided.' });
         }
 
-        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
-
-        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
-            return res.status(403).json({ message: 'You are not allowed to modify this ticket.' });
-        }
+        const ticket = req.ticket;
 
         const attachment = await storeAttachment({ file: req.file, ticketId, userId: req.user._id });
 
@@ -491,20 +447,13 @@ const uploadAttachment = async (req, res, next) => {
 
 const streamTicketAttachment = async (req, res, next) => {
     try {
-        const { ticketId, attachmentId } = req.params;
+        const { attachmentId } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(attachmentId)) {
+        if (!mongoose.Types.ObjectId.isValid(attachmentId)) {
             return res.status(400).json({ message: 'Invalid attachment identifier.' });
         }
 
-        const ticket = req.ticket || await Ticket.findById(ticketId).select({ attachments: 1, requester: 1, assignee: 1 });
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
-
-        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
-            return res.status(403).json({ message: 'You are not allowed to access this ticket.' });
-        }
+        const ticket = req.ticket;
 
         const attachment = ticket.attachments?.find((item) => item._id?.toString() === attachmentId);
         if (!attachment?.path) {
@@ -530,16 +479,9 @@ const streamTicketAttachment = async (req, res, next) => {
 
 const deleteAttachment = async (req, res, next) => {
     try {
-        const { ticketId, attachmentId } = req.params;
+        const { attachmentId } = req.params;
 
-        const ticket = req.ticket || (mongoose.Types.ObjectId.isValid(ticketId) ? await Ticket.findById(ticketId) : null);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found.' });
-        }
-
-        if (!hasTicketAccess(ticket, req.user._id, req.user.role)) {
-            return res.status(403).json({ message: 'You are not allowed to modify this ticket.' });
-        }
+        const ticket = req.ticket;
 
         const attachmentIndex = ticket.attachments.findIndex((item) => item._id?.toString() === attachmentId);
         if (attachmentIndex === -1) {
