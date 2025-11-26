@@ -173,13 +173,22 @@ const storeAttachment = async ({ file, ticketId, userId }) => {
 
 const createTicket = async (req, res, next) => {
     try {
-        const { subject, description, category, priority } = req.body;
+        const { subject, description, category, priority, requester: requesterInput } = req.body;
         if (!subject || !description) {
             return res.status(400).json({ message: 'Subject and description are required.' });
         }
 
+        let requesterId = req.user._id;
+        if (requesterInput && (isAdmin(req.user) || isSupport(req.user))) {
+            const parsedRequester = toObjectId(requesterInput);
+            if (!parsedRequester) {
+                return res.status(400).json({ message: 'Invalid requester provided.' });
+            }
+            requesterId = parsedRequester;
+        }
+
         const ticket = await Ticket.create({
-            requester: req.user._id,
+            requester: requesterId,
             subject: subject.trim(),
             description: description.trim(),
             category: category?.trim() || undefined,
