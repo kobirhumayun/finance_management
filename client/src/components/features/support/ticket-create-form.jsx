@@ -1,7 +1,7 @@
 // File: src/components/features/support/ticket-create-form.jsx
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import PageHeader from "@/components/shared/page-header";
 import { toast } from "@/components/ui/sonner";
 import { useForm } from "react-hook-form";
@@ -28,6 +29,7 @@ import { createTicket, fetchTickets } from "@/lib/queries/tickets";
 import { resolveMaxAttachmentBytes } from "@/lib/attachments";
 import { qk } from "@/lib/query-keys";
 import { adminUsersOptions } from "@/lib/queries/admin-users";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Files, Paperclip, X } from "lucide-react";
 
 const REQUESTER_SELF_VALUE = "__self";
@@ -69,6 +71,10 @@ export default function TicketCreateForm({
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
   const fileInputRef = useRef(null);
+  const [requesterPopoverOpen, setRequesterPopoverOpen] = useState(false);
+  const [requesterSearch, setRequesterSearch] = useState("");
+
+  const debouncedRequesterSearch = useDebouncedValue(requesterSearch, 300);
 
   const ticketMetaQuery = useQuery({
     queryKey: qk.tickets.list({ limit: 1 }),
@@ -77,7 +83,7 @@ export default function TicketCreateForm({
   });
 
   const requesterQuery = useQuery({
-    ...adminUsersOptions({ limit: 50 }),
+    ...adminUsersOptions({ limit: 20, search: debouncedRequesterSearch || undefined }),
     enabled: showRequesterSelector,
   });
 
@@ -203,10 +209,17 @@ export default function TicketCreateForm({
     return items
       .map((user) => ({
         value: user.id || "",
-        label: user.fullName || user.email || user.username || "Unnamed user",
+        label: user.fullName || user.username || user.email || "Unnamed user",
+        meta: user.email && user.email !== user.fullName ? user.email : user.username || null,
       }))
       .filter((option) => Boolean(option.value));
   }, [requesterQuery.data?.items, showRequesterSelector]);
+
+  useEffect(() => {
+    if (!requesterPopoverOpen) {
+      setRequesterSearch("");
+    }
+  }, [requesterPopoverOpen]);
 
   return (
     <div className="space-y-8">
@@ -270,24 +283,79 @@ export default function TicketCreateForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Requester (optional)</FormLabel>
-                      <Select
-                        value={field.value || ""}
-                        onValueChange={(value) => field.onChange(value || REQUESTER_SELF_VALUE)}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a requester" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value={REQUESTER_SELF_VALUE}>Use my account</SelectItem>
-                          {requesterOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={requesterPopoverOpen} onOpenChange={setRequesterPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between"
+                              aria-expanded={requesterPopoverOpen}
+                            >
+                              <span className="truncate text-left">
+                                {field.value === REQUESTER_SELF_VALUE || !field.value
+                                  ? "Use my account"
+                                  : requesterOptions.find((option) => option.value === field.value)?.label ||
+                                    "Select a requester"}
+                              </span>
+                              <span className="ml-2 text-xs text-muted-foreground">Search</span>
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[420px] p-0" align="start">
+                          <div className="border-b p-3">
+                            <Input
+                              placeholder="Search by name or email"
+                              value={requesterSearch}
+                              onChange={(event) => setRequesterSearch(event.target.value)}
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-64 space-y-1 overflow-y-auto p-1">
+                            <Button
+                              type="button"
+                              variant={field.value === REQUESTER_SELF_VALUE ? "secondary" : "ghost"}
+                              className="h-auto w-full justify-start whitespace-normal px-3 py-2 text-left"
+                              onClick={() => {
+                                field.onChange(REQUESTER_SELF_VALUE);
+                                setRequesterPopoverOpen(false);
+                              }}
+                            >
+                              <div>
+                                <p className="font-medium">Use my account</p>
+                                <p className="text-xs text-muted-foreground">Submit ticket as yourself</p>
+                              </div>
+                            </Button>
+                            {requesterQuery.isFetching ? (
+                              <p className="px-3 py-2 text-sm text-muted-foreground">Searching users…</p>
+                            ) : null}
+                            {!requesterQuery.isFetching && requesterOptions.length === 0 ? (
+                              <p className="px-3 py-2 text-sm text-muted-foreground">
+                                {requesterSearch ? "No users match your search" : "No users available"}
+                              </p>
+                            ) : null}
+                            {requesterOptions.map((option) => (
+                              <Button
+                                key={option.value}
+                                type="button"
+                                variant={field.value === option.value ? "secondary" : "ghost"}
+                                className="h-auto w-full justify-start whitespace-normal px-3 py-2 text-left"
+                                onClick={() => {
+                                  field.onChange(option.value);
+                                  setRequesterPopoverOpen(false);
+                                }}
+                              >
+                                <div>
+                                  <p className="font-medium">{option.label}</p>
+                                  {option.meta ? (
+                                    <p className="text-xs text-muted-foreground">{option.meta}</p>
+                                  ) : null}
+                                </div>
+                              </Button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
