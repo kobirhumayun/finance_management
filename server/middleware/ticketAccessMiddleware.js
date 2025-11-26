@@ -22,7 +22,20 @@ const ensureTicketAccess = async (req, res, next) => {
         return res.status(400).json({ message: 'Invalid ticket identifier.' });
     }
 
-    const ticket = await Ticket.findById(ticketId);
+    const ticket = await Ticket.findById(ticketId).select({
+        requester: 1,
+        assignee: 1,
+        subject: 1,
+        description: 1,
+        category: 1,
+        priority: 1,
+        status: 1,
+        staleSince: 1,
+        attachments: 1,
+        activityLog: 1,
+        createdAt: 1,
+        updatedAt: 1,
+    });
 
     if (!ticket) {
         return res.status(404).json({ message: 'Ticket not found.' });
