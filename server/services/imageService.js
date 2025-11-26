@@ -11,10 +11,14 @@ const DEFAULT_SIZE_LIMIT = 5 * 1024 * 1024;
 const UPLOAD_FILE_SIZE_LIMIT = Number.isFinite(Number(process.env.UPLOAD_MAX_BYTES)) && Number(process.env.UPLOAD_MAX_BYTES) > 0
     ? Number(process.env.UPLOAD_MAX_BYTES)
     : DEFAULT_SIZE_LIMIT;
-const ACCEPTED_MIME_TYPES = new Set([
+const IMAGE_MIME_TYPES = new Set([
     'image/jpeg',
     'image/png',
     'image/webp',
+]);
+const ACCEPTED_MIME_TYPES = new Set([
+    ...IMAGE_MIME_TYPES,
+    'application/pdf',
 ]);
 
 let ensureRootPromise;
@@ -42,16 +46,26 @@ const buildRelativePath = (segments = []) => segments.filter(Boolean).join('/');
 
 const toPublicUrl = (relativePath) => `/api/uploads/${relativePath}`;
 
-const validateFileInput = (file) => {
+const getMimeType = (file) => file?.mimetype?.toLowerCase() || '';
+
+const isImageMimeType = (mimeType) => IMAGE_MIME_TYPES.has((mimeType || '').toLowerCase());
+
+const validateFileInput = (file, { requireImage = false } = {}) => {
     if (!file || !file.buffer || !file.buffer.length) {
-        throw new Error('No image file provided.');
+        throw new Error('No file provided.');
     }
 
-    if (file.size && file.size > UPLOAD_FILE_SIZE_LIMIT) {
-        throw new Error('Image exceeds the allowed file size.');
+    const size = typeof file.size === 'number' ? file.size : file.buffer.length;
+    if (size > UPLOAD_FILE_SIZE_LIMIT) {
+        throw new Error('File exceeds the allowed upload size.');
     }
 
-    if (file.mimetype && !ACCEPTED_MIME_TYPES.has(file.mimetype.toLowerCase())) {
+    const mimeType = getMimeType(file);
+    if (mimeType && !ACCEPTED_MIME_TYPES.has(mimeType)) {
+        throw new Error('Unsupported file format. Upload a PNG, JPG, WebP image, or PDF document.');
+    }
+
+    if (requireImage && !isImageMimeType(mimeType)) {
         throw new Error('Unsupported image format. Upload a PNG, JPG, or WebP image.');
     }
 };
@@ -99,8 +113,25 @@ const buildDescriptor = ({
     uploadedAt: new Date(),
 });
 
+const buildPassThroughDescriptor = ({
+    originalName,
+    storedRelativePath,
+    absolutePath,
+    mimeType,
+    size,
+}) => ({
+    filename: originalName || 'file',
+    mimeType: mimeType || 'application/octet-stream',
+    size: typeof size === 'number' ? size : null,
+    width: null,
+    height: null,
+    url: toPublicUrl(storedRelativePath),
+    path: absolutePath,
+    uploadedAt: new Date(),
+});
+
 const saveImage = async ({ file, scopeSegments, maxDimension }) => {
-    validateFileInput(file);
+    validateFileInput(file, { requireImage: true });
     const storedFileName = `${randomUUID()}.webp`;
     const relativePath = buildRelativePath([...scopeSegments, storedFileName]);
     const { data, info } = await processImageBuffer(file.buffer, { maxDimension });
@@ -113,17 +144,46 @@ const saveImage = async ({ file, scopeSegments, maxDimension }) => {
     });
 };
 
+const resolveFileExtension = (file) => {
+    const mimeType = getMimeType(file);
+    if (mimeType === 'application/pdf') {
+        return '.pdf';
+    }
+    const ext = path.extname(file?.originalname || '').toLowerCase();
+    return ext || '';
+};
+
+const savePassThroughFile = async ({ file, scopeSegments }) => {
+    validateFileInput(file);
+    const extension = resolveFileExtension(file) || '.bin';
+    const storedFileName = `${randomUUID()}${extension}`;
+    const relativePath = buildRelativePath([...scopeSegments, storedFileName]);
+    const absolutePath = await writeImageFile({ data: file.buffer, relativePath });
+    return buildPassThroughDescriptor({
+        originalName: file.originalname || storedFileName,
+        storedRelativePath: relativePath,
+        absolutePath,
+        mimeType: getMimeType(file) || undefined,
+        size: typeof file.size === 'number' ? file.size : file.buffer?.length,
+    });
+};
+
 const saveTransactionAttachment = async ({ file, userId, projectId }) => saveImage({
     file,
     scopeSegments: ['transactions', sanitizeSegment(userId), sanitizeSegment(projectId)],
     maxDimension: DEFAULT_MAX_DIMENSION,
 });
 
-const saveTicketAttachment = async ({ file, userId, ticketId }) => saveImage({
-    file,
-    scopeSegments: ['tickets', sanitizeSegment(userId), sanitizeSegment(ticketId)],
-    maxDimension: DEFAULT_MAX_DIMENSION,
-});
+const saveTicketAttachment = async ({ file, userId, ticketId }) => {
+    const mimeType = getMimeType(file);
+    const baseOptions = { scopeSegments: ['tickets', sanitizeSegment(userId), sanitizeSegment(ticketId)] };
+
+    if (isImageMimeType(mimeType)) {
+        return saveImage({ ...baseOptions, file, maxDimension: DEFAULT_MAX_DIMENSION });
+    }
+
+    return savePassThroughFile({ ...baseOptions, file });
+};
 
 const saveProfileImage = async ({ file, userId }) => saveImage({
     file,
