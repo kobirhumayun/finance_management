@@ -454,7 +454,7 @@ export default function TicketCreateForm({
                   </ul>
                 ) : null}
                 <p className="text-xs text-muted-foreground">
-                  You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
+                  You can attach multiple files (images or PDFs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
                     fallback: "the upload limit",
                   })}
                   {" "}

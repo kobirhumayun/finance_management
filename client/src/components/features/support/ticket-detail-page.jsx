@@ -353,6 +353,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                         id="reply-attachments"
                         type="file"
                         multiple
+                        accept="image/*,.pdf"
                         className="hidden"
                         onChange={handleAttachmentChange}
                       />
@@ -404,7 +405,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
                       </ul>
                     ) : null}
                     <p className="text-xs text-muted-foreground">
-                      You can attach multiple files (images, PDFs, docs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
+                      You can attach multiple files (images or PDFs) up to {formatFileSize(resolvedMaxAttachmentBytes, {
                         fallback: "the upload limit",
                       })}{" "}
                       each.
