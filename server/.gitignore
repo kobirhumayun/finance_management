@@ -74,6 +74,8 @@ dist/
 # Temporary files
 tmp/
 temp/
+uploads/
+/ms-playwright
 
 # IDE files
 .idea/

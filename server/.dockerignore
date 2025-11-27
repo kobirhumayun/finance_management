@@ -2,6 +2,7 @@ node_modules
 npm-debug.log
 logs
 coverage
+uploads
 .env
 .env.*
 .DS_Store
@@ -9,3 +10,4 @@ coverage
 .gitignore
 /tmp
 /tests
+/ms-playwright
