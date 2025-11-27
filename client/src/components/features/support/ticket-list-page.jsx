@@ -49,10 +49,10 @@ function TicketListItem({ ticket, ticketLinkPrefix }) {
             <span className="font-medium capitalize">Priority: {ticket.priority}</span>
             {ticket.category ? <span>Category: {ticket.category}</span> : null}
             <span>Updated {formatDate(ticket.updatedAt)}</span>
-            {ticket.attachments?.length ? (
+            {ticket.attachmentCount ? (
               <span className="inline-flex items-center gap-1">
                 <Paperclip className="h-3 w-3" />
-                {ticket.attachments.length} attachment{ticket.attachments.length === 1 ? "" : "s"}
+                {ticket.attachmentCount} attachment{ticket.attachmentCount === 1 ? "" : "s"}
               </span>
             ) : null}
           </div>
