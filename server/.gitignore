@@ -75,6 +75,7 @@ dist/
 tmp/
 temp/
 uploads/
+/ms-playwright
 
 # IDE files
 .idea/
