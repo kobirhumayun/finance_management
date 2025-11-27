@@ -27,26 +27,34 @@ import {
   rejectAdminPayment,
 } from "@/lib/queries/admin-payments";
 import { formatNumber } from "@/lib/formatters";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 // Payments moderation view for administrators.
 export default function AdminPaymentsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("pending");
   const [searchFilter, setSearchFilter] = useState("");
+  const [appliedSearchFilter, setAppliedSearchFilter] = useState("");
   const [isRejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [paymentToReject, setPaymentToReject] = useState(null);
   const [rejectComment, setRejectComment] = useState("");
+
+  const debouncedSearchFilter = useDebouncedValue(searchFilter, 400);
+
+  useEffect(() => {
+    setAppliedSearchFilter(debouncedSearchFilter);
+  }, [debouncedSearchFilter]);
 
   const filters = useMemo(() => {
     const normalized = {};
     if (statusFilter && statusFilter !== "all") {
       normalized.status = statusFilter;
     }
-    if (searchFilter && searchFilter.trim()) {
-      normalized.search = searchFilter.trim();
+    if (appliedSearchFilter && appliedSearchFilter.trim()) {
+      normalized.search = appliedSearchFilter.trim();
     }
     return normalized;
-  }, [statusFilter, searchFilter]);
+  }, [statusFilter, appliedSearchFilter]);
 
   const PAGE_SIZE = 20;
 
@@ -400,6 +408,11 @@ export default function AdminPaymentsPage() {
     ? rejectPaymentMutation.variables?.payment?.id ?? null
     : null;
 
+  const handleSearchSubmit = (event) => {
+    event?.preventDefault();
+    setAppliedSearchFilter(searchFilter);
+  };
+
   const handleApprove = (payment) => {
     if (!payment?.userId || !payment?.planId || !(payment?.paymentId ?? payment?.id)) {
       toast.error("Payment record is missing required identifiers.");
@@ -513,7 +526,7 @@ export default function AdminPaymentsPage() {
             <CardTitle>Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" onSubmit={handleSearchSubmit}>
               <div className="space-y-2">
                 <Label htmlFor="admin-payments-search">Search</Label>
                 <Input
@@ -539,7 +552,7 @@ export default function AdminPaymentsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </form>
             {isRefetching ? (
               <p className="text-xs text-muted-foreground">Refreshing…</p>
             ) : null}
