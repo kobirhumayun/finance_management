@@ -7,4 +7,5 @@ yarn-error.log*
 .git
 .env
 .env.local
+.env.*
 coverage
