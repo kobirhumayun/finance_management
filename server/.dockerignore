@@ -10,3 +10,4 @@ uploads
 .gitignore
 /tmp
 /tests
+/ms-playwright
