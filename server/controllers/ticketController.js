@@ -97,6 +97,15 @@ const mapTicketForResponse = (ticket, { includeDetails = true } = {}) => {
     return mappedTicket;
 };
 
+const updateAttachmentCount = (ticket, delta) => {
+    const currentCount = typeof ticket.attachmentCount === 'number'
+        ? ticket.attachmentCount
+        : (Array.isArray(ticket.attachments) ? ticket.attachments.length : 0);
+
+    const nextCount = Math.max(0, currentCount + delta);
+    ticket.attachmentCount = nextCount;
+};
+
 const buildUserLookupFromTickets = async (tickets = []) => {
     const ticketList = Array.isArray(tickets) ? tickets : [tickets];
     const userIds = new Set();
@@ -219,6 +228,7 @@ const createTicket = async (req, res, next) => {
                 files.map((file) => storeAttachment({ file, ticketId: ticket._id, userId: req.user._id })),
             );
             ticket.attachments.push(...attachments);
+            updateAttachmentCount(ticket, attachments.length);
         }
 
         await ticket.save();
@@ -291,25 +301,17 @@ const listTickets = async (req, res, next) => {
             category: 1,
             updatedAt: 1,
             createdAt: 1,
-            attachmentCount: { $size: { $ifNull: ['$attachments', []] } },
+            attachmentCount: 1,
         };
 
-        const [{ data: tickets = [], total: totalResults = [] } = {}] = await Ticket.aggregate([
-            { $match: filters },
-            { $sort: { updatedAt: -1 } },
-            {
-                $facet: {
-                    data: [
-                        { $skip: skip },
-                        { $limit: safeLimit },
-                        { $project: projection },
-                    ],
-                    total: [{ $count: 'count' }],
-                },
-            },
+        const [tickets, total] = await Promise.all([
+            Ticket.find(filters, projection)
+                .sort({ updatedAt: -1 })
+                .skip(skip)
+                .limit(safeLimit)
+                .lean(),
+            Ticket.countDocuments(filters),
         ]);
-
-        const total = totalResults[0]?.count || 0;
 
         const { tickets: mappedTickets } = await mapTicketsWithUsers(tickets, {
             includeDetails: false,
@@ -364,6 +366,7 @@ const addComment = async (req, res, next) => {
             );
             ticket.attachments.push(...attachments);
             savedAttachments.push(...attachments);
+            updateAttachmentCount(ticket, attachments.length);
         }
 
         ticket.activityLog.push({
@@ -466,6 +469,7 @@ const uploadAttachment = async (req, res, next) => {
         const attachment = await storeAttachment({ file: req.file, ticketId, userId: req.user._id });
 
         ticket.attachments.push(attachment);
+        updateAttachmentCount(ticket, 1);
         ticket.activityLog.push({
             actor: req.user._id,
             action: 'attachment_added',
@@ -530,6 +534,7 @@ const deleteAttachment = async (req, res, next) => {
         }
 
         const [attachment] = ticket.attachments.splice(attachmentIndex, 1);
+        updateAttachmentCount(ticket, -1);
         if (attachment) {
             try {
                 await discardDescriptor(attachment);

@@ -113,6 +113,10 @@ const ticketSchema = new Schema({
         type: visibilitySchema,
         default: () => ({})
     },
+    attachmentCount: {
+        type: Number,
+        default: 0,
+    },
     attachments: [attachmentSchema],
     activityLog: [activityLogSchema]
 }, {
