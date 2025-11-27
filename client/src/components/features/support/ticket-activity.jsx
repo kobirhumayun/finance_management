@@ -69,6 +69,8 @@ const getRoleTheme = (roleLabel) => {
   return {
     container: palette.alignRight ? "flex-row-reverse text-right" : "",
     contentAlignment: palette.alignRight ? "items-end text-right" : "",
+    headerAlignment: palette.alignRight ? "justify-end text-right" : "",
+    headerMetaAlignment: palette.alignRight ? "flex-row-reverse" : "",
     avatar: "ring-2 ring-transparent",
     avatarStyle: {
       color: tone.text,
@@ -213,6 +215,7 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
   const Icon = actionIcons[event.action] || MessageSquare;
   const label = actionLabels[event.action] || "Update";
   const actorName = event.actorDetails?.displayName || event.actorName || (event.actor ? "User" : "System");
+  const actorBatch = event.actorDetails?.batch;
   const roleLabel = buildRoleLabel(event, ticket);
   const attachments = Array.isArray(event.attachments) ? event.attachments : [];
   const roleTheme = getRoleTheme(roleLabel);
@@ -223,8 +226,17 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
         <AvatarFallback>{getInitials(actorName)}</AvatarFallback>
       </Avatar>
       <div className={`flex-1 space-y-3 ${roleTheme.contentAlignment}`}>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex flex-wrap items-center gap-2 ${roleTheme.headerAlignment}`}>
           <p className="text-sm font-semibold leading-none text-foreground">{actorName}</p>
+          {roleLabel === "Requester" && actorBatch ? (
+            <Badge
+              variant="outline"
+              className={`text-[11px] ${roleTheme.badge}`}
+              style={roleTheme.badgeStyle}
+            >
+              Batch {actorBatch}
+            </Badge>
+          ) : null}
           <Badge
             variant="outline"
             className={`text-[11px] capitalize ${roleTheme.badge}`}
@@ -232,7 +244,9 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
           >
             {roleLabel}
           </Badge>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span
+            className={`flex items-center gap-1 text-xs text-muted-foreground ${roleTheme.headerMetaAlignment}`}
+          >
             <CalendarClock className="h-3.5 w-3.5" />
             {formatDateTime(event.at)}
           </span>
