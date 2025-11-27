@@ -224,7 +224,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
       return users?.[id] || null;
     };
 
-    const assignedAttachmentIds = new Set();
+    const referencedAttachmentIds = new Set();
     const hydrateAttachment = (attachment) => {
       if (!attachment) return null;
       const hydrated = {
@@ -232,28 +232,9 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
         resolvedUrl: resolveAssetUrl(attachment?.url, attachment?.uploadedAt ?? attachment?.updatedAt),
       };
       if (hydrated.id) {
-        assignedAttachmentIds.add(hydrated.id);
+        referencedAttachmentIds.add(hydrated.id);
       }
       return hydrated;
-    };
-
-    const matchAttachments = (event) => {
-      const timestamp = parseTimestamp(event?.at);
-      const normalizedMessage = event?.message?.toLowerCase?.().trim?.() || "";
-      return attachments.filter((attachment) => {
-        if (!attachment || assignedAttachmentIds.has(attachment.id)) return false;
-        const uploadedAt = parseTimestamp(attachment.uploadedAt);
-        const nameMatch =
-          normalizedMessage && attachment.filename?.toLowerCase?.() === normalizedMessage;
-        const timeMatch =
-          uploadedAt && timestamp && Math.abs(uploadedAt - timestamp) <= 5 * 60 * 1000;
-
-        if (nameMatch || timeMatch) {
-          assignedAttachmentIds.add(attachment.id);
-          return true;
-        }
-        return false;
-      });
     };
 
     const eventsWithActors = events.map((entry) => ({
@@ -268,15 +249,11 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
           ? entry.attachments.map(hydrateAttachment).filter(Boolean)
           : [];
 
-        const resolvedAttachments = providedAttachments.length
-          ? providedAttachments
-          : matchAttachments(entry);
-
-        return { ...entry, attachments: resolvedAttachments };
+        return { ...entry, attachments: providedAttachments };
       });
 
     const unassignedAttachments = attachments.filter(
-      (attachment) => attachment && !assignedAttachmentIds.has(attachment.id)
+      (attachment) => attachment && !referencedAttachmentIds.has(attachment.id)
     );
 
     return [
