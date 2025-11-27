@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, MessageSquare, Paperclip, Plus } from "lucide-react";
 import PageHeader from "@/components/shared/page-header";
@@ -69,19 +69,28 @@ export default function TicketListPage({
   createLink = "/support/tickets/new",
 }) {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [search]);
+
   const filters = useMemo(
     () => ({
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       status: status !== "all" ? status : undefined,
       priority: priority !== "all" ? priority : undefined,
       page,
       limit: PAGE_SIZE,
     }),
-    [search, status, priority, page],
+    [debouncedSearch, status, priority, page],
   );
 
   const { data, isLoading, isFetching, isError } = useQuery({
