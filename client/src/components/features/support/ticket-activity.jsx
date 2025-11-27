@@ -46,6 +46,32 @@ const getInitials = (value) => {
   return `${first[0] || ""}${second[0] || ""}`.toUpperCase() || "?";
 };
 
+const getRoleTheme = (roleLabel) => {
+  if (roleLabel === "Requester") {
+    return {
+      container: "flex-row-reverse text-right",
+      contentAlignment: "items-end text-right",
+      avatar: "ring-2 ring-primary/40 bg-primary/10 text-primary",
+      badge: "border-primary/40 bg-primary/15 text-primary",
+      bubble: "border border-primary/30 bg-primary/10",
+      icon: "text-primary",
+      attachment: "border-primary/30 bg-primary/5",
+      attachmentIcon: "text-primary",
+    };
+  }
+
+  return {
+    container: "",
+    contentAlignment: "",
+    avatar: "bg-muted",
+    badge: "bg-secondary text-secondary-foreground",
+    bubble: "border bg-muted/40",
+    icon: "text-muted-foreground",
+    attachment: "bg-card/60",
+    attachmentIcon: "text-muted-foreground",
+  };
+};
+
 const formatDateTime = (value) => {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
@@ -86,7 +112,7 @@ const buildRoleLabel = (event, ticket) => {
   return "Collaborator";
 };
 
-const AttachmentCard = ({ attachment, onDownload, onView, compact = false }) => {
+const AttachmentCard = ({ attachment, onDownload, onView, compact = false, tone = null }) => {
   const Icon = getFileIcon(attachment);
   const url = attachment?.resolvedUrl || attachment?.url || "";
 
@@ -100,10 +126,17 @@ const AttachmentCard = ({ attachment, onDownload, onView, compact = false }) => 
     onView?.(attachment);
   };
 
+  const attachmentClasses = [
+    "flex gap-3 rounded-md border p-3",
+    tone?.attachment || "bg-card/60",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="flex gap-3 rounded-md border bg-card/60 p-3">
+    <div className={attachmentClasses}>
       <div className="mt-0.5">
-        <Icon className="h-5 w-5 text-muted-foreground" />
+        <Icon className={`h-5 w-5 ${tone?.attachmentIcon || "text-muted-foreground"}`} />
       </div>
       <div className="flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2 text-sm font-medium leading-none">
@@ -158,16 +191,17 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
   const actorName = event.actorDetails?.displayName || event.actorName || (event.actor ? "User" : "System");
   const roleLabel = buildRoleLabel(event, ticket);
   const attachments = Array.isArray(event.attachments) ? event.attachments : [];
+  const roleTheme = getRoleTheme(roleLabel);
 
   return (
-    <div className="flex gap-3">
-      <Avatar className="mt-1 h-9 w-9">
+    <div className={`flex gap-3 ${roleTheme.container}`}>
+      <Avatar className={`mt-1 h-9 w-9 ${roleTheme.avatar}`}>
         <AvatarFallback>{getInitials(actorName)}</AvatarFallback>
       </Avatar>
-      <div className="flex-1 space-y-3">
+      <div className={`flex-1 space-y-3 ${roleTheme.contentAlignment}`}>
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold leading-none text-foreground">{actorName}</p>
-          <Badge variant="secondary" className="text-[11px] capitalize">
+          <Badge variant="outline" className={`text-[11px] capitalize ${roleTheme.badge}`}>
             {roleLabel}
           </Badge>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -175,9 +209,9 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
             {formatDateTime(event.at)}
           </span>
         </div>
-        <div className="rounded-lg border bg-muted/40 p-3">
-          <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <Icon className="h-4 w-4" />
+        <div className={`rounded-lg p-3 ${roleTheme.bubble}`}>
+          <div className={`mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground ${roleTheme.contentAlignment}`}>
+            <Icon className={`h-4 w-4 ${roleTheme.icon}`} />
             {label}
           </div>
           {event.message ? (
@@ -198,6 +232,7 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
                 attachment={attachment}
                 onDownload={onDownloadAttachment}
                 onView={onViewAttachment}
+                tone={roleTheme}
               />
             ))}
           </div>
