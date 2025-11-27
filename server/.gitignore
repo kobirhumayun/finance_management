@@ -74,6 +74,7 @@ dist/
 # Temporary files
 tmp/
 temp/
+uploads/
 
 # IDE files
 .idea/
