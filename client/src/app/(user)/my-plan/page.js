@@ -238,9 +238,6 @@ export default function MyPlanPage() {
             <Button asChild variant="outline">
               <Link href="/pricing">Change Plan</Link>
             </Button>
-            <Button asChild>
-              <Link href="mailto:sales@example.com?subject=Plan%20inquiry">Contact Sales</Link>
-            </Button>
           </div>
         </CardContent>
       </Card>
