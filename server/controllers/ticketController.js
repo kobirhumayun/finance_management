@@ -294,18 +294,27 @@ const listTickets = async (req, res, next) => {
             attachmentCount: { $size: { $ifNull: ['$attachments', []] } },
         };
 
-        const [tickets, total] = await Promise.all([
-            Ticket.aggregate([
-                { $match: filters },
-                { $sort: { updatedAt: -1 } },
-                { $skip: skip },
-                { $limit: safeLimit },
-                { $project: projection },
-            ]),
-            Ticket.countDocuments(filters),
+        const [{ data: tickets = [], total: totalResults = [] } = {}] = await Ticket.aggregate([
+            { $match: filters },
+            { $sort: { updatedAt: -1 } },
+            {
+                $facet: {
+                    data: [
+                        { $skip: skip },
+                        { $limit: safeLimit },
+                        { $project: projection },
+                    ],
+                    total: [{ $count: 'count' }],
+                },
+            },
         ]);
 
-        const { tickets: mappedTickets } = await mapTicketsWithUsers(tickets, { includeDetails: false, includeUsers: false });
+        const total = totalResults[0]?.count || 0;
+
+        const { tickets: mappedTickets } = await mapTicketsWithUsers(tickets, {
+            includeDetails: false,
+            includeUsers: false,
+        });
 
         res.status(200).json({
             tickets: mappedTickets,
