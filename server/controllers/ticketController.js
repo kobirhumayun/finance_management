@@ -57,7 +57,7 @@ const mapTicketAttachment = (attachment, ticketId) => {
     };
 };
 
-const mapTicketForResponse = (ticket) => {
+const mapTicketForResponse = (ticket, { includeDetails = true } = {}) => {
     if (!ticket) {
         return ticket;
     }
@@ -65,15 +65,24 @@ const mapTicketForResponse = (ticket) => {
     const plainTicket = typeof ticket.toObject === 'function' ? ticket.toObject() : { ...ticket };
     const ticketId = plainTicket._id ? plainTicket._id.toString() : plainTicket.id;
 
-    return {
+    const mappedTicket = {
         ...plainTicket,
         id: ticketId,
         requester: plainTicket.requester ? plainTicket.requester.toString() : plainTicket.requester,
         assignee: plainTicket.assignee ? plainTicket.assignee.toString() : plainTicket.assignee,
-        attachments: Array.isArray(plainTicket.attachments)
+    };
+
+    const attachmentCount = typeof plainTicket.attachmentCount === 'number'
+        ? plainTicket.attachmentCount
+        : (Array.isArray(plainTicket.attachments) ? plainTicket.attachments.length : 0);
+
+    mappedTicket.attachmentCount = attachmentCount;
+
+    if (includeDetails) {
+        mappedTicket.attachments = Array.isArray(plainTicket.attachments)
             ? plainTicket.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
-            : [],
-        activityLog: Array.isArray(plainTicket.activityLog)
+            : [];
+        mappedTicket.activityLog = Array.isArray(plainTicket.activityLog)
             ? plainTicket.activityLog.map((entry) => ({
                 ...entry,
                 actor: entry.actor ? entry.actor.toString() : null,
@@ -82,8 +91,10 @@ const mapTicketForResponse = (ticket) => {
                     ? entry.attachments.map((attachment) => mapTicketAttachment(attachment, ticketId)).filter(Boolean)
                     : [],
             }))
-            : [],
-    };
+            : [];
+    }
+
+    return mappedTicket;
 };
 
 const buildUserLookupFromTickets = async (tickets = []) => {
@@ -141,11 +152,11 @@ const buildUserLookupFromTickets = async (tickets = []) => {
     }, {});
 };
 
-const mapTicketsWithUsers = async (tickets) => {
+const mapTicketsWithUsers = async (tickets, { includeDetails = true, includeUsers = true } = {}) => {
     const mappedTickets = (Array.isArray(tickets) ? tickets : [tickets])
-        .map(mapTicketForResponse)
+        .map((ticket) => mapTicketForResponse(ticket, { includeDetails }))
         .filter(Boolean);
-    const users = await buildUserLookupFromTickets(mappedTickets);
+    const users = includeUsers ? await buildUserLookupFromTickets(mappedTickets) : {};
     return { tickets: mappedTickets, users };
 };
 
@@ -272,16 +283,29 @@ const listTickets = async (req, res, next) => {
         const safePage = Math.max(parseInt(page, 10) || 1, 1);
         const skip = (safePage - 1) * safeLimit;
 
+        const projection = {
+            subject: 1,
+            description: 1,
+            status: 1,
+            priority: 1,
+            category: 1,
+            updatedAt: 1,
+            createdAt: 1,
+            attachmentCount: { $size: { $ifNull: ['$attachments', []] } },
+        };
+
         const [tickets, total] = await Promise.all([
-            Ticket.find(filters)
-                .sort({ updatedAt: -1 })
-                .skip(skip)
-                .limit(safeLimit)
-                .lean(),
+            Ticket.aggregate([
+                { $match: filters },
+                { $sort: { updatedAt: -1 } },
+                { $skip: skip },
+                { $limit: safeLimit },
+                { $project: projection },
+            ]),
             Ticket.countDocuments(filters),
         ]);
 
-        const { tickets: mappedTickets, users } = await mapTicketsWithUsers(tickets);
+        const { tickets: mappedTickets } = await mapTicketsWithUsers(tickets, { includeDetails: false, includeUsers: false });
 
         res.status(200).json({
             tickets: mappedTickets,
@@ -291,7 +315,7 @@ const listTickets = async (req, res, next) => {
                 total,
                 totalPages: Math.ceil(total / safeLimit) || 1,
             },
-            users,
+            users: {},
             attachmentLimitBytes: getUploadFileSizeLimit(),
         });
     } catch (error) {
