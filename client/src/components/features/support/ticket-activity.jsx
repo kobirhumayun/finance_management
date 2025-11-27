@@ -46,29 +46,53 @@ const getInitials = (value) => {
   return `${first[0] || ""}${second[0] || ""}`.toUpperCase() || "?";
 };
 
+const rolePalettes = {
+  Requester: { color: "var(--primary)", alignRight: true },
+  Support: { color: "var(--chart-2)" },
+  Admin: { color: "var(--chart-5)" },
+};
+
+const buildToneStyles = (color) => {
+  const baseColor = color || "var(--muted-foreground)";
+  return {
+    text: baseColor,
+    surface: `color-mix(in oklab, ${baseColor} 12%, transparent)`,
+    surfaceStrong: `color-mix(in oklab, ${baseColor} 18%, transparent)`,
+    border: `color-mix(in oklab, ${baseColor} 28%, transparent)`,
+  };
+};
+
 const getRoleTheme = (roleLabel) => {
-  if (roleLabel === "Requester") {
-    return {
-      container: "flex-row-reverse text-right",
-      contentAlignment: "items-end text-right",
-      avatar: "ring-2 ring-primary/40 bg-primary/10 text-primary",
-      badge: "border-primary/40 bg-primary/15 text-primary",
-      bubble: "border border-primary/30 bg-primary/10",
-      icon: "text-primary",
-      attachment: "border-primary/30 bg-primary/5",
-      attachmentIcon: "text-primary",
-    };
-  }
+  const palette = rolePalettes[roleLabel] || { color: "var(--muted-foreground)" };
+  const tone = buildToneStyles(palette.color);
 
   return {
-    container: "",
-    contentAlignment: "",
-    avatar: "bg-muted",
-    badge: "bg-secondary text-secondary-foreground",
-    bubble: "border bg-muted/40",
-    icon: "text-muted-foreground",
-    attachment: "bg-card/60",
-    attachmentIcon: "text-muted-foreground",
+    container: palette.alignRight ? "flex-row-reverse text-right" : "",
+    contentAlignment: palette.alignRight ? "items-end text-right" : "",
+    avatar: "ring-2 ring-transparent",
+    avatarStyle: {
+      color: tone.text,
+      backgroundColor: tone.surface,
+      boxShadow: `0 0 0 2px ${tone.border}`,
+    },
+    badge: "border",
+    badgeStyle: {
+      color: tone.text,
+      borderColor: tone.border,
+      backgroundColor: tone.surface,
+    },
+    bubble: "border",
+    bubbleStyle: {
+      borderColor: tone.border,
+      backgroundColor: tone.surfaceStrong,
+    },
+    iconStyle: { color: tone.text },
+    attachment: "border",
+    attachmentStyle: {
+      borderColor: tone.border,
+      backgroundColor: tone.surface,
+    },
+    attachmentIconStyle: { color: tone.text },
   };
 };
 
@@ -126,17 +150,17 @@ const AttachmentCard = ({ attachment, onDownload, onView, compact = false, tone 
     onView?.(attachment);
   };
 
-  const attachmentClasses = [
-    "flex gap-3 rounded-md border p-3",
-    tone?.attachment || "bg-card/60",
-  ]
+  const attachmentClasses = ["flex gap-3 rounded-md border p-3", tone?.attachment || "bg-card/60"]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={attachmentClasses}>
+    <div className={attachmentClasses} style={tone?.attachmentStyle}>
       <div className="mt-0.5">
-        <Icon className={`h-5 w-5 ${tone?.attachmentIcon || "text-muted-foreground"}`} />
+        <Icon
+          className={`h-5 w-5 ${tone?.attachmentIcon || "text-muted-foreground"}`}
+          style={tone?.attachmentIconStyle}
+        />
       </div>
       <div className="flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2 text-sm font-medium leading-none">
@@ -195,13 +219,17 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
 
   return (
     <div className={`flex gap-3 ${roleTheme.container}`}>
-      <Avatar className={`mt-1 h-9 w-9 ${roleTheme.avatar}`}>
+      <Avatar className={`mt-1 h-9 w-9 ${roleTheme.avatar}`} style={roleTheme.avatarStyle}>
         <AvatarFallback>{getInitials(actorName)}</AvatarFallback>
       </Avatar>
       <div className={`flex-1 space-y-3 ${roleTheme.contentAlignment}`}>
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold leading-none text-foreground">{actorName}</p>
-          <Badge variant="outline" className={`text-[11px] capitalize ${roleTheme.badge}`}>
+          <Badge
+            variant="outline"
+            className={`text-[11px] capitalize ${roleTheme.badge}`}
+            style={roleTheme.badgeStyle}
+          >
             {roleLabel}
           </Badge>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -209,9 +237,11 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
             {formatDateTime(event.at)}
           </span>
         </div>
-        <div className={`rounded-lg p-3 ${roleTheme.bubble}`}>
-          <div className={`mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground ${roleTheme.contentAlignment}`}>
-            <Icon className={`h-4 w-4 ${roleTheme.icon}`} />
+        <div className={`rounded-lg p-3 ${roleTheme.bubble}`} style={roleTheme.bubbleStyle}>
+          <div
+            className={`mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground ${roleTheme.contentAlignment}`}
+          >
+            <Icon className="h-4 w-4" style={roleTheme.iconStyle} />
             {label}
           </div>
           {event.message ? (
