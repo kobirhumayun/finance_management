@@ -127,6 +127,13 @@ ticketSchema.index({ updatedAt: 1 });
 
 ticketSchema.index({ requester: 1, status: 1 });
 ticketSchema.index({ assignee: 1, status: 1 });
+ticketSchema.index({ subject: 'text', description: 'text' }, {
+    weights: {
+        subject: 10,
+        description: 5,
+    },
+    name: 'TicketTextIndex',
+});
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 

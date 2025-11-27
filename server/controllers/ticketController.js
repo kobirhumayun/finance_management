@@ -258,35 +258,31 @@ const listTickets = async (req, res, next) => {
             limit = 10,
         } = req.query;
 
-        const filters = {};
+        const baseFilters = {};
 
         if (status) {
-            filters.status = status;
+            baseFilters.status = status;
         }
         if (priority) {
-            filters.priority = priority;
+            baseFilters.priority = priority;
         }
         if (category) {
-            filters.category = category;
+            baseFilters.category = category;
         }
         if (assignee && (isAdmin(req.user) || isSupport(req.user))) {
             const assigneeId = toObjectId(assignee);
             if (assigneeId) {
-                filters.assignee = assigneeId;
+                baseFilters.assignee = assigneeId;
             }
         }
 
         if (isAdmin(req.user) || isSupport(req.user)) {
             const requesterId = toObjectId(requester);
             if (requesterId) {
-                filters.requester = requesterId;
+                baseFilters.requester = requesterId;
             }
         } else {
-            filters.requester = req.user._id;
-        }
-
-        if (search && typeof search === 'string') {
-            filters.subject = { $regex: new RegExp(search.trim(), 'i') };
+            baseFilters.requester = req.user._id;
         }
 
         const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
@@ -304,14 +300,49 @@ const listTickets = async (req, res, next) => {
             attachmentCount: 1,
         };
 
-        const [tickets, total] = await Promise.all([
+        const searchTerm = (typeof search === 'string' && search.trim()) ? search.trim() : '';
+        const usingTextSearch = Boolean(searchTerm);
+        const filters = usingTextSearch ? { ...baseFilters, $text: { $search: searchTerm } } : { ...baseFilters };
+
+        if (usingTextSearch) {
+            projection.score = { $meta: 'textScore' };
+        }
+
+        const sort = usingTextSearch ? { score: { $meta: 'textScore' }, updatedAt: -1 } : { updatedAt: -1 };
+
+        const executeQuery = () => Promise.all([
             Ticket.find(filters, projection)
-                .sort({ updatedAt: -1 })
+                .sort(sort)
                 .skip(skip)
                 .limit(safeLimit)
                 .lean(),
             Ticket.countDocuments(filters),
         ]);
+
+        let tickets;
+        let total;
+
+        try {
+            [tickets, total] = await executeQuery();
+        } catch (error) {
+            if (usingTextSearch) {
+                const regex = new RegExp(searchTerm, 'i');
+                const legacyFilters = { ...baseFilters, $or: [{ subject: regex }, { description: regex }] };
+                const legacyProjection = { ...projection };
+                delete legacyProjection.score;
+
+                [tickets, total] = await Promise.all([
+                    Ticket.find(legacyFilters, legacyProjection)
+                        .sort({ updatedAt: -1 })
+                        .skip(skip)
+                        .limit(safeLimit)
+                        .lean(),
+                    Ticket.countDocuments(legacyFilters),
+                ]);
+            } else {
+                throw error;
+            }
+        }
 
         const { tickets: mappedTickets } = await mapTicketsWithUsers(tickets, {
             includeDetails: false,
