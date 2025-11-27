@@ -535,4 +535,8 @@ module.exports = {
     uploadAttachment,
     streamTicketAttachment,
     deleteAttachment,
+    __test__: {
+        mapTicketForResponse,
+        mapTicketAttachment,
+    },
 };
