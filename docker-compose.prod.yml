@@ -4,7 +4,7 @@ services:
       target: production
     environment:
       NODE_ENV: production
-    command: npm run start
+    # Removed "command: npm run start" to allow the Dockerfile CMD to run "node server.js"
 
   finance-management-api:
     build:
