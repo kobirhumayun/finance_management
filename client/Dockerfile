@@ -3,19 +3,19 @@
 FROM node:24-bookworm-slim AS base
 
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS=1 \
-    NEXT_FORCE_WEBPACK=1 \
-    NEXT_USE_TURBOPACK=0 \
-    NEXT_TURBOPACK_USE_WORKER=0
+  NEXT_FONT_IGNORE_REMOTE_FONT_ERRORS=1 \
+  NEXT_FORCE_WEBPACK=1 \
+  NEXT_USE_TURBOPACK=0 \
+  NEXT_TURBOPACK_USE_WORKER=0
 
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-      ca-certificates \
-      curl \
-      dumb-init \
-    && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  dumb-init \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS dependencies
 
@@ -34,27 +34,19 @@ FROM dependencies AS builder
 COPY . .
 RUN npm run build
 
-FROM dependencies AS production-dependencies
-
-RUN npm prune --omit=dev \
-  && npm cache clean --force
-
 FROM base AS production
 
 ENV NODE_ENV=production \
-    PORT=3000
+  PORT=3000
 
+# 1. Copy public assets
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/scripts ./scripts
-COPY --from=production-dependencies /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
-COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
-COPY --from=builder /app/components.json ./components.json
-COPY --from=builder /app/jsconfig.json ./jsconfig.json
 
-RUN chown -R node:node /app
+# 2. Copy the standalone folder
+COPY --from=builder --chown=node:node /app/.next/standalone/app ./
+
+# 3. Copy static assets (images, fonts, chunks)
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
 USER node
 
@@ -64,4 +56,6 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=40s \
   CMD curl -fsS http://127.0.0.1:3000/ || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["npm", "run", "start"]
+
+# 4. Start the server directly (Do NOT use npm run start)
+CMD ["node", "server.js"]
