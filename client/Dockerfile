@@ -34,25 +34,16 @@ FROM dependencies AS builder
 COPY . .
 RUN npm run build
 
-FROM dependencies AS production-dependencies
-
-RUN npm prune --omit=dev \
-  && npm cache clean --force
-
 FROM base AS production
 
 ENV NODE_ENV=production \
     PORT=3000
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/scripts ./scripts
-COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
-COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
-COPY --from=builder /app/components.json ./components.json
-COPY --from=builder /app/jsconfig.json ./jsconfig.json
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/.next/standalone ./.next/standalone
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 RUN chown -R node:node /app
 
