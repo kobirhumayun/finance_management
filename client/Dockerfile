@@ -40,6 +40,8 @@ ENV NODE_ENV=production \
     PORT=3000
 
 COPY --from=builder /app/package*.json ./
+RUN npm ci --omit=dev
+
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/.next/standalone ./.next/standalone
 COPY --from=builder /app/.next/static ./.next/static
