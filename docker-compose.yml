@@ -143,6 +143,19 @@ services:
     volumes:
       - finance-management-redis-data:/data
 
+  finance-management-backup:
+    build:
+      context: ./backup
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+    volumes:
+      - finance-management-uploads:/data/uploads:ro
+    restart: "no"
+    networks:
+      - finance-management_net
+
 volumes:
   finance-management-mongo-data:
     driver: local
