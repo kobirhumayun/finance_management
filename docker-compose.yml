@@ -143,6 +143,31 @@ services:
     volumes:
       - finance-management-redis-data:/data
 
+  finance-management-backup:
+    build: ./backup
+    container_name: finance-management-backup
+    # We do NOT restart automatically; we run this on a schedule via cron/host
+    restart: "no"
+    depends_on:
+      finance-management-db:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      # Connection to your MongoDB container
+      MONGO_URI: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@finance-management-db:27017/${MONGO_DATABASE}?authSource=admin"
+      # Restic Configuration (Add these to your .env)
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY} 
+    volumes:
+      # Mount the SAME named volume used by your API
+      - finance-management-uploads:/data/uploads:ro
+      # (Optional) Mount SSH keys if using SFTP
+      - ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro
+    networks:
+      - finance-management_net      # To reach MongoDB
+      - finance-management_outbound # To reach external backup repo (SFTP/S3)
+
 volumes:
   finance-management-mongo-data:
     driver: local
