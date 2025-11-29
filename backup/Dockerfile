@@ -1,14 +1,15 @@
-# backup/Dockerfile
 FROM alpine:latest
 
-# Install Restic, MongoDB Tools, and SSH (for SFTP)
-RUN apk add --no-cache restic mongodb-tools openssh-client bash
+# Install Restic, Mongo Tools, SSH, Bash, and dos2unix
+# dos2unix is critical for Windows-to-Linux compatibility
+RUN apk add --no-cache restic mongodb-tools openssh-client bash dos2unix
 
-# Create backup directory
 WORKDIR /data
 
-# Add the backup script
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
+# 1. Fix Windows line endings (CRLF -> LF)
+# 2. Make the script executable
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
