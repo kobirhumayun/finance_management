@@ -105,6 +105,37 @@ The repository includes a one-off backup task that dumps MongoDB, archives uploa
    ```
    Adjust the host path and repository URL to match your storage target.
 
+### Restoring from a snapshot
+Use the backup container to pull data out of your Restic repository and replay it into MongoDB.
+
+1. Choose a host directory to hold the restored files (e.g., `/path/to/restore`).
+2. Export the same variables used for backups (`MONGO_URI`, `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`).
+3. Restore the latest snapshot into that directory:
+   ```bash
+   docker compose run --rm \
+     -v /path/to/restore:/restore \
+     finance-management-backup \
+     sh -c "restic restore latest --target /restore"
+   ```
+4. Replay the MongoDB dump back into your cluster (using `--drop` if you intend to replace existing data):
+   ```bash
+   docker compose run --rm \
+     -v /path/to/restore:/restore \
+     -e MONGO_URI \
+     finance-management-backup \
+     sh -c "mongorestore --uri \"$MONGO_URI\" --drop /restore/tmp/mongo_dump.*"
+   ```
+   The dump path matches the temporary directory created during backup; adjust the glob if you used a different Restic `--path` filter.
+5. Restore uploaded files by copying them from the Restic output into the uploads volume:
+   ```bash
+   docker compose run --rm \
+     -v /path/to/restore:/restore \
+     -v finance-management-uploads:/data/uploads \
+     finance-management-backup \
+     sh -c "cp -a /restore/data/uploads/. /data/uploads"
+   ```
+   This copies the restored uploads back into the Compose-managed volume used by the API and web containers.
+
 ## Security
 - No service in this stack publishes host ports; only the shared edge Nginx service faces the public internet.
 - Secrets remain in `.env` and are injected at runtime via Compose.
