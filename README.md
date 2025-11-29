@@ -80,6 +80,31 @@ Use the combinations below to quickly start the stack in each environment. Every
 - Redis stores session locks and tokens in `finance-management-redis-data`. Back up this volume if retaining session continuity across restarts is important; otherwise it can be treated as disposable cache data.
 - Uploaded transaction attachments and profile photos live under the path defined by `UPLOADS_ROOT` (defaults to `/app/uploads` inside the API container). The Compose stack automatically mounts the `finance-management-uploads` named volume at that path so user-provided files survive container restarts and deployments. If you override `UPLOADS_ROOT`, update the Compose volume target to match the new in-container path.
 
+## Backups
+The repository includes a one-off backup task that dumps MongoDB, archives uploads, and prunes old snapshots using Restic.
+
+1. Populate the following variables in your `.env` file (or export them in your shell before running the task):
+   - `MONGO_URI` – connection string for the database you want to back up.
+   - `RESTIC_REPOSITORY` – Restic repository URL (e.g., `s3:s3.amazonaws.com/bucket/path` or a local path mounted into the container).
+   - `RESTIC_PASSWORD` – encryption password for the repository.
+2. Run the backup container on demand:
+   ```bash
+   docker compose run --rm finance-management-backup
+   ```
+   The entrypoint will:
+   - create a `mongodump` in a temporary directory using `MONGO_URI`,
+   - initialize the Restic repository if it has not been bootstrapped,
+   - back up both the MongoDB dump and `/data/uploads`, and
+   - prune snapshots with `--keep-daily 7 --keep-weekly 4`.
+3. If your Restic repository lives on the local filesystem, mount it into the container during the run, for example:
+   ```bash
+   docker compose run --rm \
+     -v /path/on/host/restic-repo:/restic-repo \
+     -e RESTIC_REPOSITORY=/restic-repo \
+     finance-management-backup
+   ```
+   Adjust the host path and repository URL to match your storage target.
+
 ## Security
 - No service in this stack publishes host ports; only the shared edge Nginx service faces the public internet.
 - Secrets remain in `.env` and are injected at runtime via Compose.
