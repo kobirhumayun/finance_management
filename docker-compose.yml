@@ -143,6 +143,26 @@ services:
     volumes:
       - finance-management-redis-data:/data
 
+  finance-management-backup:
+    build: ./backup
+    container_name: finance-management-backup
+    # "no" is crucial: This is a task, not a service that stays alive
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      RESTIC_REPOSITORY: "/repo"
+    volumes:
+      # Read/Write access allows you to restore files back to this volume
+      - finance-management-uploads:/data/uploads
+      # Maps a folder on your VPS host to the container
+      - ./backups:/repo
+    networks:
+      - finance-management_net
+      - finance-management_outbound
+
 volumes:
   finance-management-mongo-data:
     driver: local

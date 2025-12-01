@@ -10,6 +10,7 @@ build/
 dist/
 out/
 coverage/
+backups/
 
 # Logs and runtime files
 npm-debug.log*

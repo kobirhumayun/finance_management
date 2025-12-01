@@ -203,3 +203,83 @@ proxy_cache_bypass $http_upgrade;
 - Ensure the edge Nginx container is the only service joined to `edge_net` aside from application `*-web` containers.
 
 With this layout, the Next.js front end is the only component exposed to the shared edge network, while the API, MongoDB, and Redis remain protected on the private network. Nginx terminates TLS, routes requests by hostname, and forwards traffic to the appropriate internal service without opening host ports on the app stack.
+
+# BACKUP & DISASTER RECOVERY GUIDE
+
+## 1. Overview
+This project uses a containerized **Restic** solution for efficient, chunk-based deduplicated backups. The system automatically dumps the MongoDB database and syncs both the dump and the `uploads/` volume to a secure repository.
+
+---
+
+## 2. Setup & Configuration
+
+### Environment Variables (.env)
+Add these variables to your `.env` file on both your local machine and VPS:
+
+# --- BACKUP CONFIGURATION ---
+# Secure password to encrypt the backup repository (Keep this safe!)
+RESTIC_PASSWORD="change_this_to_a_very_secure_password"
+
+# Internal container path for the repository. 
+# Maps to './backups' on the host via docker-compose.yml
+RESTIC_REPOSITORY="/repo"
+
+# Database Connection String (Ensure this matches your environment)
+MONGO_URI=mongodb://root:example@finance-management-db:27017/finance_db?authSource=admin
+
+
+---
+
+## 3. How to Backup
+
+The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots.
+
+### Manual Backup (Windows & Linux)
+Run this command anytime to trigger an immediate backup:
+
+docker compose run --rm finance-management-backup
+
+
+### Automated Backup (Ubuntu VPS)
+Set up a cron job to run nightly (e.g., at 3 AM).
+1. Run `crontab -e`
+2. Add the following line:
+
+0 3 * * * cd /path/to/finance_management && docker compose run --rm finance-management-backup >> /var/log/backup.log 2>&1
+
+
+---
+
+## 4. How to Restore (Disaster Recovery)
+
+⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the latest backup.
+
+### Option A: Restore on Ubuntu VPS (Production)
+Use the standard restoration command:
+
+docker compose run --rm --entrypoint /restore.sh finance-management-backup
+
+
+### Option B: Restore on Windows (Git Bash)
+You must use a double slash `//` for the script path to prevent Git Bash path conversion errors:
+
+docker compose run --rm --entrypoint //restore.sh finance-management-backup
+
+
+---
+
+## 5. Syncing Backups (VPS <-> Local)
+
+Use `rsync` to transfer the backup repository between your local machine and the VPS.
+
+### Download Backups (VPS -> Local)
+Run this in Git Bash on Windows to pull production backups to your machine:
+
+mkdir -p backups
+rsync -avz -e ssh user@your-vps-ip:/path/to/project/backups/ ./backups/
+
+
+### Upload Backups (Local -> VPS)
+Run this in Git Bash on Windows to push your local backups to the server (for restoration):
+
+rsync -avz -e ssh ./backups/ user@your-vps-ip:/path/to/project/backups/
