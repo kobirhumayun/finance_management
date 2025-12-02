@@ -7,7 +7,7 @@ This guide outlines the day-to-day practices for contributing to the Finance Man
 - Node.js 18+
 - npm 9+
 - MongoDB 5.x running locally on `mongodb://localhost:27017`
-- (Optional) Redis 6.x when you want to exercise production-like auth session coordination from the frontend
+- Redis 6.x for the PDF queue worker and production-like auth session coordination from the frontend
 
 After cloning the repository, install dependencies for each workspace:
 
@@ -39,6 +39,17 @@ npm run dev
 ```
 
 This command launches Nodemon with hot reloading on `http://localhost:5000`. When adjusting JWT expiry constants or email templates, restart the server to ensure the values are reloaded from the environment.
+
+### PDF worker
+
+Run the Playwright-powered PDF worker in a separate terminal once Redis is available:
+
+```bash
+cd server
+npm run pdf-worker
+```
+
+The worker listens for jobs published by the API and should stay online alongside Redis when you are testing report exports.
 
 ### Frontend (Next.js)
 

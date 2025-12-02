@@ -18,7 +18,7 @@ const projectRoutes = require('./routes/project');
 const reportRoutes = require('./routes/report');
 const ticketRoutes = require('./routes/ticket');
 const { initializeEnforcer } = require('./services/casbin');
-const { initializePlaywright } = require('./services/playwrightPool');
+const { shutdownPdfQueue } = require('./services/pdfQueue');
 const { scheduleSubscriptionExpiryCheck } = require('./jobs/subscriptionJobs');
 const { scheduleStaleTicketScan } = require('./jobs/ticketJobs');
 const AppError = require('./utils/AppError');
@@ -83,8 +83,6 @@ const startServer = async () => {
         await connectDB();
         await initializeEnforcer();
         console.log('Authorization enforcer initialized');
-        await initializePlaywright();
-        console.log('Playwright pool initialized');
         scheduleSubscriptionExpiryCheck();
         scheduleStaleTicketScan();
 
@@ -99,6 +97,12 @@ const startServer = async () => {
         process.exit(1); // Exit if server cannot start
     }
 };
+
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+    process.once(signal, () => {
+        shutdownPdfQueue().finally(() => process.exit(0));
+    });
+});
 
 // --- Initialize Server ---
 startServer();
