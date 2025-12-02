@@ -6,6 +6,16 @@ dotenv.config();
 
 const mongoUri = process.env.MONGO_URI;
 
+const parseInteger = (value, fallback) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+};
+
+const MAX_RETRIES = parseInteger(process.env.MONGO_CONNECT_MAX_RETRIES, 5);
+const RETRY_DELAY_MS = parseInteger(process.env.MONGO_CONNECT_RETRY_DELAY_MS, 5000);
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 if (!mongoUri) {
     console.error('Error: MONGO_URI is not defined in the environment variables.');
     process.exit(1);
@@ -25,37 +35,56 @@ const connectDB = async () => {
         return connectionPromise;
     }
 
-    // Start a new connection attempt
+    // Start a new connection attempt with retries
     connectionPromise = (async () => {
-        console.log('Attempting to connect to MongoDB...');
+        let attempt = 0;
+        let lastError;
 
-        try {
-            // Mongoose 6+ uses these defaults, but explicitly setting some options can be useful.
-            // Consider adding options like `serverSelectionTimeoutMS`, `socketTimeoutMS`, etc., if needed.
-            const conn = await mongoose.connect(mongoUri, {
-                // Mongoose 6 defaults are generally good.
-                // autoIndex: true, // Consider 'false' in production for performance, manage indexes manually.
-                // bufferCommands: true, // Default, useful but can hide connection issues.
-            });
-
-            console.log(`MongoDB Connected: ${conn.connection.host}`);
-
+        while (attempt <= MAX_RETRIES) {
             try {
-                await Payment.syncIndexes();
-                console.log('Payment collection indexes synced.');
-            } catch (indexError) {
-                console.error('Failed to sync Payment indexes:', indexError);
-                throw indexError;
-            }
-            return conn;
+                console.log(
+                    `Attempting to connect to MongoDB (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`
+                );
 
-        } catch (error) {
-            console.error(`Initial MongoDB Connection Error: ${error.message}`);
-            // Reset the promise on failure to allow for retry attempts if desired
-            connectionPromise = null;
-            // Exit or implement a retry mechanism. Exiting is simpler but less resilient.
-            process.exit(1);
+                const conn = await mongoose.connect(mongoUri, {
+                    // Mongoose 6 defaults are generally good.
+                    // autoIndex: true, // Consider 'false' in production for performance, manage indexes manually.
+                    // bufferCommands: true, // Default, useful but can hide connection issues.
+                });
+
+                console.log(`MongoDB Connected: ${conn.connection.host}`);
+
+                try {
+                    await Payment.syncIndexes();
+                    console.log('Payment collection indexes synced.');
+                } catch (indexError) {
+                    console.error('Failed to sync Payment indexes:', indexError);
+                    throw indexError;
+                }
+
+                return conn;
+            } catch (error) {
+                lastError = error;
+                attempt += 1;
+                console.error(`MongoDB connection attempt ${attempt} failed: ${error.message}`);
+
+                if (attempt > MAX_RETRIES) {
+                    connectionPromise = null;
+                    throw lastError;
+                }
+
+                const backoffDelay = RETRY_DELAY_MS * attempt;
+                console.log(
+                    `Retrying MongoDB connection in ${backoffDelay / 1000} seconds... (retry ${attempt}/${
+                        MAX_RETRIES
+                    })`
+                );
+                await delay(backoffDelay);
+            }
         }
+
+        connectionPromise = null;
+        throw lastError;
     })();
 
     return connectionPromise;
