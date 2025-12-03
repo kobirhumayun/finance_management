@@ -5,7 +5,7 @@ const queue = new Queue(getPdfQueueName(), { connection: getPdfQueueConnection()
 
 (async () => {
     await queue.waitUntilReady();
-    await queue.client.ping();
+    await queue.getJobCounts();
     await queue.close();
     process.exit(0);
 })().catch((error) => {
