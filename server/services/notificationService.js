@@ -32,16 +32,17 @@ const sendNotification = async ({ method, user, subject, text, html }) => {
                 }
                 // Example: await sendSms(user.phone, text);
                 throw new Error('SMS sending not yet implemented.'); // Remove when implemented
-                break;
 
             default:
                 throw new Error('Unsupported notification method.');
         }
+
         return true; // Indicate success
     } catch (error) {
         console.error(`Failed to send notification via ${method}:`, error);
-        // Depending on requirements, you might want to retry or log persistently
-        return false; // Indicate failure
+        const wrappedError = new Error(`Notification dispatch via ${method || 'unknown'} failed.`);
+        wrappedError.cause = error;
+        throw wrappedError;
     }
 };
 
