@@ -16,9 +16,9 @@ The stack also includes a dedicated **PDF Generation Service** (`finance-managem
    - `.env.local.template` &rarr; `.env` for local development or hot reload workflows (e.g., `docker compose --profile localdb up`).
    - `.env.production.template` &rarr; `.env` for staging/production deployments.
    - `.env.example` is the canonical checklist of every supported variable; consult it when you need knobs that are not pre-filled in the templates above.
-2. Each template includes two `MONGO_URI` examples under the “Backend configuration” section:
-   - The first line points at the bundled MongoDB container (`finance-management-db`) and should stay uncommented when you want Compose to spin up the local database.
-   - The second line shows an external MongoDB Atlas (or any other cluster) URI. Uncomment that line and comment/remove the local URI when you need to target an outside database; update the hostname, username, and password to match your cluster.
+2. Each template includes two `MONGO_URI` examples under the “Backend configuration” section. `MONGO_URI` now stops at the host/credentials while `MONGO_DB` declares the database name:
+   - The first URI targets the bundled MongoDB container (`finance-management-db`) and should stay uncommented when you want Compose to spin up the local database.
+   - The second URI shows an external MongoDB Atlas (or any other cluster) host. Uncomment that line and comment/remove the local URI when you need to target an outside database; update the hostname, username, and password to match your cluster and leave `MONGO_DB` set to the desired database name.
 3. Fill in the remaining runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
 4. Keep `.env` private—never commit it to source control.
 
@@ -223,19 +223,20 @@ Add these variables to your `.env` file on both your local machine and VPS:
 # Secure password to encrypt the backup repository (Keep this safe!)
 RESTIC_PASSWORD="change_this_to_a_very_secure_password"
 
-# Internal container path for the repository. 
+# Internal container path for the repository.
 # Maps to './backups' on the host via docker-compose.yml
 RESTIC_REPOSITORY="/repo"
 
-# Database Connection String (Ensure this matches your environment)
-MONGO_URI=mongodb://root:example@finance-management-db:27017/finance_db?authSource=admin
+# Database connection (host/credentials only) and name
+MONGO_URI=mongodb://root:example@finance-management-db:27017?authSource=admin
+MONGO_DB=finance_db
 
 
 ---
 
 ## 3. How to Backup
 
-The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots.
+The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots. Pass additional mongodump flags (for example, to exclude collections) via `MONGODUMP_EXTRA_ARGS` when invoking the container.
 
 ### Manual Backup (Windows & Linux)
 Run this command anytime to trigger an immediate backup:
@@ -258,8 +259,13 @@ Set up a cron job to run nightly (e.g., at 3 AM).
 ⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the latest backup.
 
 ### Option A: Restore on Ubuntu VPS (Production)
-Use the standard restoration command:
+Use the standard restoration command (set `MONGORESTORE_EXTRA_ARGS` to forward `--ns*` flags when you need to rewrite namespaces during a restore without touching credentials):
 
+docker compose run --rm --entrypoint /restore.sh finance-management-backup
+
+Example (restoring into a different database name without editing secrets):
+
+MONGORESTORE_EXTRA_ARGS="--nsFrom=${MONGO_DB}.* --nsTo=finance_restore.*" \
 docker compose run --rm --entrypoint /restore.sh finance-management-backup
 
 

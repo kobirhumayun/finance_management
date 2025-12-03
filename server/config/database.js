@@ -5,6 +5,7 @@ const Payment = require('../models/Payment');
 dotenv.config();
 
 const mongoUri = process.env.MONGO_URI;
+const mongoDb = process.env.MONGO_DB || process.env.MONGO_DATABASE;
 
 const parseInteger = (value, fallback) => {
     const parsed = Number.parseInt(value, 10);
@@ -16,8 +17,37 @@ const RETRY_DELAY_MS = parseInteger(process.env.MONGO_CONNECT_RETRY_DELAY_MS, 50
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-if (!mongoUri) {
-    console.error('Error: MONGO_URI is not defined in the environment variables.');
+const buildMongoUri = (baseUri, databaseName) => {
+    if (!baseUri) {
+        throw new Error('MONGO_URI is not defined in the environment variables.');
+    }
+
+    if (!databaseName) {
+        throw new Error('MONGO_DB (or MONGO_DATABASE) is not defined in the environment variables.');
+    }
+
+    const [uriWithoutQuery, queryPart] = baseUri.split('?');
+    const authorityIndex = uriWithoutQuery.indexOf('//');
+    const authorityAndPath = authorityIndex >= 0 ? uriWithoutQuery.slice(authorityIndex + 2) : uriWithoutQuery;
+    const firstPathSlash = authorityAndPath.indexOf('/');
+    const hasDatabasePath = firstPathSlash !== -1 && authorityAndPath.slice(firstPathSlash + 1).length > 0;
+
+    if (hasDatabasePath) {
+        return queryPart ? `${uriWithoutQuery}?${queryPart}` : uriWithoutQuery;
+    }
+
+    const normalizedBase = uriWithoutQuery.endsWith('/') ? uriWithoutQuery.slice(0, -1) : uriWithoutQuery;
+    const queryString = queryPart ? `?${queryPart}` : '';
+
+    return `${normalizedBase}/${databaseName}${queryString}`;
+};
+
+let fullMongoUri;
+
+try {
+    fullMongoUri = buildMongoUri(mongoUri, mongoDb);
+} catch (error) {
+    console.error(`Error: ${error.message}`);
     process.exit(1);
 }
 
@@ -46,7 +76,7 @@ const connectDB = async () => {
                     `Attempting to connect to MongoDB (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`
                 );
 
-                const conn = await mongoose.connect(mongoUri, {
+                const conn = await mongoose.connect(fullMongoUri, {
                     // Mongoose 6 defaults are generally good.
                     // autoIndex: true, // Consider 'false' in production for performance, manage indexes manually.
                     // bufferCommands: true, // Default, useful but can hide connection issues.

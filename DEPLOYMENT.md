@@ -27,7 +27,8 @@ Populate the copies with the values that match your infrastructure. The tables b
 | Variable | Description |
 | --- | --- |
 | `PORT` | Port that the API server should listen on. |
-| `MONGO_URI` | MongoDB connection string pointing at the production database. |
+| `MONGO_URI` | MongoDB connection string without the database component (host + credentials). |
+| `MONGO_DB` | Database name appended to `MONGO_URI` at runtime. |
 | `REDIS_URL` | Redis connection string used by the API for queueing PDF work. |
 | `PDF_QUEUE_REDIS_URL` / `PDF_QUEUE_NAME` | Override the Redis endpoint or queue name used by the Playwright worker. Defaults to `REDIS_URL` and `summary-pdf`. |
 | `PDF_JOB_RESPONSE_TIMEOUT_MS` / `PDF_JOB_PROCESS_TIMEOUT_MS` | Optional timeouts controlling how long the API waits for a PDF result and how long the worker is allowed to process a job. |

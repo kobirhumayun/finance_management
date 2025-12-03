@@ -130,7 +130,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-${MONGO_DATABASE}}
     volumes:
       - finance-management-mongo-data:/data/db
     restart: unless-stopped
@@ -190,6 +190,7 @@ services:
       - .env
     environment:
       MONGO_URI: ${MONGO_URI}
+      MONGO_DB: ${MONGO_DB:-${MONGO_DATABASE}}
       RESTIC_PASSWORD: ${RESTIC_PASSWORD}
       RESTIC_REPOSITORY: "/repo"
     volumes:

@@ -4,7 +4,8 @@
 
 Create a `.env` file in this directory using [`.env.example`](./.env.example) as a template. Key variables include:
 
-- `MONGO_URI`: MongoDB connection string.
+- `MONGO_URI`: MongoDB connection string without the database component (host + credentials + query string).
+- `MONGO_DB` / `MONGO_DATABASE`: Database name to append to `MONGO_URI` at runtime.
 - `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET`: Secrets used for signing JWTs.
 - `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`: Credentials and sender information for transactional emails.
 - `OTP_EXPIRY_MINUTES`: Minutes before OTP codes expire.

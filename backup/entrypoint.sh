@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+if [ -z "$MONGO_URI" ]; then
+    echo "Error: MONGO_URI is not set."
+    exit 1
+fi
+
+if [ -z "$MONGO_DB" ]; then
+    echo "Error: MONGO_DB is not set."
+    exit 1
+fi
+
 # Configuration
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 DUMP_FILE="/data/dump/mongo_dump_${TIMESTAMP}.archive"
@@ -10,7 +20,15 @@ echo "--- Starting Backup Job at ${TIMESTAMP} ---"
 # 1. Dump MongoDB
 echo "Step 1: Creating MongoDB Dump..."
 mkdir -p /data/dump
-mongodump --uri="$MONGO_URI" --archive="$DUMP_FILE"
+
+DUMP_ARGS=(--uri="$MONGO_URI" --db="$MONGO_DB" --archive="$DUMP_FILE")
+
+if [ -n "$MONGODUMP_EXTRA_ARGS" ]; then
+    # shellcheck disable=SC2206
+    DUMP_ARGS+=( $MONGODUMP_EXTRA_ARGS )
+fi
+
+mongodump "${DUMP_ARGS[@]}"
 
 # 2. Initialize Restic Repo (if it doesn't exist)
 if ! restic snapshots > /dev/null 2>&1; then

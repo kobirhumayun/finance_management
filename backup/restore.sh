@@ -11,6 +11,17 @@ echo "======================================================="
 echo "Starting in 5 seconds... (Press Ctrl+C to cancel)"
 sleep 5
 
+# Ensure required variables exist so operators can add --ns* flags without editing secrets
+if [ -z "$MONGO_URI" ]; then
+    echo "Error: MONGO_URI is not set."
+    exit 1
+fi
+
+if [ -z "$MONGO_DB" ]; then
+    echo "Error: MONGO_DB is not set."
+    exit 1
+fi
+
 # 1. Pull Files from Restic
 echo "--> Step 1: Fetching latest snapshot from Restic..."
 # We clean the temp folder first just in case
@@ -27,10 +38,19 @@ if [ -z "$ARCHIVE_FILE" ]; then
     exit 1
 fi
 
-mongorestore \
-    --uri="$MONGO_URI" \
-    --drop \
+RESTORE_ARGS=(
+    --uri="$MONGO_URI"
+    --db="$MONGO_DB"
+    --drop
     --archive="$ARCHIVE_FILE"
+)
+
+if [ -n "$MONGORESTORE_EXTRA_ARGS" ]; then
+    # shellcheck disable=SC2206
+    RESTORE_ARGS+=( $MONGORESTORE_EXTRA_ARGS )
+fi
+
+mongorestore "${RESTORE_ARGS[@]}"
 
 # 3. Restore Uploads
 echo "--> Step 3: Restoring User Uploads..."
