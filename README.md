@@ -212,6 +212,10 @@ With this layout, the Next.js front end is the only component exposed to the sha
 ## 1. Overview
 This project uses a containerized **Restic** solution for efficient, chunk-based deduplicated backups. The system automatically dumps the MongoDB database and syncs both the dump and the `uploads/` volume to a secure repository.
 
+### Platform notes
+- **Ubuntu:** All backup/restore commands below assume Docker Engine + Docker Compose Plugin are installed. Run them from the repository root with your deployment `.env` file in place so `MONGO_URI`, `MONGO_DB`, and Restic variables are available to the backup container.
+- **Windows:** Use Git Bash (or WSL) so Docker CLI commands and shell scripts execute correctly. When invoking `restore.sh`, pass the double-slash path (`//restore.sh`) to avoid Git Bash path mangling.
+
 ---
 
 ## 2. Setup & Configuration
@@ -238,15 +242,20 @@ MONGO_DB=finance_db
 
 The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots. The dump prefers `--nsInclude=${MONGO_DB}.*` (avoiding deprecated `--db/--collection` flags); if your bundled MongoDB tools do not support `--nsInclude`, the script falls back to `--db` with a warning. Pass additional `mongodump` options—like extra `--nsInclude` filters to scope specific collections—via `MONGODUMP_EXTRA_ARGS` when invoking the container.
 
-### Manual Backup (Windows & Linux)
-Run this command anytime to trigger an immediate backup:
-
-docker compose run --rm finance-management-backup
-
+### Manual Backup
+- **Ubuntu:**
+  ```bash
+  docker compose run --rm finance-management-backup
+  ```
+- **Windows (Git Bash):**
+  ```bash
+  docker compose run --rm finance-management-backup
+  ```
+  (No path tweaks are required for the backup entrypoint.)
 
 ### Automated Backup (Ubuntu VPS)
 Set up a cron job to run nightly (e.g., at 3 AM).
-1. Run `crontab -e`
+1. Run `crontab -e`.
 2. Add the following line:
 
 0 3 * * * cd /path/to/finance_management && docker compose run --rm finance-management-backup >> /var/log/backup.log 2>&1
@@ -258,21 +267,41 @@ Set up a cron job to run nightly (e.g., at 3 AM).
 
 ⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the latest backup.
 
-### Option A: Restore on Ubuntu VPS (Production)
-Use the standard restoration command. The restore step also scopes to `--nsInclude=${MONGO_DB}.*` by default (falling back to deprecated `--db` if the toolchain does not support `--nsInclude`); set `MONGORESTORE_EXTRA_ARGS` to forward `--ns*` flags (for example, `--nsFrom/--nsTo` pairs) when you need to rewrite namespaces during a restore without touching credentials:
+### Restore on Ubuntu
+1. Ensure Docker is running and your `.env` file still holds the credentials and `MONGO_DB` value that matches the backup you intend to restore.
+2. Run the restore container:
+   ```bash
+   docker compose run --rm --entrypoint /restore.sh finance-management-backup
+   ```
+3. Optional: when you need namespace rewrites (for example, targeting a different database name temporarily), set `MONGORESTORE_EXTRA_ARGS` before the command:
+   ```bash
+   MONGORESTORE_EXTRA_ARGS="--nsFrom=${MONGO_DB}.* --nsTo=finance_restore.*" \
+   docker compose run --rm --entrypoint /restore.sh finance-management-backup
+   ```
 
-docker compose run --rm --entrypoint /restore.sh finance-management-backup
+### Restore on Windows (Git Bash)
+1. Confirm Docker Desktop is running and your `.env` file is present in the project root.
+2. Use a double slash for the entrypoint path to avoid Git Bash rewriting the script location:
+   ```bash
+   docker compose run --rm --entrypoint //restore.sh finance-management-backup
+   ```
+3. Namespace rewrites work the same way as Ubuntu; prefix the command with `MONGORESTORE_EXTRA_ARGS="--nsFrom=... --nsTo=..."` when needed.
 
-Example (restoring into a different database name without editing secrets):
-
-MONGORESTORE_EXTRA_ARGS="--nsFrom=${MONGO_DB}.* --nsTo=finance_restore.*" \
-docker compose run --rm --entrypoint /restore.sh finance-management-backup
-
-
-### Option B: Restore on Windows (Git Bash)
-You must use a double slash `//` for the script path to prevent Git Bash path conversion errors:
-
-docker compose run --rm --entrypoint //restore.sh finance-management-backup
+### Database rename procedure (permanent or one-off)
+Use this flow when you need to change the database name without exposing credentials or editing secrets inside a dump:
+1. **Before restoring:**
+   - Decide whether the rename is temporary (restore into a different database for testing) or permanent (changing the app's live database name).
+   - For a temporary rename, keep `.env` as-is and rely on namespace rewrites in `MONGORESTORE_EXTRA_ARGS`.
+   - For a permanent rename, update `MONGO_DB` in your `.env` to the new name so the application and future backups use it.
+2. **Run the restore with namespace rewrites:**
+   ```bash
+   MONGORESTORE_EXTRA_ARGS="--nsFrom=${MONGO_DB}.* --nsTo=<new_db_name>.*" \
+   docker compose run --rm --entrypoint /restore.sh finance-management-backup
+   ```
+   Replace `<new_db_name>` with the target name. The restore script will auto-detect whether to use `--nsInclude` or fallback `--db` flags based on the installed MongoDB tools.
+3. **After restoring:**
+   - If the rename is permanent, ensure `MONGO_DB=<new_db_name>` is committed to your operational `.env` and redeploy the stack so the API connects to the renamed database.
+   - If the rename was temporary, no additional action is required; future backups will continue to use the original `MONGO_DB` value.
 
 
 ---
