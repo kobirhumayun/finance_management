@@ -21,11 +21,20 @@ echo "--- Starting Backup Job at ${TIMESTAMP} ---"
 echo "Step 1: Creating MongoDB Dump..."
 mkdir -p /data/dump
 
-DUMP_ARGS=(
-    --uri="$MONGO_URI"
-    --nsInclude="${MONGO_DB}.*"
-    --archive="$DUMP_FILE"
-)
+if mongodump --help | grep -q -- '--nsInclude'; then
+    DUMP_ARGS=(
+        --uri="$MONGO_URI"
+        --nsInclude="${MONGO_DB}.*"
+        --archive="$DUMP_FILE"
+    )
+else
+    echo "Warning: mongodump does not support --nsInclude. Falling back to deprecated --db flag."
+    DUMP_ARGS=(
+        --uri="$MONGO_URI"
+        --db="$MONGO_DB"
+        --archive="$DUMP_FILE"
+    )
+fi
 
 if [ -n "$MONGODUMP_EXTRA_ARGS" ]; then
     # shellcheck disable=SC2206

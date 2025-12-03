@@ -236,7 +236,7 @@ MONGO_DB=finance_db
 
 ## 3. How to Backup
 
-The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots. The dump uses `--nsInclude=${MONGO_DB}.*` (avoiding deprecated `--db/--collection` flags); pass additional `mongodump` options—like extra `--nsInclude` filters to scope specific collections—via `MONGODUMP_EXTRA_ARGS` when invoking the container.
+The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots. The dump prefers `--nsInclude=${MONGO_DB}.*` (avoiding deprecated `--db/--collection` flags); if your bundled MongoDB tools do not support `--nsInclude`, the script falls back to `--db` with a warning. Pass additional `mongodump` options—like extra `--nsInclude` filters to scope specific collections—via `MONGODUMP_EXTRA_ARGS` when invoking the container.
 
 ### Manual Backup (Windows & Linux)
 Run this command anytime to trigger an immediate backup:
@@ -259,7 +259,7 @@ Set up a cron job to run nightly (e.g., at 3 AM).
 ⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the latest backup.
 
 ### Option A: Restore on Ubuntu VPS (Production)
-Use the standard restoration command. The restore step also scopes to `--nsInclude=${MONGO_DB}.*` by default; set `MONGORESTORE_EXTRA_ARGS` to forward `--ns*` flags (for example, `--nsFrom/--nsTo` pairs) when you need to rewrite namespaces during a restore without touching credentials:
+Use the standard restoration command. The restore step also scopes to `--nsInclude=${MONGO_DB}.*` by default (falling back to deprecated `--db` if the toolchain does not support `--nsInclude`); set `MONGORESTORE_EXTRA_ARGS` to forward `--ns*` flags (for example, `--nsFrom/--nsTo` pairs) when you need to rewrite namespaces during a restore without touching credentials:
 
 docker compose run --rm --entrypoint /restore.sh finance-management-backup
 

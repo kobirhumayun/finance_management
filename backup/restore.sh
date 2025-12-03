@@ -38,12 +38,22 @@ if [ -z "$ARCHIVE_FILE" ]; then
     exit 1
 fi
 
-RESTORE_ARGS=(
-    --uri="$MONGO_URI"
-    --nsInclude="${MONGO_DB}.*"
-    --drop
-    --archive="$ARCHIVE_FILE"
-)
+if mongorestore --help | grep -q -- '--nsInclude'; then
+    RESTORE_ARGS=(
+        --uri="$MONGO_URI"
+        --nsInclude="${MONGO_DB}.*"
+        --drop
+        --archive="$ARCHIVE_FILE"
+    )
+else
+    echo "Warning: mongorestore does not support --nsInclude. Falling back to deprecated --db flag."
+    RESTORE_ARGS=(
+        --uri="$MONGO_URI"
+        --db="$MONGO_DB"
+        --drop
+        --archive="$ARCHIVE_FILE"
+    )
+fi
 
 if [ -n "$MONGORESTORE_EXTRA_ARGS" ]; then
     # shellcheck disable=SC2206
