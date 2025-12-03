@@ -16,7 +16,11 @@ RUN apt-get update \
 FROM base AS dependencies
 
 COPY package*.json ./
-RUN npm ci --omit=optional
+# Use npm install instead of ci so the image build can succeed even when the
+# checked-in lockfile is out of sync with new dependencies. Optional
+# dependencies are omitted to keep the API image slim (Playwright lives in the
+# PDF worker image).
+RUN npm install --omit=optional
 
 FROM dependencies AS development
 

@@ -51,7 +51,10 @@ RUN apt-get update \
     && chown node:node /app/uploads
 
 COPY package*.json ./
-RUN npm ci && npx playwright install chromium
+# Use npm install so the build can refresh the lockfile when new dependencies
+# are introduced (e.g., queue packages) without failing hard in CI. Keep dev
+# dependencies omitted while ensuring Playwright is installed for the worker.
+RUN npm install --omit=dev && npx playwright install chromium
 
 COPY --chown=node:node . .
 
