@@ -21,15 +21,15 @@ const fetchUsersByIds = async (ids = []) => {
 const notifyUsers = async (users, subject, text) => {
     await Promise.all(
         users.map(async (user) => {
-            const notificationResult = await sendNotification({
-                method: 'email',
-                user,
-                subject,
-                text,
-            });
-
-            if (!notificationResult) {
-                console.warn(`Notification dispatch failed for ${user.email}`);
+            try {
+                await sendNotification({
+                    method: 'email',
+                    user,
+                    subject,
+                    text,
+                });
+            } catch (notificationError) {
+                console.warn(`Notification dispatch failed for ${user.email}:`, notificationError);
             }
         })
     );

@@ -556,14 +556,15 @@ const triggerPasswordReset = async (req, res) => {
             messageBody += `\nAfter resetting the password, you will be redirected to: ${resetLink}`;
         }
 
-        const notificationScheduled = await sendNotification({
-            method: 'email',
-            user,
-            subject: 'Password Reset Requested',
-            text: messageBody,
-        });
-
-        if (!notificationScheduled) {
+        try {
+            await sendNotification({
+                method: 'email',
+                user,
+                subject: 'Password Reset Requested',
+                text: messageBody,
+            });
+        } catch (notificationError) {
+            console.error('Failed to schedule password reset email:', notificationError);
             return res.status(500).json({ message: 'Failed to schedule password reset email.' });
         }
 
