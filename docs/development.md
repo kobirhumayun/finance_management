@@ -50,6 +50,8 @@ npm run pdf-worker
 ```
 
 The worker listens for jobs published by the API and should stay online alongside Redis when you are testing report exports.
+If your `.env` points Redis at `localhost`, set `PDF_QUEUE_SERVICE_HOST=finance-management-redis` (or the relevant Docker
+service host) so the worker and its healthcheck can reach Redis when running under Docker Compose.
 
 ### Frontend (Next.js)
 

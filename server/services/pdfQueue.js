@@ -8,8 +8,11 @@ const parseRedisUrl = (value) => {
     const redisUrl = value || process.env.PDF_QUEUE_REDIS_URL || process.env.REDIS_URL || 'redis://finance-management-redis:6379';
     const parsed = new URL(redisUrl);
 
+    const preferredContainerHost = process.env.PDF_QUEUE_SERVICE_HOST || 'finance-management-redis';
+    const parsedHostname = parsed.hostname;
+
     const connection = {
-        host: parsed.hostname,
+        host: ['127.0.0.1', 'localhost'].includes(parsedHostname) ? preferredContainerHost : parsedHostname,
         port: Number(parsed.port) || 6379,
         maxRetriesPerRequest: null,
         enableReadyCheck: true,
