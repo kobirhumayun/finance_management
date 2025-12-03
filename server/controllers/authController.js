@@ -51,13 +51,30 @@ const requestPasswordReset = async (req, res, next) => {
         // Optional HTML version
         const html = `<p>Your password reset OTP is: <b>${plainOtp}</b></p><p>It is valid for ${process.env.OTP_EXPIRY_MINUTES || '10'} minutes.</p>`;
 
-        await sendNotification({
+        const notificationPayload = {
             method: 'email', // Specify email method
             user: user,
             subject: subject,
             text: text,
             html: html // Optional
-        });
+        };
+
+        const maxAttempts = 2;
+        let notificationSent = false;
+
+        for (let attempt = 1; attempt <= maxAttempts && !notificationSent; attempt++) {
+            try {
+                await sendNotification(notificationPayload);
+                notificationSent = true;
+            } catch (notificationError) {
+                console.error(`Password reset email attempt ${attempt} failed:`, notificationError);
+            }
+        }
+
+        if (!notificationSent) {
+            await Token.deleteMany({ userId: user._id, type: 'passwordReset' });
+            return res.status(500).json({ message: 'Unable to send password reset email. Please try again later.' });
+        }
 
         // --- Best Practice: Consistent Response ---
         res.status(200).json({ message: 'If an account with that email exists, a password reset OTP has been sent.' });
