@@ -40,7 +40,7 @@ fi
 
 RESTORE_ARGS=(
     --uri="$MONGO_URI"
-    --db="$MONGO_DB"
+    --nsInclude="${MONGO_DB}.*"
     --drop
     --archive="$ARCHIVE_FILE"
 )

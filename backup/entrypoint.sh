@@ -21,7 +21,11 @@ echo "--- Starting Backup Job at ${TIMESTAMP} ---"
 echo "Step 1: Creating MongoDB Dump..."
 mkdir -p /data/dump
 
-DUMP_ARGS=(--uri="$MONGO_URI" --db="$MONGO_DB" --archive="$DUMP_FILE")
+DUMP_ARGS=(
+    --uri="$MONGO_URI"
+    --nsInclude="${MONGO_DB}.*"
+    --archive="$DUMP_FILE"
+)
 
 if [ -n "$MONGODUMP_EXTRA_ARGS" ]; then
     # shellcheck disable=SC2206
