@@ -240,7 +240,7 @@ MONGO_DB=finance_db
 
 ## 3. How to Backup
 
-The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots. The dump prefers `--nsInclude=${MONGO_DB}.*` (avoiding deprecated `--db/--collection` flags); if your bundled MongoDB tools do not support `--nsInclude`, the script falls back to `--db` with a warning. Pass additional `mongodump` options—like extra `--nsInclude` filters to scope specific collections—via `MONGODUMP_EXTRA_ARGS` when invoking the container.
+The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots. The bundled MongoDB tools now support `--nsInclude=${MONGO_DB}.*` by default (avoiding deprecated `--db/--collection` flags). If you still see a fallback warning, you are likely running an older cached image or a custom toolchain—run `docker compose build --no-cache finance-management-backup` or `docker compose pull finance-management-backup` to refresh the image. Pass additional `mongodump` options—like extra `--nsInclude` filters to scope specific collections—via `MONGODUMP_EXTRA_ARGS` when invoking the container.
 
 ### Manual Backup
 - **Ubuntu:**

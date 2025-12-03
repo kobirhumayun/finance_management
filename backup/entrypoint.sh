@@ -28,7 +28,8 @@ if mongodump --help | grep -q -- '--nsInclude'; then
         --archive="$DUMP_FILE"
     )
 else
-    echo "Warning: mongodump does not support --nsInclude. Falling back to deprecated --db flag."
+    TOOL_VERSION=$(mongodump --version 2>/dev/null | head -n 1 || echo "mongodump version unknown")
+    echo "Warning: mongodump does not support --nsInclude (${TOOL_VERSION}). Falling back to deprecated --db flag. Rebuild the finance-management-backup image to refresh MongoDB tools."
     DUMP_ARGS=(
         --uri="$MONGO_URI"
         --db="$MONGO_DB"

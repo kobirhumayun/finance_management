@@ -46,7 +46,8 @@ if mongorestore --help | grep -q -- '--nsInclude'; then
         --archive="$ARCHIVE_FILE"
     )
 else
-    echo "Warning: mongorestore does not support --nsInclude. Falling back to deprecated --db flag."
+    TOOL_VERSION=$(mongorestore --version 2>/dev/null | head -n 1 || echo "mongorestore version unknown")
+    echo "Warning: mongorestore does not support --nsInclude (${TOOL_VERSION}). Falling back to deprecated --db flag. Rebuild the finance-management-backup image to refresh MongoDB tools."
     RESTORE_ARGS=(
         --uri="$MONGO_URI"
         --db="$MONGO_DB"

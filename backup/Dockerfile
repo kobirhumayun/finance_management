@@ -1,7 +1,13 @@
-FROM alpine:latest
+FROM mongo:7.0
 
-# Install dependencies
-RUN apk add --no-cache restic mongodb-tools openssh-client bash dos2unix
+# Install dependencies (mongo image already ships with modern database tools that support --nsInclude)
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        restic \
+        openssh-client \
+        bash \
+        dos2unix \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /data
 
