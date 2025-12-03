@@ -19,16 +19,13 @@ const planLimitsDelegate = {
     },
 };
 
-const playwrightPoolDelegate = {
-    handler: async () => {
-        throw new Error('Playwright pool stub not configured.');
+const pdfQueueDelegate = {
+    enqueue: async () => {
+        throw new Error('PDF queue stub not configured.');
     },
-};
-
-const playwrightPoolModuleStub = {
-    withPage: (...args) => playwrightPoolDelegate.handler(...args),
-    initializePlaywright: async () => {},
-    shutdownPlaywright: async () => {},
+    waitForResult: async () => {
+        throw new Error('PDF queue wait stub not configured.');
+    },
 };
 
 class WorksheetMock {
@@ -93,23 +90,6 @@ before(() => {
                 },
             };
         }
-        if (request === 'playwright') {
-            return {
-                chromium: {
-                    launch: async () => ({
-                        newContext: async () => ({
-                            newPage: async () => ({
-                                setContent: async () => {},
-                                pdf: async () => Buffer.from(''),
-                                close: async () => {},
-                            }),
-                            close: async () => {},
-                        }),
-                        close: async () => {},
-                    }),
-                },
-            };
-        }
         if (request.endsWith('/services/planLimits')) {
             if (normalize(parent?.filename)?.includes('/controllers/reportController')) {
                 return {
@@ -119,12 +99,11 @@ before(() => {
                 };
             }
         }
-        if (
-            request.endsWith('/services/playwrightPool') &&
-            (normalize(parent?.filename)?.includes('/controllers/reportController') ||
-                normalize(parent?.filename)?.includes('reportSummaryExports.test.js'))
-        ) {
-            return playwrightPoolModuleStub;
+        if (request.endsWith('/services/pdfQueue')) {
+            return {
+                enqueueSummaryPdfJob: (...args) => pdfQueueDelegate.enqueue(...args),
+                waitForJobResult: (...args) => pdfQueueDelegate.waitForResult(...args),
+            };
         }
         return originalModuleLoad(request, parent, isMain);
     };
@@ -138,7 +117,6 @@ describe('report summary exports', () => {
     let reportController;
     let Transaction;
     let Project;
-    let playwrightPool;
     let originalAggregate;
     let originalFind;
     let originalProjectFind;
@@ -147,7 +125,6 @@ describe('report summary exports', () => {
         reportController = require('../controllers/reportController');
         Transaction = require('../models/Transaction');
         Project = require('../models/Project');
-        playwrightPool = require('../services/playwrightPool');
     });
 
     beforeEach(() => {
@@ -155,9 +132,6 @@ describe('report summary exports', () => {
         originalFind = Transaction.find;
         originalProjectFind = Project.find;
         createdWorkbooks.splice(0, createdWorkbooks.length);
-        playwrightPoolDelegate.handler = async () => {
-            throw new Error('Playwright pool stub not configured.');
-        };
         planLimitsDelegate.limits = {
             summary: {
                 allowFilters: true,
@@ -165,16 +139,25 @@ describe('report summary exports', () => {
                 allowExport: true,
             },
         };
+        pdfQueueDelegate.enqueue = async () => {
+            throw new Error('PDF queue stub not configured.');
+        };
+        pdfQueueDelegate.waitForResult = async () => {
+            throw new Error('PDF queue wait stub not configured.');
+        };
     });
 
     afterEach(() => {
         Transaction.aggregate = originalAggregate;
         Transaction.find = originalFind;
         Project.find = originalProjectFind;
-        playwrightPoolDelegate.handler = async () => {
-            throw new Error('Playwright pool stub not configured.');
-        };
         createdWorkbooks.splice(0, createdWorkbooks.length);
+        pdfQueueDelegate.enqueue = async () => {
+            throw new Error('PDF queue stub not configured.');
+        };
+        pdfQueueDelegate.waitForResult = async () => {
+            throw new Error('PDF queue wait stub not configured.');
+        };
     });
 
     const createResponseDouble = () => {
@@ -291,20 +274,12 @@ describe('report summary exports', () => {
             },
         });
 
-        let capturedHtml = null;
-        let pdfOptions = null;
-        playwrightPoolDelegate.handler = async (handler) => {
-            const page = {
-                setContent: async (html) => {
-                    capturedHtml = html;
-                },
-                pdf: async (options) => {
-                    pdfOptions = options;
-                    return Buffer.from('pdf-bytes');
-                },
-            };
-            return handler({ page, context: {}, browser: {} });
+        let queuedPayload = null;
+        pdfQueueDelegate.enqueue = async (payload) => {
+            queuedPayload = payload;
+            return { id: 'job-1' };
         };
+        pdfQueueDelegate.waitForResult = async () => Buffer.from('pdf-bytes').toString('base64');
 
         const req = {
             query: {},
@@ -321,9 +296,10 @@ describe('report summary exports', () => {
         assert.equal(res.headers['content-disposition'], 'attachment; filename="summary.pdf"');
         assert.ok(Buffer.isBuffer(res.payload));
         assert.equal(res.payload.toString(), 'pdf-bytes');
-        assert.ok(capturedHtml.includes('Transaction Summary'));
-        assert.ok(capturedHtml.includes('Operations'));
-        assert.deepEqual(pdfOptions, { format: 'A4', printBackground: true });
+        assert.equal(queuedPayload.transactions.length, sampleTransactions.length);
+        assert.equal(queuedPayload.projectBreakdown[0].projectName, 'Operations');
+        assert.equal(queuedPayload.counts.total, 3);
+        assert.ok(typeof queuedPayload.generatedAt === 'string');
     });
 
     test('getSummaryXlsx streams workbook with summary and transactions', async () => {

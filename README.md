@@ -1,7 +1,10 @@
 # Finance Management Docker Deployment
 
 ## Overview
+## Overview
 This repository packages the Finance Management Next.js front end and Express API into a Docker Compose stack that keeps internal dependencies isolated on the private `finance-management_net` while exposing only the `finance-management-web` container to the shared `edge_net`. A centrally managed Nginx reverse proxy (deployed elsewhere on the VPS) owns `edge_net`, publishes ports 80/443, and forwards hostname-based traffic to this application without any host ports opened by the app stack itself. The API shares the private network with MongoDB and Redis but now also joins a second outbound-only bridge that it can use to reach remote MongoDB clusters when `MONGO_URI` points off-box; the web tier proxies API traffic internally so nothing except the browser-facing Next.js server needs to be reachable from the edge.
+
+The stack also includes a dedicated **PDF Generation Service** (`finance-management-pdf`) that runs a headless Chromium browser (Playwright) to generate transaction summary reports. This service is isolated in its own container to manage resource usage (CPU/RAM) independently from the main API.
 
 ## Prerequisites
 - A VPS (or bare-metal host) already running the shared edge Nginx deployment that creates and manages the external `edge_net` network and publishes TCP ports 80 and 443.

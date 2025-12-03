@@ -7,6 +7,12 @@ const launchBrowser = async () => {
     if (!browserPromise) {
         browserPromise = chromium.launch({
             headless: true,
+            args: [
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-gpu',
+            ],
         });
     }
 
@@ -46,8 +52,8 @@ const withPage = async (handler) => {
         return await handler({ browser, context, page });
     } finally {
         await Promise.allSettled([
-            page?.close().catch(() => {}),
-            context?.close().catch(() => {}),
+            page?.close().catch(() => { }),
+            context?.close().catch(() => { }),
         ]);
     }
 };

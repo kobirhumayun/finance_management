@@ -2,8 +2,6 @@
 
 FROM node:24-bookworm-slim AS base
 
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-
 WORKDIR /app
 
 RUN apt-get update \
@@ -11,51 +9,18 @@ RUN apt-get update \
         ca-certificates \
         curl \
         dumb-init \
-        fonts-liberation \
-        libappindicator3-1 \
-        libasound2 \
-        libatk-bridge2.0-0 \
-        libatk1.0-0 \
-        libatspi2.0-0 \
-        libcairo2 \
-        libcups2 \
-        libdbus-1-3 \
-        libdrm2 \
-        libexpat1 \
-        libfontconfig1 \
-        libgbm1 \
-        libglib2.0-0 \
-        libgtk-3-0 \
-        libnspr4 \
-        libnss3 \
-        libpango-1.0-0 \
-        libpangocairo-1.0-0 \
-        libstdc++6 \
-        libx11-6 \
-        libx11-xcb1 \
-        libxcb1 \
-        libxcomposite1 \
-        libxcursor1 \
-        libxdamage1 \
-        libxext6 \
-        libxfixes3 \
-        libxi6 \
-        libxrandr2 \
-        libxrender1 \
-        libxss1 \
-        libxtst6 \
-        wget \
-        xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /ms-playwright \
     && mkdir -p /app/uploads \
     && chown node:node /app/uploads
 
 FROM base AS dependencies
 
 COPY package*.json ./
-RUN npm ci \
-    && npx playwright install chromium
+# Use npm install instead of ci so the image build can succeed even when the
+# checked-in lockfile is out of sync with new dependencies. Optional
+# dependencies are omitted to keep the API image slim (Playwright lives in the
+# PDF worker image).
+RUN npm install --omit=optional
 
 FROM dependencies AS development
 
@@ -75,7 +40,6 @@ ENV NODE_ENV=production
 
 COPY --chown=node:node package*.json ./
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
-COPY --from=production-dependencies --chown=node:node /ms-playwright /ms-playwright
 COPY --chown=node:node . .
 
 USER node

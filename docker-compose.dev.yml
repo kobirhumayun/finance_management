@@ -24,6 +24,21 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${API_PORT:-5000}/healthz || exit 1"]
 
+  finance-management-pdf:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.pdf
+    environment:
+      NODE_ENV: development
+      PDF_QUEUE_REDIS_URL: redis://finance-management-redis:6379
+      PDF_QUEUE_NAME: ${PDF_QUEUE_NAME:-summary-pdf}
+    command: node workers/pdfWorker.js
+    volumes:
+      - ./server:/app
+      - server-node_modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "node /app/workers/pdfHealthcheck.js"]
+
 volumes:
   client-node_modules:
   client-next:

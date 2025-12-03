@@ -7,7 +7,7 @@ This project ships a Next.js frontend located in [`client/`](client) and an Expr
 Before you deploy, make sure the following shared services are available:
 
 - **MongoDB** 5.x or newer.
-- **Redis** 6.x or newer (used by the frontend for coordinating token refresh state).
+- **Redis** 6.x or newer (used by the frontend for coordinating token refresh state and the PDF worker queue).
 - **Email provider** that supports either SMTP credentials or an API key compatible with Nodemailer.
 - **Process manager** such as PM2, Docker, or a platform-as-a-service environment capable of running Node.js 18+.
 
@@ -28,6 +28,9 @@ Populate the copies with the values that match your infrastructure. The tables b
 | --- | --- |
 | `PORT` | Port that the API server should listen on. |
 | `MONGO_URI` | MongoDB connection string pointing at the production database. |
+| `REDIS_URL` | Redis connection string used by the API for queueing PDF work. |
+| `PDF_QUEUE_REDIS_URL` / `PDF_QUEUE_NAME` | Override the Redis endpoint or queue name used by the Playwright worker. Defaults to `REDIS_URL` and `summary-pdf`. |
+| `PDF_JOB_RESPONSE_TIMEOUT_MS` / `PDF_JOB_PROCESS_TIMEOUT_MS` | Optional timeouts controlling how long the API waits for a PDF result and how long the worker is allowed to process a job. |
 | `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` | Random, long secrets for signing JWTs. |
 | `ACCESS_TOKEN_EXPIRY` / `REFRESH_TOKEN_EXPIRY` | Token lifetimes expressed in [zeit/ms](https://github.com/vercel/ms) notation (e.g. `15m`, `7d`). |
 | `EMAIL_PROVIDER` | Choose `smtp` for username/password transports or the identifier of a Nodemailer transport (e.g. `sendgrid`). |
@@ -105,7 +108,7 @@ services:
       - "3000:3000"
 ```
 
-Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
+The default Compose file now includes a `finance-management-pdf` worker that keeps the Playwright browser dependencies out of the API image. Allocate extra memory to this service (the sample uses a 1.5 GB limit) and ensure it can reach Redis. Adjust the configuration to match your orchestration platform. Remember to configure HTTPS termination at the load balancer or reverse proxy layer.
 
 ## 5. Post-deployment checklist
 
