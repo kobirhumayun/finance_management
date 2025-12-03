@@ -30,7 +30,7 @@ services:
       dockerfile: Dockerfile.pdf
     environment:
       NODE_ENV: development
-      PDF_QUEUE_REDIS_URL: ${PDF_QUEUE_REDIS_URL:-redis://finance-management-redis:6379}
+      PDF_QUEUE_REDIS_URL: redis://finance-management-redis:6379
       PDF_QUEUE_NAME: ${PDF_QUEUE_NAME:-summary-pdf}
     command: node workers/pdfWorker.js
     volumes:

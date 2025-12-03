@@ -23,7 +23,7 @@ cd ../client && npm install
    cp server/.env.example server/.env
    cp client/.env.example client/.env.local
    ```
-2. Update the copied files with development-friendly values. Defaults already point to `localhost` services. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
+2. Update the copied files with development-friendly values. Defaults target Docker Compose services (for example, Redis at `redis://finance-management-redis:6379`); when running MongoDB/Redis directly on your host, replace those URLs with the matching `localhost` endpoints. Replace secrets such as `NEXTAUTH_SECRET`, `ACCESS_TOKEN_SECRET`, and `REFRESH_TOKEN_SECRET` with randomly generated strings (`openssl rand -hex 32`).
 3. Ensure MongoDB is running: `mongod --config /usr/local/etc/mongod.conf` (or start the service through your package manager).
 4. (Optional) Start Redis if you want to test token refresh coordination: `redis-server`.
 
@@ -98,6 +98,6 @@ Automate these commands in CI by invoking the workspace scripts explicitly: `npm
 | `MongoNetworkError` during development | Confirm MongoDB is running locally and the URI in `server/.env` is correct. |
 | Password reset emails fail | Use a service like Mailhog locally by setting `EMAIL_HOST=localhost`, `EMAIL_PORT=1025`, and `EMAIL_SECURE=false`. |
 | Next.js cannot reach the API | Verify that `AUTH_BACKEND_URL` points to the backend dev server and that CORS allows `http://localhost:3000`. |
-| Redis connection refused | Either start Redis locally or leave `REDIS_URL` unset during development to fall back to in-memory session coordination. |
+| Redis connection refused | Start Redis locally and point `REDIS_URL`/`PDF_QUEUE_REDIS_URL` at the right host (e.g., `redis://finance-management-redis:6379` in Docker or `redis://localhost:6379` on bare metal). |
 
 Keeping these practices in mind will ensure a smooth development experience across the monorepo.
