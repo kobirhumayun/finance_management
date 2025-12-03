@@ -17,6 +17,7 @@ services:
       target: development
     environment:
       NODE_ENV: development
+      PDF_QUEUE_SERVICE_HOST: finance-management-redis
     command: npm run dev
     volumes:
       - ./server:/app
@@ -32,6 +33,7 @@ services:
       NODE_ENV: development
       PDF_QUEUE_REDIS_URL: redis://finance-management-redis:6379
       PDF_QUEUE_NAME: ${PDF_QUEUE_NAME:-summary-pdf}
+      PDF_QUEUE_SERVICE_HOST: finance-management-redis
     command: node workers/pdfWorker.js
     volumes:
       - ./server:/app

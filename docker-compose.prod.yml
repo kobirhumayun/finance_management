@@ -11,6 +11,7 @@ services:
       target: production
     environment:
       NODE_ENV: production
+      PDF_QUEUE_SERVICE_HOST: finance-management-redis
     command: node server.js
 
   finance-management-pdf:
@@ -18,3 +19,4 @@ services:
       dockerfile: Dockerfile.pdf
     environment:
       NODE_ENV: production
+      PDF_QUEUE_SERVICE_HOST: finance-management-redis

@@ -10,9 +10,10 @@ const parseRedisUrl = (value) => {
 
     const preferredContainerHost = process.env.PDF_QUEUE_SERVICE_HOST || 'finance-management-redis';
     const parsedHostname = parsed.hostname;
+    const isLoopbackHost = ['127.0.0.1', 'localhost', '0.0.0.0', 'host.docker.internal'].includes(parsedHostname);
 
     const connection = {
-        host: ['127.0.0.1', 'localhost'].includes(parsedHostname) ? preferredContainerHost : parsedHostname,
+        host: isLoopbackHost ? preferredContainerHost : parsedHostname,
         port: Number(parsed.port) || 6379,
         maxRetriesPerRequest: null,
         enableReadyCheck: true,
