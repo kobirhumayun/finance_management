@@ -15,9 +15,9 @@ The stack also includes a dedicated **PDF Generation Service** (`finance-managem
    - `.env.local.template` &rarr; `.env` for local development or hot reload workflows (e.g., `docker compose --profile localdb up`).
    - `.env.production.template` &rarr; `.env` for staging/production deployments.
    - `.env.example` is the canonical checklist of every supported variable; consult it when you need knobs that are not pre-filled in the templates above.
-2. Each template includes two `MONGO_URI` examples under the “Backend configuration” section:
-   - The first line points at the bundled MongoDB container (`finance-management-db`) and should stay uncommented when you want Compose to spin up the local database.
-   - The second line shows an external MongoDB Atlas (or any other cluster) URI. Uncomment that line and comment/remove the local URI when you need to target an outside database; update the hostname, username, and password to match your cluster.
+2. Each template includes configuration for the MongoDB connection:
+   - **Local Database**: The default `MONGO_URI` points to the bundled `finance-management-db` container.
+   - **External Database**: To use an external cluster (e.g., MongoDB Atlas), comment out the local URI and uncomment the external URI example. Update the credentials and hostname accordingly.
    - **Important**: The `MONGO_URI` should **not** include the database name. The database name is configured separately via `MONGO_DB_NAME`.
 3. Fill in the remaining runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
 4. Keep `.env` private—never commit it to source control.
@@ -234,6 +234,10 @@ MONGO_URI=mongodb://root:example@finance-management-db:27017/?authSource=admin
 
 # Database Name
 MONGO_DB_NAME=finance_db
+
+# Restore Configuration (Optional)
+# RESTORE_SOURCE_DB=finance_management
+# RESTORE_TARGET_DB=finance_db
 ```
 
 ---
@@ -242,7 +246,7 @@ MONGO_DB_NAME=finance_db
 
 The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots.
 
-### Manual Backup (Windows & Linux)
+### Manual Backup
 Run this command anytime to trigger an immediate backup:
 
 ```bash
@@ -264,42 +268,42 @@ Set up a cron job to run nightly (e.g., at 3 AM).
 
 ⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the selected backup.
 
-### Option A: Restore on Ubuntu VPS (Production)
-Use the standard restoration command (restores the latest snapshot):
+### Restoring the Latest Snapshot (Default)
+This is the most common restore operation. It restores the most recent snapshot available in the repository.
 
+**On Linux/Mac/VPS:**
 ```bash
 docker compose run --rm --entrypoint /restore.sh finance-management-backup
 ```
 
-To list available snapshots:
+**On Windows (Git Bash):**
+You must use a double slash `//` for the script path to prevent Git Bash path conversion errors.
+```bash
+docker compose run --rm --entrypoint //restore.sh finance-management-backup
+```
+
+### Advanced Restore Options
+
+#### List Available Snapshots
+To see a list of all available snapshots with their IDs and timestamps:
 
 ```bash
 docker compose run --rm --entrypoint "/restore.sh --list" finance-management-backup
 ```
 
-To restore a specific snapshot:
+#### Restore a Specific Snapshot
+To restore a specific snapshot by its ID (obtained from the list command):
 
 ```bash
 docker compose run --rm --entrypoint "/restore.sh --snapshot <snapshot_id>" finance-management-backup
 ```
 
-To restore to a different database (e.g., for testing):
+#### Restore to a Different Database
+Useful for testing or verifying a backup without overwriting the production database. You can specify the source database name (in the backup) and the target database name (to restore to).
 
 ```bash
-docker compose run --rm --entrypoint "/restore.sh --snapshot <id> finance_management finance_management_test" finance-management-backup
-```
-
-### Option B: Restore on Windows (Git Bash)
-You must use a double slash `//` for the script path to prevent Git Bash path conversion errors:
-
-```bash
-docker compose run --rm --entrypoint //restore.sh finance-management-backup
-```
-
-List snapshots:
-
-```bash
-docker compose run --rm --entrypoint "//restore.sh --list" finance-management-backup
+# Format: /restore.sh --snapshot <id> <source_db_name> <target_db_name>
+docker compose run --rm --entrypoint "/restore.sh --snapshot latest finance_management finance_management_test" finance-management-backup
 ```
 
 ---
