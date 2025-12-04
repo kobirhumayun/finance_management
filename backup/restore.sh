@@ -27,12 +27,33 @@ if [ -z "$ARCHIVE_FILE" ]; then
     exit 1
 fi
 
+# Detect the original database name from the archive
+echo "--> Detecting original database name..."
+# Run a dry run to list namespaces. We capture stderr because mongorestore logs there.
+# We look for "restoring <db>.<collection>" lines.
+# Example: "restoring finance.users from ..."
+SOURCE_DB=$(mongorestore --archive="$ARCHIVE_FILE" --dryRun --verbose 2>&1 | grep -oE "restoring [^ ]+\.[^ ]+" | head -n 1 | awk '{print $2}' | cut -d. -f1)
+
+if [ -z "$SOURCE_DB" ]; then
+    echo "Warning: Could not detect source database name. Attempting fallback detection..."
+    # Another try: just list the archive content
+    SOURCE_DB=$(mongorestore --archive="$ARCHIVE_FILE" --dryRun 2>&1 | grep -m 1 "restoring" | awk '{print $2}' | cut -d. -f1)
+fi
+
+if [ -z "$SOURCE_DB" ]; then
+    echo "Error: Could not determine source database name from archive. Cannot perform safe rename."
+    exit 1
+fi
+
+echo "Detected source database: $SOURCE_DB"
+echo "Target database: $MONGO_DB_NAME"
+
 mongorestore \
     --uri="$MONGO_URI" \
     --drop \
     --archive="$ARCHIVE_FILE" \
-    --nsInclude="*.*" \
-    --nsFrom="*.*" \
+    --nsInclude="${SOURCE_DB}.*" \
+    --nsFrom="${SOURCE_DB}.*" \
     --nsTo="${MONGO_DB_NAME}.*"
 
 # 3. Restore Uploads
