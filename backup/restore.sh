@@ -44,16 +44,26 @@ mongorestore --archive="$ARCHIVE_FILE" --dryRun --verbose > /tmp/dryrun.log 2>&1
 SOURCE_DB=$(grep -oE "restoring [^ ]+\.[^ ]+" /tmp/dryrun.log | head -n 1 | awk '{print $2}' | cut -d. -f1)
 
 if [ -z "$SOURCE_DB" ]; then
-    # Fallback: Look for "reading metadata for <db>.<collection>"
+    # Fallback 1: Look for "reading metadata for <db>.<collection>"
     SOURCE_DB=$(grep -oE "reading metadata for [^ ]+\.[^ ]+" /tmp/dryrun.log | head -n 1 | awk '{print $4}' | cut -d. -f1)
 fi
 
 if [ -z "$SOURCE_DB" ]; then
-    echo "Error: Could not detect source database name from archive."
+    # Fallback 2: Look for "restoring users from <db>.users" or similar patterns if format differs
+    # Or just look for any "db.collection" pattern that isn't a system one
+    SOURCE_DB=$(grep -oE " [a-zA-Z0-9_]+\.[a-zA-Z0-9_]+ " /tmp/dryrun.log | grep -v "admin." | grep -v "local." | grep -v "config." | head -n 1 | awk '{print $1}' | cut -d. -f1)
+fi
+
+if [ -z "$SOURCE_DB" ]; then
+    echo "Warning: Could not detect source database name from archive."
     echo "--- Start of Dry Run Output ---"
     cat /tmp/dryrun.log
     echo "--- End of Dry Run Output ---"
-    exit 1
+    
+    # Fallback to a default if we can't detect it, to avoid total failure if the user knows what they are doing.
+    # We can try to assume it's the same as MONGO_DB_NAME if we are lucky, or 'finance_management' as it's the project default.
+    echo "Attempting fallback to default 'finance_management'..."
+    SOURCE_DB="finance_management"
 fi
 
 echo "Detected source database: $SOURCE_DB"
