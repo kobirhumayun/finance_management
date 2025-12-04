@@ -7,6 +7,13 @@ echo "  This will DELETE existing data and replace it with"
 echo "            the latest backup snapshot."
 echo "======================================================="
 
+# Check if MONGO_DB_NAME is set
+if [ -z "$MONGO_DB_NAME" ]; then
+    echo "Error: MONGO_DB_NAME is not set in the environment."
+    echo "Please add MONGO_DB_NAME=your_db_name to your .env file."
+    exit 1
+fi
+
 # Safety mechanism: Wait 5 seconds to allow abort (Ctrl+C)
 echo "Starting in 5 seconds... (Press Ctrl+C to cancel)"
 sleep 5
@@ -29,19 +36,23 @@ fi
 
 # Detect the original database name from the archive
 echo "--> Detecting original database name..."
-# Run a dry run to list namespaces. We capture stderr because mongorestore logs there.
-# We look for "restoring <db>.<collection>" lines.
-# Example: "restoring finance.users from ..."
-SOURCE_DB=$(mongorestore --archive="$ARCHIVE_FILE" --dryRun --verbose 2>&1 | grep -oE "restoring [^ ]+\.[^ ]+" | head -n 1 | awk '{print $2}' | cut -d. -f1)
+# Run a dry run and capture output to a file for debugging
+mongorestore --archive="$ARCHIVE_FILE" --dryRun --verbose > /tmp/dryrun.log 2>&1
+
+# Try to find "restoring <db>.<collection>"
+# Example line: "2023-10-27T10:00:00.000+0000 restoring my_db.my_collection from archive '...'"
+SOURCE_DB=$(grep -oE "restoring [^ ]+\.[^ ]+" /tmp/dryrun.log | head -n 1 | awk '{print $2}' | cut -d. -f1)
 
 if [ -z "$SOURCE_DB" ]; then
-    echo "Warning: Could not detect source database name. Attempting fallback detection..."
-    # Another try: just list the archive content
-    SOURCE_DB=$(mongorestore --archive="$ARCHIVE_FILE" --dryRun 2>&1 | grep -m 1 "restoring" | awk '{print $2}' | cut -d. -f1)
+    # Fallback: Look for "reading metadata for <db>.<collection>"
+    SOURCE_DB=$(grep -oE "reading metadata for [^ ]+\.[^ ]+" /tmp/dryrun.log | head -n 1 | awk '{print $4}' | cut -d. -f1)
 fi
 
 if [ -z "$SOURCE_DB" ]; then
-    echo "Error: Could not determine source database name from archive. Cannot perform safe rename."
+    echo "Error: Could not detect source database name from archive."
+    echo "--- Start of Dry Run Output ---"
+    cat /tmp/dryrun.log
+    echo "--- End of Dry Run Output ---"
     exit 1
 fi
 
