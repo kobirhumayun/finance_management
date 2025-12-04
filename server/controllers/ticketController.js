@@ -411,6 +411,17 @@ const addComment = async (req, res, next) => {
 
         await ticket.save();
 
+        const actorName = await resolveActorName(req.user);
+        const subjectLine = `New response on ticket: ${ticket.subject}`;
+        const message = `New response from ${actorName}:\n\n${comment || '(Attachment only)'}`;
+
+        await notifyTicketParticipants({
+            ticket,
+            subject: subjectLine,
+            text: message,
+            excludeUserId: req.user._id,
+        });
+
         const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
 
         res.status(200).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });

@@ -35,7 +35,14 @@ const notifyUsers = async (users, subject, text) => {
     );
 };
 
-const notifyTicketParticipants = async ({ ticket, subject, text, includeRequester = true, includeAssignee = true }) => {
+const notifyTicketParticipants = async ({
+    ticket,
+    subject,
+    text,
+    includeRequester = true,
+    includeAssignee = true,
+    excludeUserId = null,
+}) => {
     try {
         const recipientIds = [];
 
@@ -47,7 +54,12 @@ const notifyTicketParticipants = async ({ ticket, subject, text, includeRequeste
             recipientIds.push(ticket.assignee);
         }
 
-        const recipients = await fetchUsersByIds(recipientIds);
+        // Filter out the excluded user (e.g., the one who performed the action)
+        const filteredRecipientIds = excludeUserId
+            ? recipientIds.filter((id) => id.toString() !== excludeUserId.toString())
+            : recipientIds;
+
+        const recipients = await fetchUsersByIds(filteredRecipientIds);
         if (!recipients.length) {
             return false;
         }
