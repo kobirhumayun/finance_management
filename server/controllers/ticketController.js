@@ -236,7 +236,7 @@ const createTicket = async (req, res, next) => {
         const actorName = await resolveActorName(req.user);
         const subjectLine = `Ticket created: ${ticket.subject}`;
         const message = `Ticket "${ticket.subject}" was created by ${actorName}. We will notify you on further updates.`;
-        await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
+        notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
         const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
         res.status(201).json({ ticket: mappedTickets[0], users, attachmentLimitBytes: getUploadFileSizeLimit() });
@@ -415,7 +415,7 @@ const addComment = async (req, res, next) => {
         const subjectLine = `New response on ticket: ${ticket.subject}`;
         const message = `New response from ${actorName}:\n\n${comment || '(Attachment only)'}`;
 
-        await notifyTicketParticipants({
+        notifyTicketParticipants({
             ticket,
             subject: subjectLine,
             text: message,
@@ -454,7 +454,7 @@ const updateStatus = async (req, res, next) => {
         const actorName = await resolveActorName(req.user);
         const subjectLine = `Ticket status updated: ${ticket.subject}`;
         const message = `Status for ticket "${ticket.subject}" updated to ${status} by ${actorName}.`;
-        await notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
+        notifyTicketParticipants({ ticket, subject: subjectLine, text: message });
 
         const { tickets: mappedTickets, users } = await mapTicketsWithUsers([ticket]);
 
