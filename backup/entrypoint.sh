@@ -10,7 +10,7 @@ echo "--- Starting Backup Job at ${TIMESTAMP} ---"
 # 1. Dump MongoDB
 echo "Step 1: Creating MongoDB Dump..."
 mkdir -p /data/dump
-mongodump --uri="$MONGO_URI" --archive="$DUMP_FILE"
+mongodump --uri="$MONGO_URI" --db="$MONGO_DB_NAME" --archive="$DUMP_FILE"
 
 # 2. Initialize Restic Repo (if it doesn't exist)
 if ! restic snapshots > /dev/null 2>&1; then

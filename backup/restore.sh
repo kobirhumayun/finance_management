@@ -30,7 +30,10 @@ fi
 mongorestore \
     --uri="$MONGO_URI" \
     --drop \
-    --archive="$ARCHIVE_FILE"
+    --archive="$ARCHIVE_FILE" \
+    --nsInclude="*.*" \
+    --nsFrom="*.*" \
+    --nsTo="${MONGO_DB_NAME}.*"
 
 # 3. Restore Uploads
 echo "--> Step 3: Restoring User Uploads..."
