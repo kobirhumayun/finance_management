@@ -54,6 +54,7 @@ services:
       - .env
     environment:
       MONGO_URI: ${MONGO_URI}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${API_PORT:-5000}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
@@ -130,7 +131,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
     volumes:
       - finance-management-mongo-data:/data/db
     restart: unless-stopped
@@ -190,6 +191,7 @@ services:
       - .env
     environment:
       MONGO_URI: ${MONGO_URI}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
       RESTIC_PASSWORD: ${RESTIC_PASSWORD}
       RESTIC_REPOSITORY: "/repo"
     volumes:

@@ -1,7 +1,6 @@
 # Finance Management Docker Deployment
 
 ## Overview
-## Overview
 This repository packages the Finance Management Next.js front end and Express API into a Docker Compose stack that keeps internal dependencies isolated on the private `finance-management_net` while exposing only the `finance-management-web` container to the shared `edge_net`. A centrally managed Nginx reverse proxy (deployed elsewhere on the VPS) owns `edge_net`, publishes ports 80/443, and forwards hostname-based traffic to this application without any host ports opened by the app stack itself. The API shares the private network with MongoDB and Redis but now also joins a second outbound-only bridge that it can use to reach remote MongoDB clusters when `MONGO_URI` points off-box; the web tier proxies API traffic internally so nothing except the browser-facing Next.js server needs to be reachable from the edge.
 
 The stack also includes a dedicated **PDF Generation Service** (`finance-management-pdf`) that runs a headless Chromium browser (Playwright) to generate transaction summary reports. This service is isolated in its own container to manage resource usage (CPU/RAM) independently from the main API.
@@ -16,9 +15,10 @@ The stack also includes a dedicated **PDF Generation Service** (`finance-managem
    - `.env.local.template` &rarr; `.env` for local development or hot reload workflows (e.g., `docker compose --profile localdb up`).
    - `.env.production.template` &rarr; `.env` for staging/production deployments.
    - `.env.example` is the canonical checklist of every supported variable; consult it when you need knobs that are not pre-filled in the templates above.
-2. Each template includes two `MONGO_URI` examples under the “Backend configuration” section:
-   - The first line points at the bundled MongoDB container (`finance-management-db`) and should stay uncommented when you want Compose to spin up the local database.
-   - The second line shows an external MongoDB Atlas (or any other cluster) URI. Uncomment that line and comment/remove the local URI when you need to target an outside database; update the hostname, username, and password to match your cluster.
+2. Each template includes configuration for the MongoDB connection:
+   - **Local Database**: The default `MONGO_URI` points to the bundled `finance-management-db` container.
+   - **External Database**: To use an external cluster (e.g., MongoDB Atlas), comment out the local URI and uncomment the external URI example. Update the credentials and hostname accordingly.
+   - **Important**: The `MONGO_URI` should **not** include the database name. The database name is configured separately via `MONGO_DB_NAME`.
 3. Fill in the remaining runtime secrets (MongoDB credentials, JWT secrets, NextAuth secret, SMTP credentials, etc.) and adjust domains and URLs for your environment.
 4. Keep `.env` private—never commit it to source control.
 
@@ -219,6 +219,7 @@ This project uses a containerized **Restic** solution for efficient, chunk-based
 ### Environment Variables (.env)
 Add these variables to your `.env` file on both your local machine and VPS:
 
+```bash
 # --- BACKUP CONFIGURATION ---
 # Secure password to encrypt the backup repository (Keep this safe!)
 RESTIC_PASSWORD="change_this_to_a_very_secure_password"
@@ -228,8 +229,16 @@ RESTIC_PASSWORD="change_this_to_a_very_secure_password"
 RESTIC_REPOSITORY="/repo"
 
 # Database Connection String (Ensure this matches your environment)
-MONGO_URI=mongodb://root:example@finance-management-db:27017/finance_db?authSource=admin
+# Note: Do NOT include the database name here.
+MONGO_URI=mongodb://root:example@finance-management-db:27017/?authSource=admin
 
+# Database Name
+MONGO_DB_NAME=finance_db
+
+# Restore Configuration (Optional)
+# RESTORE_SOURCE_DB=finance_management
+# RESTORE_TARGET_DB=finance_db
+```
 
 ---
 
@@ -237,37 +246,65 @@ MONGO_URI=mongodb://root:example@finance-management-db:27017/finance_db?authSour
 
 The backup container is a "one-off" task. It dumps the DB, pushes changes to Restic, and prunes old snapshots.
 
-### Manual Backup (Windows & Linux)
+### Manual Backup
 Run this command anytime to trigger an immediate backup:
 
+```bash
 docker compose run --rm finance-management-backup
-
+```
 
 ### Automated Backup (Ubuntu VPS)
 Set up a cron job to run nightly (e.g., at 3 AM).
 1. Run `crontab -e`
 2. Add the following line:
 
+```bash
 0 3 * * * cd /path/to/finance_management && docker compose run --rm finance-management-backup >> /var/log/backup.log 2>&1
-
+```
 
 ---
 
 ## 4. How to Restore (Disaster Recovery)
 
-⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the latest backup.
+⚠️ **WARNING:** These commands will DELETE your current database and uploads, replacing them with the selected backup.
 
-### Option A: Restore on Ubuntu VPS (Production)
-Use the standard restoration command:
+### Restoring the Latest Snapshot (Default)
+This is the most common restore operation. It restores the most recent snapshot available in the repository.
 
+**On Linux/Mac/VPS:**
+```bash
 docker compose run --rm --entrypoint /restore.sh finance-management-backup
+```
 
-
-### Option B: Restore on Windows (Git Bash)
-You must use a double slash `//` for the script path to prevent Git Bash path conversion errors:
-
+**On Windows (Git Bash):**
+You must use a double slash `//` for the script path to prevent Git Bash path conversion errors.
+```bash
 docker compose run --rm --entrypoint //restore.sh finance-management-backup
+```
 
+### Advanced Restore Options
+
+#### List Available Snapshots
+To see a list of all available snapshots with their IDs and timestamps:
+
+```bash
+docker compose run --rm --entrypoint "/restore.sh --list" finance-management-backup
+```
+
+#### Restore a Specific Snapshot
+To restore a specific snapshot by its ID (obtained from the list command):
+
+```bash
+docker compose run --rm --entrypoint "/restore.sh --snapshot <snapshot_id>" finance-management-backup
+```
+
+#### Restore to a Different Database
+Useful for testing or verifying a backup without overwriting the production database. You can specify the source database name (in the backup) and the target database name (to restore to).
+
+```bash
+# Format: /restore.sh --snapshot <id> <source_db_name> <target_db_name>
+docker compose run --rm --entrypoint "/restore.sh --snapshot latest finance_management finance_management_test" finance-management-backup
+```
 
 ---
 
@@ -278,11 +315,14 @@ Use `rsync` to transfer the backup repository between your local machine and the
 ### Download Backups (VPS -> Local)
 Run this in Git Bash on Windows to pull production backups to your machine:
 
+```bash
 mkdir -p backups
 rsync -avz -e ssh user@your-vps-ip:/path/to/project/backups/ ./backups/
-
+```
 
 ### Upload Backups (Local -> VPS)
 Run this in Git Bash on Windows to push your local backups to the server (for restoration):
 
+```bash
 rsync -avz -e ssh ./backups/ user@your-vps-ip:/path/to/project/backups/
+```

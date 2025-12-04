@@ -47,6 +47,7 @@ const connectDB = async () => {
                 );
 
                 const conn = await mongoose.connect(mongoUri, {
+                    dbName: process.env.MONGO_DB_NAME,
                     // Mongoose 6 defaults are generally good.
                     // autoIndex: true, // Consider 'false' in production for performance, manage indexes manually.
                     // bufferCommands: true, // Default, useful but can hide connection issues.
