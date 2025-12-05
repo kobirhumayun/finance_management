@@ -325,45 +325,22 @@ export default function AddTransactionDialog({
                   ? `Currently stored: ${existingAttachment.filename || "Attachment"} (${formatFileSize(existingAttachment.size, {
                     fallback: "unknown size",
                   })})`
-                  : `PNG, JPG, WebP, or PDF up to ${formatFileSize(resolvedMaxAttachmentBytes)}.`}
-            </p>
-            {removeExistingAttachment && !attachmentFile ? (
-              <p className="text-xs text-muted-foreground">The current attachment will be removed when you save.</p>
-            ) : null}
-            {attachmentError ? <p className="text-sm text-destructive">{attachmentError}</p> : null}
-            {(attachmentPreview || showPdfPlaceholder || (existingAttachmentUrl && !attachmentFile && !removeExistingAttachment)) && (
-              <div className="overflow-hidden rounded-lg border bg-muted/20">
-                {showPdfPlaceholder ? (
-                  <div className="flex h-48 items-center justify-center bg-gray-50 text-gray-400">
-                    <div className="text-center">
-                      <span className="block text-2xl font-bold">PDF</span>
-                      <span className="text-xs">
-                        {attachmentFile?.name || existingAttachment?.filename}
-                      </span>
-                    </div>
-                  </div>
-                ) : attachmentPreview ? (
-                  <img src={attachmentPreview} alt="Selected transaction attachment" className="max-h-48 w-full object-contain" />
-                ) : !isPdf(null, existingAttachment) ? (
-                  <img
-                    src={existingAttachmentUrl}
-                    alt={existingAttachment?.filename || "Stored attachment"}
                     className="max-h-48 w-full object-contain"
                   />
                 ) : null}
-              </div>
-            )}
           </div>
-        </form>
-        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" form="add-transaction-form" className="w-full sm:w-auto" disabled={isSaving}>
-            {isSaving ? "Saving..." : isEditMode ? "Update Transaction" : "Save Transaction"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            )}
+        </div>
+      </form>
+      <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button type="submit" form="add-transaction-form" className="w-full sm:w-auto" disabled={isSaving}>
+          {isSaving ? "Saving..." : isEditMode ? "Update Transaction" : "Save Transaction"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+    </Dialog >
   );
 }

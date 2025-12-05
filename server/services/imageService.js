@@ -168,29 +168,26 @@ const savePassThroughFile = async ({ file, scopeSegments }) => {
     });
 };
 
-const saveTransactionAttachment = async ({ file, userId, projectId }) => {
+const saveSmartAttachment = async ({ file, scopeSegments, maxDimension = DEFAULT_MAX_DIMENSION }) => {
     const mimeType = getMimeType(file);
-    const baseOptions = {
-        scopeSegments: ['transactions', sanitizeSegment(userId), sanitizeSegment(projectId)],
-    };
+    const baseOptions = { scopeSegments };
 
     if (isImageMimeType(mimeType)) {
-        return saveImage({ ...baseOptions, file, maxDimension: DEFAULT_MAX_DIMENSION });
+        return saveImage({ ...baseOptions, file, maxDimension });
     }
 
     return savePassThroughFile({ ...baseOptions, file });
 };
 
-const saveTicketAttachment = async ({ file, userId, ticketId }) => {
-    const mimeType = getMimeType(file);
-    const baseOptions = { scopeSegments: ['tickets', sanitizeSegment(userId), sanitizeSegment(ticketId)] };
+const saveTransactionAttachment = async ({ file, userId, projectId }) => saveSmartAttachment({
+    file,
+    scopeSegments: ['transactions', sanitizeSegment(userId), sanitizeSegment(projectId)],
+});
 
-    if (isImageMimeType(mimeType)) {
-        return saveImage({ ...baseOptions, file, maxDimension: DEFAULT_MAX_DIMENSION });
-    }
-
-    return savePassThroughFile({ ...baseOptions, file });
-};
+const saveTicketAttachment = async ({ file, userId, ticketId }) => saveSmartAttachment({
+    file,
+    scopeSegments: ['tickets', sanitizeSegment(userId), sanitizeSegment(ticketId)],
+});
 
 const saveProfileImage = async ({ file, userId }) => saveImage({
     file,
