@@ -40,7 +40,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
 
   const filename = attachment?.filename || "Attachment";
   const mimeType = attachment?.mimeType || "";
-  const isPdf = mimeType === "application/pdf" || filename.toLowerCase().endsWith(".pdf");
+  const isPdf = mimeType === "application/pdf" || filename.trim().toLowerCase().endsWith(".pdf");
 
   const uploadedAtLabel = isPending ? "Processing..." : formatDateTime(attachment?.uploadedAt);
   const sizeLabel = isPending ? "Processing..." : formatFileSize(attachment?.size, { fallback: "—" });

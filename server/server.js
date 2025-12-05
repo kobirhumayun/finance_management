@@ -28,7 +28,23 @@ const port = process.env.PORT || 5000;
 
 const app = express();
 // Secure HTTP headers
-app.use(helmet());
+app.use(
+    helmet({
+        contentSecurityPolicy: {
+            useDefaults: true,
+            directives: {
+                "default-src": ["'self'"],
+                "img-src": ["'self'", "https:", "data:", "blob:"],
+                "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+                "style-src": ["'self'", "https:", "'unsafe-inline'"],
+                "font-src": ["'self'", "https:", "data:"],
+                "object-src": ["'self'"], // Allowed for PDF viewer
+                "frame-src": ["'self'"], // Allowed for iframes
+            },
+        },
+        crossOriginEmbedderPolicy: false,
+    })
+);
 
 // Middleware
 app.use(
