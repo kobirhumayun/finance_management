@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
+import PdfViewer from "@/components/shared/pdf-viewer";
 
 const formatDateTime = (value) => {
   if (!value) return null;
@@ -87,11 +88,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
               </div>
             ) : resolvedUrl && !imageError ? (
               isPdf ? (
-                <iframe
-                  src={resolvedUrl}
-                  className="h-[600px] w-full rounded-lg border bg-white"
-                  title={filename}
-                />
+                <PdfViewer url={resolvedUrl} />
               ) : (
                 <img
                   src={resolvedUrl}
