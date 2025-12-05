@@ -221,17 +221,17 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
   const roleTheme = getRoleTheme(roleLabel);
 
   return (
-    <div className={`flex gap-3 ${roleTheme.container}`}>
-      <Avatar className={`mt-1 h-9 w-9 ${roleTheme.avatar}`} style={roleTheme.avatarStyle}>
-        <AvatarFallback>{getInitials(actorName)}</AvatarFallback>
+    <div className={`flex gap-3 sm:gap-4 ${roleTheme.container}`}>
+      <Avatar className={`mt-1 h-8 w-8 sm:h-9 sm:w-9 ${roleTheme.avatar}`} style={roleTheme.avatarStyle}>
+        <AvatarFallback className="text-xs sm:text-sm">{getInitials(actorName)}</AvatarFallback>
       </Avatar>
-      <div className={`flex-1 space-y-3 ${roleTheme.contentAlignment}`}>
+      <div className={`flex-1 min-w-0 space-y-2 sm:space-y-3 ${roleTheme.contentAlignment}`}>
         <div className={`flex flex-wrap items-center gap-2 ${roleTheme.headerAlignment}`}>
-          <p className="text-sm font-semibold leading-none text-foreground">{actorName}</p>
+          <p className="text-sm font-semibold leading-none text-foreground truncate max-w-[150px] sm:max-w-none">{actorName}</p>
           {roleLabel === "Requester" && actorBatch ? (
             <Badge
               variant="outline"
-              className={`text-[11px] ${roleTheme.badge}`}
+              className={`text-[10px] sm:text-[11px] px-1.5 py-0 ${roleTheme.badge}`}
               style={roleTheme.badgeStyle}
             >
               Batch {actorBatch}
@@ -239,15 +239,15 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
           ) : null}
           <Badge
             variant="outline"
-            className={`text-[11px] capitalize ${roleTheme.badge}`}
+            className={`text-[10px] sm:text-[11px] px-1.5 py-0 capitalize ${roleTheme.badge}`}
             style={roleTheme.badgeStyle}
           >
             {roleLabel}
           </Badge>
           <span
-            className={`flex items-center gap-1 text-xs text-muted-foreground ${roleTheme.headerMetaAlignment}`}
+            className={`flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground ${roleTheme.headerMetaAlignment}`}
           >
-            <CalendarClock className="h-3.5 w-3.5" />
+            <CalendarClock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             {formatDateTime(event.at)}
           </span>
         </div>
@@ -255,11 +255,11 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
           <div
             className={`mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground ${roleTheme.contentAlignment}`}
           >
-            <Icon className="h-4 w-4" style={roleTheme.iconStyle} />
+            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={roleTheme.iconStyle} />
             {label}
           </div>
           {event.message ? (
-            <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">{event.message}</p>
+            <p className="text-sm leading-relaxed text-foreground whitespace-pre-line break-words">{event.message}</p>
           ) : null}
           {event.action === "description" ? (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -269,7 +269,7 @@ const ConversationMessage = ({ event, ticket, onDownloadAttachment, onViewAttach
           ) : null}
         </div>
         {attachments.length ? (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full max-w-full">
             {attachments.map((attachment) => (
               <AttachmentCard
                 key={attachment.id || attachment.url}

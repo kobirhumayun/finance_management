@@ -28,10 +28,10 @@ export default function UserLayout({ children }) {
         onMobileOpenChange={setMobileOpen}
         footer={<div className="px-4 pb-4 text-xs text-muted-foreground">Need more features? Visit the Pricing page.</div>}
       />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Header variant="dashboard" onMenuClick={() => setMobileOpen(true)} />
         <Separator className="hidden lg:block" />
-        <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">{children}</main>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

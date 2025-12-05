@@ -38,14 +38,16 @@ function TicketListItem({ ticket, ticketLinkPrefix }) {
       href={`${ticketLinkPrefix}/${ticket.id}`}
       className="block rounded-lg border bg-card p-4 transition hover:border-primary/60 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="flex items-start gap-4">
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-base font-semibold leading-tight text-foreground line-clamp-1">{ticket.subject}</p>
-            <TicketStatusBadge status={ticket.status} />
+            <div className="self-start sm:self-auto">
+              <TicketStatusBadge status={ticket.status} />
+            </div>
           </div>
           <p className="text-sm text-muted-foreground line-clamp-2">{ticket.description || "No description provided."}</p>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="font-medium capitalize">Priority: {ticket.priority}</span>
             {ticket.category ? <span>Category: {ticket.category}</span> : null}
             <span>Updated {formatDate(ticket.updatedAt)}</span>
@@ -136,8 +138,8 @@ export default function TicketListPage({
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
+        <CardContent className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <div className="space-y-2 sm:col-span-2 md:col-span-1">
             <Label htmlFor="ticket-search">Search</Label>
             <div className="relative">
               <Input
