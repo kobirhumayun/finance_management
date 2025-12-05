@@ -161,7 +161,7 @@ export default function TransactionTable({
                           onClick={() => openAttachmentDialog(transaction)}
                           disabled={!attachmentsFeatureEnabled || !transaction?.attachment}
                         >
-                          {transaction?.attachment?.isPending ? "Processing..." : "View image"}
+                          {transaction?.attachment?.isPending ? "Processing..." : "View attachment"}
                         </Button>
                         <Button
                           variant="outline"
@@ -259,7 +259,7 @@ export default function TransactionTable({
                     onClick={() => openAttachmentDialog(transaction)}
                     disabled={!attachmentsFeatureEnabled || !transaction?.attachment}
                   >
-                    {transaction?.attachment?.isPending ? "Processing attachment" : "View image"}
+                    {transaction?.attachment?.isPending ? "Processing attachment" : "View attachment"}
                   </Button>
                   <Button
                     variant="outline"

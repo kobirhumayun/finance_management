@@ -168,11 +168,18 @@ const savePassThroughFile = async ({ file, scopeSegments }) => {
     });
 };
 
-const saveTransactionAttachment = async ({ file, userId, projectId }) => saveImage({
-    file,
-    scopeSegments: ['transactions', sanitizeSegment(userId), sanitizeSegment(projectId)],
-    maxDimension: DEFAULT_MAX_DIMENSION,
-});
+const saveTransactionAttachment = async ({ file, userId, projectId }) => {
+    const mimeType = getMimeType(file);
+    const baseOptions = {
+        scopeSegments: ['transactions', sanitizeSegment(userId), sanitizeSegment(projectId)],
+    };
+
+    if (isImageMimeType(mimeType)) {
+        return saveImage({ ...baseOptions, file, maxDimension: DEFAULT_MAX_DIMENSION });
+    }
+
+    return savePassThroughFile({ ...baseOptions, file });
+};
 
 const saveTicketAttachment = async ({ file, userId, ticketId }) => {
     const mimeType = getMimeType(file);
