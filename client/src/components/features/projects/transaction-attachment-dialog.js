@@ -39,6 +39,9 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
   }, [resolvedUrl, transaction?.id]);
 
   const filename = attachment?.filename || "Attachment";
+  const mimeType = attachment?.mimeType || "";
+  const isPdf = mimeType === "application/pdf" || filename.toLowerCase().endsWith(".pdf");
+
   const uploadedAtLabel = isPending ? "Processing..." : formatDateTime(attachment?.uploadedAt);
   const sizeLabel = isPending ? "Processing..." : formatFileSize(attachment?.size, { fallback: "—" });
   const dimensionsLabel = attachment?.width && attachment?.height
@@ -49,7 +52,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
 
   return (
     <Dialog open={showDialog} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[calc(100vh-2rem)] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{transaction?.subcategory || "Transaction attachment"}</DialogTitle>
           <DialogDescription>
@@ -83,16 +86,24 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
                 This attachment is still processing. Once it finishes uploading you can view or download it here.
               </div>
             ) : resolvedUrl && !imageError ? (
-              <img
-                src={resolvedUrl}
-                alt={filename}
-                className="max-h-[420px] w-full rounded-lg border bg-black/5 object-contain"
-                onError={() => setImageError(true)}
-              />
+              isPdf ? (
+                <iframe
+                  src={resolvedUrl}
+                  className="h-[600px] w-full rounded-lg border bg-white"
+                  title={filename}
+                />
+              ) : (
+                <img
+                  src={resolvedUrl}
+                  alt={filename}
+                  className="max-h-[600px] w-full rounded-lg border bg-black/5 object-contain"
+                  onError={() => setImageError(true)}
+                />
+              )
             ) : (
               <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                 {imageError
-                  ? "Unable to load the stored image. Try downloading it instead."
+                  ? "Unable to load the stored file. Try downloading it instead."
                   : "No preview available."}
               </div>
             )}
@@ -100,7 +111,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
               {resolvedUrl ? (
                 <Button asChild size="sm">
                   <a href={resolvedUrl} target="_blank" rel="noreferrer" download>
-                    Download image
+                    Download file
                   </a>
                 </Button>
               ) : null}

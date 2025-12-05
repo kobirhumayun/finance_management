@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
 import { cn, formatFileSize, resolveAssetUrl } from "@/lib/utils";
-import { IMAGE_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateImageAttachment } from "@/lib/attachments";
+import { TRANSACTION_ATTACHMENT_TYPES, resolveMaxAttachmentBytes, validateFileAttachment } from "@/lib/attachments";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -67,12 +67,18 @@ export default function AddTransactionDialog({
     [maxAttachmentBytes]
   );
   const validateAttachment = useCallback(
-    (file) =>
-      validateImageAttachment(
+    (file) => {
+      const error = validateFileAttachment(
         file,
+        TRANSACTION_ATTACHMENT_TYPES,
         resolvedMaxAttachmentBytes,
         (size) => formatFileSize(size)
-      ),
+      );
+      if (error === "Unsupported file format.") {
+        return "Unsupported format. Upload a PNG, JPG, WebP image, or PDF document.";
+      }
+      return error;
+    },
     [resolvedMaxAttachmentBytes]
   );
   const form = useForm({
@@ -113,12 +119,12 @@ export default function AddTransactionDialog({
       form.reset(
         initialData
           ? {
-              date: initialData.date || "",
-              type: (initialData.type || "Income").toLowerCase(),
-              amount: Number(initialData.amount) || 0,
-              subcategory: initialData.subcategory || "",
-              description: initialData.description || "",
-            }
+            date: initialData.date || "",
+            type: (initialData.type || "Income").toLowerCase(),
+            amount: Number(initialData.amount) || 0,
+            subcategory: initialData.subcategory || "",
+            description: initialData.description || "",
+          }
           : { date: "", type: "income", amount: 0, subcategory: "", description: "" }
       );
       resetAttachmentState();
@@ -137,7 +143,11 @@ export default function AddTransactionDialog({
       return;
     }
     setAttachmentFile(file);
-    replaceAttachmentPreview(URL.createObjectURL(file));
+    if (file.type === "application/pdf") {
+      replaceAttachmentPreview(null); // No preview for PDF upload yet
+    } else {
+      replaceAttachmentPreview(URL.createObjectURL(file));
+    }
     setAttachmentError(null);
     setRemoveExistingAttachment(false);
   };
@@ -183,6 +193,14 @@ export default function AddTransactionDialog({
       setIsSaving(false);
     }
   };
+
+  const isPdf = (file, existing) => {
+    if (file) return file.type === "application/pdf";
+    if (existing) return existing.filename?.endsWith(".pdf") || existing.mimeType === "application/pdf";
+    return false;
+  };
+
+  const showPdfPlaceholder = isPdf(attachmentFile, existingAttachment) && !removeExistingAttachment;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -256,7 +274,7 @@ export default function AddTransactionDialog({
             <input
               ref={fileInputRef}
               type="file"
-              accept={IMAGE_ATTACHMENT_TYPES.join(",")}
+              accept={TRANSACTION_ATTACHMENT_TYPES.join(",")}
               className="hidden"
               onChange={handleAttachmentChange}
               disabled={isSaving || !attachmentsFeatureEnabled}
@@ -271,7 +289,7 @@ export default function AddTransactionDialog({
                 aria-disabled={!attachmentsFeatureEnabled}
                 disabled={isSaving || !attachmentsFeatureEnabled}
               >
-                {attachmentFile ? "Change image" : "Upload image"}
+                {attachmentFile ? "Change file" : "Upload file"}
               </Button>
               {attachmentFile ? (
                 <Button
@@ -296,7 +314,7 @@ export default function AddTransactionDialog({
                   aria-disabled={!attachmentsFeatureEnabled}
                   disabled={isSaving || !attachmentsFeatureEnabled}
                 >
-                  Remove stored image
+                  Remove stored file
                 </Button>
               ) : null}
             </div>
@@ -304,26 +322,35 @@ export default function AddTransactionDialog({
               {attachmentFile
                 ? `${attachmentFile.name} (${formatFileSize(attachmentFile.size, { fallback: "unknown size" })})`
                 : existingAttachment && !removeExistingAttachment
-                ? `Currently stored: ${existingAttachment.filename || "Attachment"} (${formatFileSize(existingAttachment.size, {
+                  ? `Currently stored: ${existingAttachment.filename || "Attachment"} (${formatFileSize(existingAttachment.size, {
                     fallback: "unknown size",
                   })})`
-                : `PNG, JPG, or WebP up to ${formatFileSize(resolvedMaxAttachmentBytes)}.`}
+                  : `PNG, JPG, WebP, or PDF up to ${formatFileSize(resolvedMaxAttachmentBytes)}.`}
             </p>
             {removeExistingAttachment && !attachmentFile ? (
               <p className="text-xs text-muted-foreground">The current attachment will be removed when you save.</p>
             ) : null}
             {attachmentError ? <p className="text-sm text-destructive">{attachmentError}</p> : null}
-            {(attachmentPreview || (existingAttachmentUrl && !attachmentFile && !removeExistingAttachment)) && (
+            {(attachmentPreview || showPdfPlaceholder || (existingAttachmentUrl && !attachmentFile && !removeExistingAttachment)) && (
               <div className="overflow-hidden rounded-lg border bg-muted/20">
-                {attachmentPreview ? (
+                {showPdfPlaceholder ? (
+                  <div className="flex h-48 items-center justify-center bg-gray-50 text-gray-400">
+                    <div className="text-center">
+                      <span className="block text-2xl font-bold">PDF</span>
+                      <span className="text-xs">
+                        {attachmentFile?.name || existingAttachment?.filename}
+                      </span>
+                    </div>
+                  </div>
+                ) : attachmentPreview ? (
                   <img src={attachmentPreview} alt="Selected transaction attachment" className="max-h-48 w-full object-contain" />
-                ) : (
+                ) : !isPdf(null, existingAttachment) ? (
                   <img
                     src={existingAttachmentUrl}
                     alt={existingAttachment?.filename || "Stored attachment"}
                     className="max-h-48 w-full object-contain"
                   />
-                )}
+                ) : null}
               </div>
             )}
           </div>
