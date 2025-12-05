@@ -19,6 +19,7 @@ import { addTicketComment, fetchTicketDetail, updateTicketStatus } from "@/lib/q
 import { formatDate } from "@/lib/formatters";
 import { formatFileSize, resolveAssetUrl } from "@/lib/utils";
 import { resolveMaxAttachmentBytes } from "@/lib/attachments";
+import SupportAttachmentDialog from "@/components/features/support/support-attachment-dialog";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open" },
@@ -48,6 +49,7 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   const ticketId = useMemo(() => (Array.isArray(params?.ticketId) ? params.ticketId[0] : params?.ticketId), [params]);
 
   const [comment, setComment] = useState("");
+  const [viewingAttachment, setViewingAttachment] = useState(null);
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState(null);
   const fileInputRef = useRef(null);
@@ -129,9 +131,8 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
   }, [ticket?.attachments]);
 
   const handleViewAttachment = (attachment) => {
-    const url = attachment?.resolvedUrl || attachment?.url;
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (!attachment) return;
+    setViewingAttachment(attachment);
   };
 
   const handleDownloadAttachment = (attachment) => {
@@ -458,6 +459,12 @@ export default function TicketDetailPage({ backHref = "/support/tickets" }) {
           </div>
         </div>
       ) : null}
+
+      <SupportAttachmentDialog
+        open={Boolean(viewingAttachment)}
+        onOpenChange={(open) => !open && setViewingAttachment(null)}
+        attachment={viewingAttachment}
+      />
     </div>
   );
 }
