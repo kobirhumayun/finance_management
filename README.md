@@ -250,16 +250,22 @@ The backup container is a "one-off" task. It dumps the DB, pushes changes to Res
 Run this command anytime to trigger an immediate backup:
 
 ```bash
-docker compose run --rm finance-management-backup
+docker compose run --rm finance-management-backup /backup.sh
 ```
 
-### Automated Backup (Ubuntu VPS)
-Set up a cron job to run nightly (e.g., at 3 AM).
-1. Run `crontab -e`
-2. Add the following line:
+### Automated Backup (Cron Daemon)
+The `finance-management-backup` container now runs as a daemon with a built-in cron scheduler.
+By default, it runs the backup job daily at **03:00 AM**.
+
+To change the schedule, add the `BACKUP_CRON_SCHEDULE` variable to your `.env` file:
 
 ```bash
-0 3 * * * cd /path/to/finance_management && docker compose run --rm finance-management-backup >> /var/log/backup.log 2>&1
+BACKUP_CRON_SCHEDULE="0 4 * * *" # Run at 4 AM
+```
+
+Then restart the backup container:
+```bash
+docker compose up -d finance-management-backup
 ```
 
 ---
