@@ -33,8 +33,12 @@ const streamStoredFile = async ({ descriptor, res, fallbackFilename = 'file', di
     const absolutePath = resolveDescriptorPath(descriptor);
     await fsp.access(absolutePath, fs.constants.R_OK);
     const stats = await fsp.stat(absolutePath);
-    const mimeType = descriptor?.mimeType || 'application/octet-stream';
+    let mimeType = descriptor?.mimeType || 'application/octet-stream';
     const filename = sanitizeFilename(descriptor?.filename, fallbackFilename);
+
+    if (filename.toLowerCase().endsWith('.pdf')) {
+        mimeType = 'application/pdf';
+    }
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Length', stats.size);

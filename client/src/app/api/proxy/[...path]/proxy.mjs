@@ -41,6 +41,8 @@ const PASS_RES_HEADERS = new Set([
   "last-modified",
   "location",
   "set-cookie",
+  "content-security-policy",
+  "x-frame-options",
 ]);
 
 function buildBackendUrl(req, pathSegments) {
