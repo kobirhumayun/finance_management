@@ -91,7 +91,7 @@ export default function TransactionAttachmentDialog({ open, onOpenChange, transa
                   src={resolvedUrl}
                   className="h-[600px] w-full rounded-lg border bg-white"
                   title={filename}
-                  sandbox="allow-scripts"
+                  sandbox="allow-same-origin allow-scripts allow-popups"
                 />
               ) : (
                 <img
