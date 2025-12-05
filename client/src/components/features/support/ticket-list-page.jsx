@@ -39,7 +39,7 @@ function TicketListItem({ ticket, ticketLinkPrefix }) {
       className="block rounded-lg border bg-card p-4 transition hover:border-primary/60 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-base font-semibold leading-tight text-foreground line-clamp-1">{ticket.subject}</p>
             <div className="self-start sm:self-auto">
