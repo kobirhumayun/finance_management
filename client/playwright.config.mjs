@@ -26,4 +26,5 @@ export default defineConfig({
     },
   ],
   globalSetup: "./tests/e2e/global-setup.mjs",
+  globalTeardown: "./tests/e2e/global-teardown.mjs",
 });
