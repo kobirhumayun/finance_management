@@ -62,8 +62,10 @@ Next.js runs on `http://localhost:3000` by default. The development server proxi
 
 ## 4. Database fixtures
 
-- Seed scripts live in [`server/scripts/`](../server/scripts). Run `npm run seed` from the `server/` directory to populate reference data.
+- Seed scripts live in [`server/scripts/`](../server/scripts). Run `npm run seed:e2e` from the `server/` directory with `ALLOW_E2E_SEED=true` set in the environment to reset MongoDB to the deterministic Playwright fixtures and clear BullMQ queues.
 - Integration tests use an in-memory Mongo server configured in [`server/jest.setup.js`](../server/jest.setup.js). Keep this setup in mind when adding new collections so that tests initialize the fixtures they need.
+- End-to-end runs call the seeding script automatically via Playwright global setup/teardown; keep tests isolated from one another so they can run in parallel without assuming state from a previous file.
+- When iterating locally, you can snapshot the seeded Mongo database with `mongodump` and restore it between runs to avoid repeatedly re-applying fixtures; keep the canonical fixture definitions in `server/scripts/fixtures` up to date so snapshots stay reproducible.
 
 ## 5. Coding conventions
 
@@ -84,9 +86,12 @@ Next.js runs on `http://localhost:3000` by default. The development server proxi
 
 ### End-to-end (Playwright)
 
-1. Start the full stack so the Next.js app is reachable: `docker compose up`.
-2. Seed the API with predictable fixtures from the backend workspace: `cd server && npm run seed`.
+1. Start the full stack with the `e2e` profile so MongoDB and Redis come up alongside the web/API containers and the web app binds to `localhost:3000`: `docker compose --profile e2e up -d`.
+2. Seed the API with predictable fixtures from the backend workspace: `cd server && ALLOW_E2E_SEED=true npm run seed:e2e` (Playwright runs this automatically during global setup/teardown).
 3. Run the browser tests from `client/`: `npm run test:e2e` (use `npm run test:e2e:headed` to observe the flows interactively).
+4. When finished, tear the stack down and reset data/temporary uploads for a clean slate: `docker compose --profile e2e down -v`.
+
+The root `.env`, `client/.env.local`, and `server/.env` files include non-production defaults (local domains, test credentials, and a stubbed SMTP target on `localhost:1025`) to keep E2E runs deterministic. The Compose stack mounts named volumes for MongoDB, Redis, and uploaded files; using `down -v` removes them between runs.
 
 Playwright is configured via [`client/playwright.config.mjs`](../client/playwright.config.mjs) with a default base URL of `http://localhost:3000`, headless runs, trace/video capture on failure, and a persisted storage state under `client/tests/e2e/.auth/user.json` for authenticated sessions.
 
