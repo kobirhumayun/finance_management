@@ -6,7 +6,8 @@
     "test": "node --test",
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "pdf-worker": "node workers/pdfWorker.js"
+    "pdf-worker": "node workers/pdfWorker.js",
+    "seed:e2e": "node scripts/seed-e2e.js"
   },
   "keywords": [],
   "author": "",
