@@ -82,6 +82,14 @@ Next.js runs on `http://localhost:3000` by default. The development server proxi
 | Lint | `npm run lint` (from `client/` or `server/`) | Ensures ESLint rules pass in the relevant workspace. |
 | Type checks | `npm run typecheck` (from `client/`) | Validates the Next.js TypeScript types. |
 
+### End-to-end (Playwright)
+
+1. Start the full stack so the Next.js app is reachable: `docker compose up`.
+2. Seed the API with predictable fixtures from the backend workspace: `cd server && npm run seed`.
+3. Run the browser tests from `client/`: `npm run test:e2e` (use `npm run test:e2e:headed` to observe the flows interactively).
+
+Playwright is configured via [`client/playwright.config.mjs`](../client/playwright.config.mjs) with a default base URL of `http://localhost:3000`, headless runs, trace/video capture on failure, and a persisted storage state under `client/tests/e2e/.auth/user.json` for authenticated sessions.
+
 Automate these commands in CI by invoking the workspace scripts explicitly: `npm run --prefix server test`, `npm run --prefix client test`, etc.
 
 ## 7. Git workflow tips
