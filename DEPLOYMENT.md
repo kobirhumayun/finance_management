@@ -128,3 +128,23 @@ The default Compose file now includes a `finance-management-pdf` worker that kee
 | Subscription job runs multiple times | Ensure `SUBSCRIPTION_JOB_LOCK_TTL_MS` exceeds the longest job duration and that each runner uses a unique `JOB_INSTANCE_ID`. |
 
 With the environment configured and the services monitored, the application is ready for production traffic.
+
+## 7. Database Management
+
+### Manual Database Access
+To access the running MongoDB instance and perform manual updates (e.g., changing a user's role), use the following commands.
+
+1. **Access the MongoDB Shell:**
+   Replace `MONGO_USERNAME` and `MONGO_PASSWORD` with the values from your `.env` file.
+
+   ```bash
+   docker compose exec finance-management-db mongosh --username "MONGO_USERNAME" --password "MONGO_PASSWORD" --authenticationDatabase admin
+   ```
+
+2. **Update a User Role:**
+   Once inside the shell, switch to the database and run the update command:
+
+   ```javascript
+   use finance
+   db.users.updateOne({ email: "user@example.com" }, { $set: { role: "admin" } })
+   ```
