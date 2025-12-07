@@ -3,6 +3,7 @@ services:
     build:
       context: ./client
     image: finance-management-web:latest
+    container_name: finance-management-web
     env_file:
       - .env
     environment:
@@ -50,6 +51,7 @@ services:
     build:
       context: ./server
     image: finance-management-api:latest
+    container_name: finance-management-api
     env_file:
       - .env
     environment:
@@ -93,6 +95,7 @@ services:
       context: ./server
       dockerfile: Dockerfile.pdf
     image: finance-management-pdf:latest
+    container_name: finance-management-pdf
     env_file:
       - .env
     environment:
@@ -126,6 +129,7 @@ services:
     image: mongo:8.0
     profiles:
       - localdb
+    container_name: finance-management-db
     env_file:
       - .env
     environment:
@@ -156,6 +160,7 @@ services:
 
   finance-management-redis:
     image: redis:7.4-alpine
+    container_name: finance-management-redis
     restart: unless-stopped
     deploy:
       resources:
