@@ -129,7 +129,35 @@ The default Compose file now includes a `finance-management-pdf` worker that kee
 
 With the environment configured and the services monitored, the application is ready for production traffic.
 
-## 7. Database Management
+## 7. HTTPS Configuration (Let's Encrypt)
+To enable HTTPS protection for your domain using a free Let's Encrypt certificate, follow these steps on your production server:
+
+1.  **Ensure DNS Resolution**:
+    Make sure your domain (e.g., `finance.example.com`) points to your server's public IP address.
+
+2.  **Initialize SSL Certificates**:
+    Run the provided helper script. Replace `your@email.com` with your actual email address for certificate renewal notifications.
+
+    ```bash
+    chmod +x scripts/init-ssl.sh
+    ./scripts/init-ssl.sh --email your@email.com
+    ```
+    This script will:
+    - Download recommended Nginx SSL configuration parameters.
+    - Request a certificate from Let's Encrypt via Certbot.
+
+3.  **Enable HTTPS in Nginx**:
+    Once the certificate is successfully obtained, edit `nginx/conf.d/finance.conf`:
+    - Uncomment the HTTP-to-HTTPS redirect block.
+    - Uncomment the SSL `server` block listening on port 443.
+    - Restart the Nginx service:
+      ```bash
+      docker compose restart finance-management-web
+      # Or if using the dedicated nginx composition:
+      docker compose -f compose.nginx.yml restart nginx
+      ```
+
+## 8. Database Management
 
 ### Manual Database Access
 To access the running MongoDB instance and perform manual updates (e.g., changing a user's role), use the following commands.

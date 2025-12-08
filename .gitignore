@@ -45,3 +45,8 @@ serverless/
 
 # Docker and compose overrides
 docker-compose.override.yml
+
+# SSL Certificates and challenges
+letsencrypt/
+www/
+
