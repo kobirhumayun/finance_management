@@ -157,6 +157,29 @@ To enable HTTPS protection for your domain using a free Let's Encrypt certificat
       docker compose -f compose.nginx.yml restart nginx
       ```
 
+### Adding New Subdomains
+If you need to secure additional subdomains (e.g., `api.example.com`) later:
+
+1.  **Update Script**:
+    Add the new domain to `scripts/init-ssl.sh`:
+    ```bash
+    domains=(finance.example.com example.com api.example.com)
+    ```
+
+2.  **Update Nginx**:
+    Add the new domain to `server_name` in `nginx/conf.d/finance.conf` (in **both** HTTP and HTTPS blocks):
+    ```nginx
+    server_name finance.example.com example.com api.example.com;
+    ```
+
+3.  **Apply Changes**:
+    Reload Nginx to recognize the new name, then run the script again to expand the certificate:
+    ```bash
+    docker exec edge-nginx nginx -s reload
+    ./scripts/init-ssl.sh --email your@email.com
+    ```
+
+
 ## 8. Database Management
 
 ### Manual Database Access
