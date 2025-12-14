@@ -167,6 +167,10 @@ To enable HTTPS protection for your domain using a free Let's Encrypt certificat
         ```bash
         docker compose -f compose.nginx.yml exec certbot certbot renew --dry-run
         ```
+    -   **One-off Check:** To check the expiration dates of all certificates:
+        ```bash
+        docker compose -f compose.nginx.yml exec certbot certbot certificates
+        ```
 
 ### Adding New Subdomains
 If you need to secure additional subdomains (e.g., `api.example.com`) later:
