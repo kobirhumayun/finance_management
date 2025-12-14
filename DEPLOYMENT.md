@@ -157,6 +157,21 @@ To enable HTTPS protection for your domain using a free Let's Encrypt certificat
       docker compose -f compose.nginx.yml restart nginx
       ```
 
+4.  **Automatic Renewal**:
+    The stack includes a `certbot` sidecar container that manages certificate lifecycle.
+    -   **Mechanism:** Checks validity every 12 hours.
+    -   **Renewal Threshold:** Renewals trigger 30 days prior to expiration.
+    -   **Post-Renewal Hook:** Executes `docker exec edge-nginx nginx -s reload` to refresh the web server.
+    -   **Prerequisite:** The sidecar relies on the configuration generated in Step 2. It will not provision new certificates, only renew existing ones.
+    -   **Verification:** Run the following command to simulate a renewal and ensure hooks trigger correctly:
+        ```bash
+        docker compose -f compose.nginx.yml exec certbot certbot renew --dry-run
+        ```
+    -   **One-off Check:** To check the expiration dates of all certificates:
+        ```bash
+        docker compose -f compose.nginx.yml exec certbot certbot certificates
+        ```
+
 ### Adding New Subdomains
 If you need to secure additional subdomains (e.g., `api.example.com`) later:
 

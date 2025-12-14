@@ -14,10 +14,24 @@ services:
     networks:
       - edge_net
     healthcheck:
-      test: ["CMD", "nginx", "-t"]
+      test: [ "CMD", "nginx", "-t" ]
       interval: 30s
       timeout: 5s
       retries: 3
+
+  certbot:
+    build:
+      context: ./nginx/certbot
+    container_name: finance-management-certbot
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt
+      - ./www:/var/www/html
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      - edge_net
+    depends_on:
+      - nginx
 
 networks:
   edge_net:
