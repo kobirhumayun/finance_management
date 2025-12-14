@@ -79,7 +79,11 @@ export async function middleware(request) {
   let token = null;
   let tokenError = null;
   try {
-    token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NEXTAUTH_URL?.startsWith("https://")
+    });
   } catch (error) {
     tokenError = error;
     console.error("[middleware] getToken failed", error);

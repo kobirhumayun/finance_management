@@ -43,8 +43,11 @@ app.use(
             "Pragma",
         ],
         credentials: true,
+
     })
 );
+// Enable trust proxy to correctly handle X-Forwarded-* headers from Nginx
+app.enable('trust proxy');
 app.use(express.json());
 app.use(cookieParser());
 app.use(morgan('dev'));
