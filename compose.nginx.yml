@@ -7,6 +7,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/landing:/etc/nginx/landing:ro
       - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
       - ./letsencrypt:/etc/letsencrypt
       - ./www:/var/www/html
