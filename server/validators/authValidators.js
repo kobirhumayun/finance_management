@@ -1,4 +1,4 @@
-﻿const { oneOf } = require('express-validator');
+﻿const { oneOf, body } = require('express-validator');
 const {
     isNotEmptyString,
     isEmailField,
@@ -26,7 +26,12 @@ const loginValidationRules = () => {
                 .isLength({ min: 3, max: 30 }) // Length check specific for username
                 .withMessage('Username identifier must be between 3 and 30 characters.'),
         ], { message: 'Identifier must be a valid email or an alphanumeric username (3-30 characters).' }),
-        isNotEmptyString('password'), // For login, a simple non-empty check is usually sufficient
+        // isNotEmptyString('password'), // REMOVED: isNotEmptyString escapes characters, breaking passwords with '&'
+        // Use a simple check instead to allow special characters like '&'
+        body('password')
+            .isString().withMessage('Password must be a string.')
+            .trim()
+            .notEmpty().withMessage('Password cannot be empty.'),
     ];
 };
 
