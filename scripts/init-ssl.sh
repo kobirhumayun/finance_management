@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-domains=(finance.example.com example.com)
+domains=(example.com finance.example.com)
 
 
 rsa_key_size=4096
