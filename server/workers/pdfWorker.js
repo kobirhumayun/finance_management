@@ -33,9 +33,9 @@ const pdfWorker = new Worker(
 
         await initializePlaywright();
         const pdfBuffer = await withPage(async ({ page }) => {
-            await page.setContent(html, { waitUntil: 'networkidle' });
+            await page.setContent(html, { waitUntil: 'load' });
             return page.pdf({ format: 'A4', printBackground: true });
-        });
+        }, { javaScriptEnabled: false });
 
         return pdfBuffer.toString('base64');
     },
