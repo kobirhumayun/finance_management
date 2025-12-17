@@ -43,9 +43,9 @@ const shutdownPlaywright = async () => {
     }
 };
 
-const withPage = async (handler) => {
+const withPage = async (handler, contextOptions = {}) => {
     const browser = await initializePlaywright();
-    const context = await browser.newContext();
+    const context = await browser.newContext(contextOptions);
     const page = await context.newPage();
 
     try {
