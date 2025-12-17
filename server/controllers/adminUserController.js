@@ -6,6 +6,8 @@ const Token = require('../models/Token');
 const { generateOtp } = require('../utils/otpUtils');
 const { sendNotification } = require('../services/notificationService');
 
+const { escapeRegex } = require('../utils/regexUtils');
+
 const ACCOUNT_STATUS_CODES = ['active', 'invited', 'suspended', 'disabled'];
 const SUBSCRIPTION_STATUS_CODES =
     (User.schema.path('subscriptionStatus') && User.schema.path('subscriptionStatus').enumValues) || [];
@@ -189,7 +191,7 @@ const listUsers = async (req, res) => {
         const filters = [];
 
         if (search) {
-            const regex = new RegExp(search, 'i');
+            const regex = new RegExp(escapeRegex(search), 'i');
             filters.push({
                 $or: [
                     { username: regex },

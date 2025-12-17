@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { formatUserName, getUserNameById, notifyTicketParticipants } = require('../services/ticketNotificationService');
 const { getUploadFileSizeLimit, saveTicketAttachment, discardDescriptor } = require('../services/imageService');
 const { streamStoredFile } = require('../utils/storageStreamer');
+const { escapeRegex } = require('../utils/regexUtils');
 
 const isAdmin = (user) => user?.role === 'admin';
 const isSupport = (user) => user?.role === 'support';
@@ -326,7 +327,7 @@ const listTickets = async (req, res, next) => {
             [tickets, total] = await executeQuery();
         } catch (error) {
             if (usingTextSearch) {
-                const regex = new RegExp(searchTerm, 'i');
+                const regex = new RegExp(escapeRegex(searchTerm), 'i');
                 const legacyFilters = { ...baseFilters, $or: [{ subject: regex }, { description: regex }] };
                 const legacyProjection = { ...projection };
                 delete legacyProjection.score;
