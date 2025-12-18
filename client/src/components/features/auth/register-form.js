@@ -18,7 +18,7 @@ const schema = z
   .object({
     username: z.string().min(3, "Username must be at least 3 characters"),
     email: z.string().email("Enter a valid email"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
   })
   .refine((values) => values.password === values.confirmPassword, {
@@ -47,7 +47,20 @@ export default function RegisterForm() {
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        toast.error(body?.message || "Unable to complete registration");
+
+        if (body.errors && Array.isArray(body.errors)) {
+          body.errors.forEach((err) => {
+            // express-validator v7 uses 'path', v6 uses 'param'. Checking 'path' first.
+            const field = err.path || err.param;
+            if (field && ["username", "email", "password", "confirmPassword"].includes(field)) {
+              form.setError(field, { type: "server", message: err.msg });
+            } else {
+              toast.error(err.msg || "Validation error");
+            }
+          });
+        } else {
+          toast.error(body?.message || "Unable to complete registration");
+        }
         return;
       }
 
