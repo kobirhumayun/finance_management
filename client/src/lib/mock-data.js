@@ -142,7 +142,7 @@ const adminPlans = plans.map((plan, index) => ({
 }));
 
 const adminPayments = [
-  { id: "pay-01", user: "kobirhumayun", amount: 99, method: "Mobile Banking", status: "Pending", submittedAt: "12-01-2025" },
+  { id: "pay-01", user: "exampleusername", amount: 99, method: "Mobile Banking", status: "Pending", submittedAt: "12-01-2025" },
   { id: "pay-02", user: "finops", amount: 249, method: "Wire", status: "Pending", submittedAt: "10-01-2025" },
   { id: "pay-03", user: "strategist", amount: 29, method: "Card", status: "Approved", submittedAt: "07-01-2025" },
 ];

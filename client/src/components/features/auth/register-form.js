@@ -84,14 +84,14 @@ export default function RegisterForm() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <Input id="username" placeholder="kobirhumayun" disabled={isSubmitting} {...form.register("username")} />
+            <Input id="username" placeholder="Enter your username" disabled={isSubmitting} {...form.register("username")} />
             {form.formState.errors.username && (
               <p className="text-sm text-destructive">{form.formState.errors.username.message}</p>
             )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="name@example.com" disabled={isSubmitting} {...form.register("email")} />
+            <Input id="email" type="email" placeholder="Enter your email" disabled={isSubmitting} {...form.register("email")} />
             {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
           </div>
           <div className="space-y-2">

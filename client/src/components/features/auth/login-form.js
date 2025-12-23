@@ -66,7 +66,7 @@ export default function LoginForm() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="identifier">Username or Email</Label>
-            <Input id="identifier" placeholder="kobirhumayun" disabled={isSubmitting} {...form.register("identifier")} />
+            <Input id="identifier" placeholder="Enter your username / email" disabled={isSubmitting} {...form.register("identifier")} />
             {form.formState.errors.identifier && (
               <p className="text-sm text-destructive">{form.formState.errors.identifier.message}</p>
             )}
