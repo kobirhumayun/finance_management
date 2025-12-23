@@ -84,7 +84,7 @@ export default function RegisterForm() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <Input id="username" placeholder="kobirhumayun" disabled={isSubmitting} {...form.register("username")} />
+            <Input id="username" placeholder="Enter your username" disabled={isSubmitting} {...form.register("username")} />
             {form.formState.errors.username && (
               <p className="text-sm text-destructive">{form.formState.errors.username.message}</p>
             )}
