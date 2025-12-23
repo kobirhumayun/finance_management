@@ -66,7 +66,7 @@ orderSchema.pre('save', async function (next) {
             const counter = await Counter.findByIdAndUpdate(
                 { _id: 'orderID' },
                 { $inc: { sequence_value: 1 } },
-                { new: true, upsert: true }
+                { new: true, upsert: true, session: this.$session() }
             );
             this.orderID = counter.sequence_value.toString().padStart(6, '0');
             next();
