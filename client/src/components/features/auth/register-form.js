@@ -91,7 +91,7 @@ export default function RegisterForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="name@example.com" disabled={isSubmitting} {...form.register("email")} />
+            <Input id="email" type="email" placeholder="Enter your email" disabled={isSubmitting} {...form.register("email")} />
             {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
           </div>
           <div className="space-y-2">
